@@ -9,26 +9,36 @@ struct AccountTypeSelectionView: View {
     let onSelect: (AccountType) -> Void
     @State private var buttonTapped = 0
     
+    @Environment(\.colorScheme) var colorScheme
+    
+    private var lightGradient: (Color, Color, Color) {
+        (Color.blue, Color.cyan, Color.purple)
+    }
+    
+    private var darkGradient: (Color, Color, Color) {
+        (Color(red: 0.3, green: 0, blue: 0.6), Color(red: 0.5, green: 0, blue: 0.8), Color(red: 0.2, green: 0, blue: 0.4))
+    }
+    
     var body: some View {
         ZStack {
             // Gradient background
             ZStack {
                 RadialGradient(
-                    colors: [Color.blue, .clear],
+                    colors: [colorScheme == .dark ? darkGradient.0 : lightGradient.0, .clear],
                     center: .bottom,
                     startRadius: 300,
                     endRadius: 500
                 )
                 
                 RadialGradient(
-                    colors: [Color.cyan, .clear],
+                    colors: [colorScheme == .dark ? darkGradient.1 : lightGradient.1, .clear],
                     center: .bottom,
                     startRadius: 200,
                     endRadius: 450
                 )
                 
                 RadialGradient(
-                    colors: [Color.purple, .clear],
+                    colors: [colorScheme == .dark ? darkGradient.2 : lightGradient.2, .clear],
                     center: .init(x: 0.5, y: 1.2),
                     startRadius: 80,
                     endRadius: 350
@@ -48,12 +58,12 @@ struct AccountTypeSelectionView: View {
                     
                     Text("Welcome to\nTraverse")
                         .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(.black.opacity(0.8))
+                        .foregroundStyle(.white.opacity(0.8))
                         .foregroundStyle(.ultraThinMaterial)
                         .multilineTextAlignment(.center)
                     
                     Text("The Complete Learning Ecosystem")
-                        .foregroundColor(.black.opacity(0.4))
+                        .foregroundColor(.white.opacity(0.6))
                         .foregroundStyle(.ultraThinMaterial)
                         .multilineTextAlignment(.center)
                 }
@@ -95,7 +105,7 @@ struct AccountTypeSelectionView: View {
                 .padding(.bottom, 60)
             }
         }
-        .background(.white)
+        .background(Color(.systemBackground))
         .ignoresSafeArea(.container)
     }
 }

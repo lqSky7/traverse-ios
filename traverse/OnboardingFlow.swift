@@ -27,6 +27,24 @@ struct OnboardingFlow: View {
         Color(red: 0.004, green: 0.678, blue: 1, opacity: 1)
     )
     
+    @Environment(\.colorScheme) var colorScheme
+    
+    private var lightGradient: (Color, Color, Color) {
+        (
+            Color(red: 0.004, green: 0.373, blue: 1, opacity: 1),
+            Color(red: 0, green: 0.875, blue: 1, opacity: 1),
+            Color(red: 0.004, green: 0.678, blue: 1, opacity: 1)
+        )
+    }
+    
+    private var darkGradient: (Color, Color, Color) {
+        (
+            Color(red: 0.3, green: 0, blue: 0.6, opacity: 1),
+            Color(red: 0.5, green: 0, blue: 0.8, opacity: 1),
+            Color(red: 0.2, green: 0, blue: 0.4, opacity: 1)
+        )
+    }
+    
     var body: some View {
         ZStack {
             if showGradient {
@@ -72,8 +90,8 @@ struct OnboardingFlow: View {
                             withAnimation(.smooth(duration: 0.7)) {
                                 phase = 1
                                 
-                                if let formStartGradient = form.first?.gradient {
-                                    gradient = formStartGradient
+                                if let formStartGradient = form.first?.lightGradient {
+                                    gradient = colorScheme == .dark ? form.first!.darkGradient : formStartGradient
                                 }
                                 
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -109,9 +127,10 @@ struct OnboardingFlow: View {
                 }
             }
         }
-        .background(.white)
+        .background(Color(.systemBackground))
         .ignoresSafeArea(.container)
         .onAppear {
+            gradient = colorScheme == .dark ? darkGradient : lightGradient
             if let startGradient {
                 gradient = startGradient
             }

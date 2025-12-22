@@ -39,7 +39,7 @@ struct TextCarousel: View {
                         }
                     
                         Text(item.text)
-                            .foregroundStyle(isHighlighted ? .black : .black.opacity(0.2))
+                            .foregroundStyle(Color.primary.opacity(isHighlighted ? 1 : 0.2))
                             .font(.system(size: 40, weight: .medium))
                     }
                     .drawingGroup()

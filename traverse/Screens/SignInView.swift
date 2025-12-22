@@ -29,7 +29,8 @@ struct SignInView: View {
                     title: "Username",
                     description: "Enter your username to sign in.",
                     type: .inputField(placeholder: "Enter username", keyboardType: .default),
-                    gradient: (.purple, .purple, .purple),
+                    lightGradient: (.purple, .purple, .purple),
+                    darkGradient: (.pink, .pink, .pink),
                     onSubmit: { answer in
                         authViewModel.username = answer
                         try await Task.sleep(nanoseconds: 100_000_000)
@@ -40,7 +41,8 @@ struct SignInView: View {
                     title: "Password",
                     description: "Enter your password.",
                     type: .inputField(placeholder: "Enter password", keyboardType: .default),
-                    gradient: (.blue, .blue, .blue),
+                    lightGradient: (.blue, .blue, .blue),
+                    darkGradient: (.indigo, .indigo, .indigo),
                     onSubmit: { answer in
                         authViewModel.password = answer
                         try await Task.sleep(nanoseconds: 100_000_000)

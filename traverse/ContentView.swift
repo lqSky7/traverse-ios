@@ -75,7 +75,8 @@ struct SignUpView: View {
                     title: "Username",
                     description: "Choose a unique username for your account.",
                     type: .inputField(placeholder: "Enter username", keyboardType: .default),
-                    gradient: (.blue, .blue, .blue),
+                    lightGradient: (.blue, .blue, .blue),
+                    darkGradient: (.purple, .purple, .purple),
                     onSubmit: { answer in
                         authViewModel.username = answer
                         try await Task.sleep(nanoseconds: 100_000_000)
@@ -86,7 +87,8 @@ struct SignUpView: View {
                     title: "Email",
                     description: "We'll use this to keep your account secure and send you updates.",
                     type: .inputField(placeholder: "Enter your email", keyboardType: .emailAddress),
-                    gradient: (.cyan, .cyan, .cyan),
+                    lightGradient: (.cyan, .cyan, .cyan),
+                    darkGradient: (.indigo, .indigo, .indigo),
                     onSubmit: { answer in
                         authViewModel.email = answer
                         try await Task.sleep(nanoseconds: 100_000_000)
@@ -97,7 +99,8 @@ struct SignUpView: View {
                     title: "Password",
                     description: "Create a strong password to protect your account.",
                     type: .inputField(placeholder: "Enter password", keyboardType: .default),
-                    gradient: (.purple, .purple, .purple),
+                    lightGradient: (.purple, .purple, .purple),
+                    darkGradient: (.pink, .pink, .pink),
                     onSubmit: { answer in
                         authViewModel.password = answer
                         try await Task.sleep(nanoseconds: 100_000_000)

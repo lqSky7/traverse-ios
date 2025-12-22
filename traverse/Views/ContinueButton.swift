@@ -22,7 +22,7 @@ struct ContinueButton: View {
         }) {
             if state == .loading {
                 ProgressView()
-                    .tint(.white)
+                    .tint(Color(.systemBackground))
             } else {
                 Image(systemName: icon)
             }
@@ -31,10 +31,10 @@ struct ContinueButton: View {
                 .font(.headline)
                 .bold()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(Color(.systemBackground))
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(.black)
+        .background(Color.primary)
         .cornerRadius(.infinity)
         .sensoryFeedback(.impact(weight: .medium), trigger: buttonTapped)
     }

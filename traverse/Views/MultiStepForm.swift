@@ -24,7 +24,8 @@ public struct FormStep: Identifiable {
     let description: String
 
     let type: StepType
-    let gradient: (Color, Color, Color)
+    let lightGradient: (Color, Color, Color)
+    let darkGradient: (Color, Color, Color)
 
     let onSubmit: (String) async throws -> Void
     var state: FieldState = .idle
@@ -43,6 +44,8 @@ struct MultiStepForm: View {
     @Binding var gradient: (Color, Color, Color)
     @FocusState.Binding var keyboardShown: Bool
     let onBack: () -> Void
+    
+    @Environment(\.colorScheme) var colorScheme
 
     private var hasFinishedForm: Bool {
         currentStep >= steps.count
@@ -60,9 +63,10 @@ struct MultiStepForm: View {
                             if currentStep > 0 {
                                 withAnimation(.smooth(duration: 0.5)) {
                                     currentStep -= 1
-                                    gradient = steps[currentStep].gradient
+                                    gradient = colorScheme == .dark ? steps[currentStep].darkGradient : steps[currentStep].lightGradient
                                     steps[currentStep + 1].state = .idle
                                     steps[currentStep + 1].answer = ""
+                                    steps[currentStep].state = .idle
                                 }
                             } else {
                                 onBack()
@@ -70,7 +74,7 @@ struct MultiStepForm: View {
                         }) {
                             Image(systemName: "chevron.left")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(.primary)
                                 .padding(12)
                         }
                         .sensoryFeedback(.impact(weight: .light), trigger: backTapped)
@@ -88,7 +92,7 @@ struct MultiStepForm: View {
                     ForEach(steps, id: \.id) { step in
                         Step(
                             icon: step.icon,
-                            iconColour: step.gradient.0,
+                            gradient: colorScheme == .dark ? step.darkGradient : step.lightGradient,
                             title: step.title,
                             description: step.description,
                             isExpanded: !hasFinishedForm && step.id == steps[currentStep].id
@@ -166,7 +170,7 @@ struct MultiStepForm: View {
                     currentStep += 1
 
                     if !isLastStep {
-                        gradient = steps[currentStep].gradient
+                        gradient = colorScheme == .dark ? steps[currentStep].darkGradient : steps[currentStep].lightGradient
                     }
                 }
             } catch {

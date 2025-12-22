@@ -28,13 +28,13 @@ struct InputField: View {
         HStack {
             Group {
                 if isSecure && label.lowercased().contains("password") {
-                    SecureField(label, text: $value, prompt: Text(label).foregroundStyle(.black.opacity(0.4)))
+                    SecureField(label, text: $value, prompt: Text(label).foregroundStyle(Color.primary.opacity(0.4)))
                 } else {
-                    TextField(label, text: $value, prompt: Text(label).foregroundStyle(.black.opacity(0.4)))
+                    TextField(label, text: $value, prompt: Text(label).foregroundStyle(Color.primary.opacity(0.4)))
                 }
             }
             .font(.system(size: 20, weight: .medium))
-            .foregroundStyle(.black.opacity(state == .success ? 0.4 : 1))
+            .foregroundStyle(Color.primary.opacity(state == .success ? 0.4 : 1))
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .keyboardType(keyboardType)
@@ -50,7 +50,7 @@ struct InputField: View {
                 switch state {
                 case .loading:
                     ProgressView()
-                        .tint(.white)
+                        .tint(Color(.systemBackground))
                 default:
                     Image(systemName: "arrow.right")
                 }
@@ -58,8 +58,8 @@ struct InputField: View {
             .font(.system(size: 24, weight: .bold))
             .padding(.vertical, 8)
             .padding(.horizontal, 16)
-            .foregroundStyle(.white)
-            .background(.black.opacity((isValid && state != .success) ? 1 : 0.2))
+            .foregroundStyle(Color(.systemBackground))
+            .background(Color.primary.opacity((isValid && state != .success) ? 1 : 0.2))
             .clipShape(RoundedRectangle(cornerRadius: .infinity))
             .disabled(!isValid || state == .success || state == .loading)
         }
@@ -68,7 +68,7 @@ struct InputField: View {
         .padding(.vertical, 12)
         .overlay {
             RoundedRectangle(cornerRadius: .infinity)
-                .stroke(.black.opacity(0.1), lineWidth: 1)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
         }
         .onAppear {
             // Automatically detect if this is a password field

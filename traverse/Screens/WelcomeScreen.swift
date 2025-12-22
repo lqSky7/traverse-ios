@@ -19,6 +19,8 @@ struct WelcomeScreen: View {
     @State private var continueTapped = 0
     private let hapticManager = HapticManager()
     
+    @Environment(\.colorScheme) var colorScheme
+    
     var body: some View {
         ZStack {
             // Back button
@@ -30,7 +32,7 @@ struct WelcomeScreen: View {
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.primary)
                             .padding(12)
                     }
                     .sensoryFeedback(.impact(weight: .light), trigger: backTapped)

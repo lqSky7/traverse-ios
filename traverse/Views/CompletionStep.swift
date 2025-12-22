@@ -39,7 +39,7 @@ struct CompletionStep: View {
                     .id("\(isCompleted)-\(isFetchingData)")
                     .font(.system(size: 24))
                     .bold()
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(
                         .asymmetric(
@@ -50,7 +50,7 @@ struct CompletionStep: View {
                 
                 Text(hasError ? errorMessage : isCompleted ? completionDescription : isFetchingData ? (loadingDescription ?? description) : description)
                     .id("\(isCompleted)-\(isFetchingData)")
-                    .foregroundStyle(.black.opacity(0.3))
+                    .foregroundStyle(Color.primary.opacity(0.3))
                     .fontWeight(.medium)
                     .transition(
                         .asymmetric(
