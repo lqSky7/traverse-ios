@@ -43,6 +43,7 @@ struct ContentView: View {
                 .transition(.opacity.combined(with: .offset(y: 20)))
             }
         }
+        .animation(.smooth(duration: 0.8), value: authViewModel.isAuthenticated)
     }
 }
 
@@ -125,7 +126,10 @@ struct SignUpView: View {
                     try await authViewModel.fetchCurrentUser()
                 },
                 onComplete: {
-                    authViewModel.isAuthenticated = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay for smoother transition
+                        authViewModel.isAuthenticated = true
+                    }
                 }
             )
         )

@@ -63,7 +63,10 @@ struct SignInView: View {
                     try await authViewModel.fetchCurrentUser()
                 },
                 onComplete: {
-                    authViewModel.isAuthenticated = true
+                    Task {
+                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay for smoother transition
+                        authViewModel.isAuthenticated = true
+                    }
                 }
             )
         )
