@@ -63,12 +63,12 @@ struct ChangePasswordView: View {
                     } label: {
                         if isLoading {
                             ProgressView()
-                                .tint(.white)
+                                .tint(Color(.systemBackground))
                                 .frame(maxWidth: .infinity)
                         } else {
                             Text("Change Password")
                                 .font(.headline)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color(.systemBackground))
                                 .frame(maxWidth: .infinity)
                         }
                     }

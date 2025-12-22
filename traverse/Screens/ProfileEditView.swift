@@ -47,12 +47,12 @@ struct ProfileEditView: View {
                     } label: {
                         if isLoading {
                             ProgressView()
-                                .tint(.white)
+                                .tint(Color(.systemBackground))
                                 .frame(maxWidth: .infinity)
                         } else {
                             Text("Save Changes")
                                 .font(.headline)
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color(.systemBackground))
                                 .frame(maxWidth: .infinity)
                         }
                     }
