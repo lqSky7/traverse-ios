@@ -539,4 +539,553 @@ class NetworkService {
             throw NetworkError.serverError("Failed to get achievement stats (Status: \(httpResponse.statusCode))")
         }
     }
+    
+    // MARK: - Search Users
+    func searchUsers(query: String, limit: Int = 10) async throws -> UsersSearchResponse {
+        var components = URLComponents(string: "\(baseURL)/users")
+        components?.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "limit", value: "\(limit)")
+        ]
+        
+        guard let url = components?.url else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let searchResponse = try JSONDecoder().decode(UsersSearchResponse.self, from: data)
+                return searchResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to search users (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get User Profile
+    func getUserProfile(username: String) async throws -> UserProfile {
+        guard let url = URL(string: "\(baseURL)/users/\(username)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let profileResponse = try JSONDecoder().decode(UserProfileResponse.self, from: data)
+                return profileResponse.user
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get user profile (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get User Statistics (Public)
+    func getUserStatistics(username: String) async throws -> UserStatisticsResponse {
+        guard let url = URL(string: "\(baseURL)/users/\(username)/stats") else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let statsResponse = try JSONDecoder().decode(UserStatisticsResponse.self, from: data)
+                return statsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get user statistics (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get User's Public Solves
+    func getUserSolves(username: String, limit: Int = 50, offset: Int = 0) async throws -> UserSolvesResponse {
+        var components = URLComponents(string: "\(baseURL)/solves/user/\(username)")
+        components?.queryItems = [
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "offset", value: "\(offset)")
+        ]
+        
+        guard let url = components?.url else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let solvesResponse = try JSONDecoder().decode(UserSolvesResponse.self, from: data)
+                return solvesResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get user solves (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get User's Achievements
+    func getUserAchievements(username: String) async throws -> AchievementsResponse {
+        guard let url = URL(string: "\(baseURL)/achievements/user/\(username)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let achievementsResponse = try JSONDecoder().decode(AchievementsResponse.self, from: data)
+                return achievementsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get user achievements (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Send Friend Request
+    func sendFriendRequest(username: String) async throws -> SendFriendRequestResponse {
+        guard let url = URL(string: "\(baseURL)/friends/request") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        let requestBody = SendFriendRequestBody(username: username)
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 201 {
+            do {
+                let friendRequestResponse = try JSONDecoder().decode(SendFriendRequestResponse.self, from: data)
+                return friendRequestResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to send friend request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Received Friend Requests
+    func getReceivedFriendRequests() async throws -> [FriendRequest] {
+        guard let url = URL(string: "\(baseURL)/friends/requests/received") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let requestsResponse = try JSONDecoder().decode(FriendRequestsResponse.self, from: data)
+                return requestsResponse.requests
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get received requests (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Sent Friend Requests
+    func getSentFriendRequests() async throws -> [FriendRequest] {
+        guard let url = URL(string: "\(baseURL)/friends/requests/sent") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let requestsResponse = try JSONDecoder().decode(FriendRequestsResponse.self, from: data)
+                return requestsResponse.requests
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get sent requests (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Accept Friend Request
+    func acceptFriendRequest(requestId: Int) async throws -> AcceptFriendRequestResponse {
+        guard let url = URL(string: "\(baseURL)/friends/requests/\(requestId)/accept") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let acceptResponse = try JSONDecoder().decode(AcceptFriendRequestResponse.self, from: data)
+                return acceptResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to accept friend request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Reject Friend Request
+    func rejectFriendRequest(requestId: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/friends/requests/\(requestId)/reject") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to reject friend request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Cancel Friend Request
+    func cancelFriendRequest(requestId: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/friends/requests/\(requestId)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to cancel friend request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - List Friends
+    func getFriends() async throws -> [Friend] {
+        guard let url = URL(string: "\(baseURL)/friends") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let friendsResponse = try JSONDecoder().decode(FriendsListResponse.self, from: data)
+                return friendsResponse.friends
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get friends (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Remove Friend
+    func removeFriend(username: String) async throws {
+        guard let url = URL(string: "\(baseURL)/friends/\(username)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to remove friend (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Friend's Solves
+    func getFriendSolves(username: String, limit: Int = 50, offset: Int = 0) async throws -> UserSolvesResponse {
+        var components = URLComponents(string: "\(baseURL)/friends/\(username)/solves")
+        components?.queryItems = [
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "offset", value: "\(offset)")
+        ]
+        
+        guard let url = components?.url else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let solvesResponse = try JSONDecoder().decode(UserSolvesResponse.self, from: data)
+                return solvesResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get friend's solves (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Friend's Statistics
+    func getFriendStatistics(username: String) async throws -> UserStatisticsResponse {
+        guard let url = URL(string: "\(baseURL)/friends/\(username)/stats") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let statsResponse = try JSONDecoder().decode(UserStatisticsResponse.self, from: data)
+                return statsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get friend's statistics (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Friend's Achievements
+    func getFriendAchievements(username: String) async throws -> AchievementsResponse {
+        guard let url = URL(string: "\(baseURL)/friends/\(username)/achievements") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let achievementsResponse = try JSONDecoder().decode(AchievementsResponse.self, from: data)
+                return achievementsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get friend's achievements (Status: \(httpResponse.statusCode))")
+        }
+    }
 }

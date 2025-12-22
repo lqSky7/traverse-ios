@@ -17,7 +17,6 @@ struct WelcomeScreen: View {
     
     @State private var backTapped = 0
     @State private var continueTapped = 0
-    private let hapticManager = HapticManager()
     
     @Environment(\.colorScheme) var colorScheme
     
@@ -71,7 +70,7 @@ struct WelcomeScreen: View {
                 
                 Button(action: {
                     continueTapped += 1
-                    hapticManager.playSoftRisingFeedback()
+                    HapticManager.shared.playSoftRisingFeedback()
                     action()
                 }) {
                     Text("Continue")

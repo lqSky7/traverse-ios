@@ -5,6 +5,7 @@ import Combine
 struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = HomeViewModel()
+    @State private var navigationTitle = "Welcome back,"
     
     var body: some View {
         NavigationStack {
@@ -20,13 +21,6 @@ struct HomeView: View {
                             }
                         })
                     } else {
-                        // Header Section
-                        HeaderSection(user: authViewModel.currentUser) {
-                            Task {
-                                await viewModel.loadData(username: authViewModel.currentUser?.username ?? "")
-                            }
-                        }
-                        
                         // Streak Card
                         if let solveStats = viewModel.solveStats {
                             StreakCard(streak: solveStats.stats.totalStreakDays)
@@ -72,7 +66,12 @@ struct HomeView: View {
                 .padding()
             }
             .background(Color.black)
-            .navigationTitle("Home")
+            .navigationTitle(navigationTitle)
+            .refreshable {
+                if let username = authViewModel.currentUser?.username {
+                    await viewModel.loadData(username: username)
+                }
+            }
         }
         .onAppear {
             if viewModel.solveStats == nil, let username = authViewModel.currentUser?.username {
@@ -80,38 +79,14 @@ struct HomeView: View {
                     await viewModel.loadData(username: username)
                 }
             }
+            // Update navigation title after a brief delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation {
+                    navigationTitle = authViewModel.currentUser?.username ?? "Home"
+                }
+            }
         }
         .preferredColorScheme(.dark)
-    }
-}
-
-// MARK: - Header Section
-struct HeaderSection: View {
-    let user: User?
-    let onRefresh: () -> Void
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Welcome back,")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text(user?.username ?? "User")
-                    .font(.title)
-                    .bold()
-            }
-            Spacer()
-            
-            Button(action: onRefresh) {
-                Image(systemName: "arrow.clockwise")
-                    .font(.title3)
-                    .foregroundStyle(.blue)
-                    .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
-            }
-        }
-        .padding(.horizontal)
     }
 }
 

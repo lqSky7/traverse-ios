@@ -13,23 +13,17 @@ struct MainTabView: View {
                     }
                     .tag(0)
                 
-                ExploreTab()
+                FriendsTab()
                     .tabItem {
-                        Label("Explore", systemImage: "safari.fill")
+                        Label("Friends", systemImage: "person.2.fill")
                     }
                     .tag(1)
-                
-                ActivityTab()
-                    .tabItem {
-                        Label("Activity", systemImage: "chart.line.uptrend.xyaxis")
-                    }
-                    .tag(2)
                 
                 SettingsView()
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
-                    .tag(3)
+                    .tag(2)
             }
             .tabBarMinimizeBehavior(.onScrollDown)
         } else {
@@ -40,23 +34,17 @@ struct MainTabView: View {
                     }
                     .tag(0)
                 
-                ExploreTab()
+                FriendsTab()
                     .tabItem {
-                        Label("Explore", systemImage: "safari.fill")
+                        Label("Friends", systemImage: "person.2.fill")
                     }
                     .tag(1)
-                
-                ActivityTab()
-                    .tabItem {
-                        Label("Activity", systemImage: "chart.line.uptrend.xyaxis")
-                    }
-                    .tag(2)
                 
                 SettingsView()
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
-                    .tag(3)
+                    .tag(2)
             }
         }
     }

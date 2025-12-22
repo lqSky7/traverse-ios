@@ -1,10 +1,13 @@
 import CoreHaptics
 import Combine
+import UIKit
 
 class HapticManager: ObservableObject {
+    static let shared = HapticManager()
+    
     var engine: CHHapticEngine?
     
-    init() {
+    private init() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
         
         do {
@@ -63,5 +66,15 @@ class HapticManager: ObservableObject {
         } catch {
             print("Failed to play haptic: \(error)")
         }
+    }
+    
+    func success() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+    
+    func error() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.error)
     }
 }
