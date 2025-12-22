@@ -18,6 +18,13 @@ class FriendsViewModel: ObservableObject {
     private var hasLoadedRequests = false
     
     func loadFriends(force: Bool = false) async {
+        // Use cached data from DataManager if available and not forcing refresh
+        if !force && DataManager.shared.hasData {
+            friends = DataManager.shared.friends
+            hasLoadedFriends = true
+            return
+        }
+        
         guard !hasLoadedFriends || force else { return }
         
         isLoading = true
@@ -25,6 +32,7 @@ class FriendsViewModel: ObservableObject {
         
         do {
             friends = try await NetworkService.shared.getFriends()
+            DataManager.shared.friends = friends
             hasLoadedFriends = true
         } catch {
             errorMessage = error.localizedDescription
@@ -34,6 +42,14 @@ class FriendsViewModel: ObservableObject {
     }
     
     func loadRequests(force: Bool = false) async {
+        // Use cached data from DataManager if available and not forcing refresh
+        if !force && DataManager.shared.hasData {
+            receivedRequests = DataManager.shared.receivedRequests
+            sentRequests = DataManager.shared.sentRequests
+            hasLoadedRequests = true
+            return
+        }
+        
         guard !hasLoadedRequests || force else { return }
         
         do {
@@ -42,6 +58,10 @@ class FriendsViewModel: ObservableObject {
             
             receivedRequests = try await received
             sentRequests = try await sent
+            
+            DataManager.shared.receivedRequests = receivedRequests
+            DataManager.shared.sentRequests = sentRequests
+            
             hasLoadedRequests = true
         } catch {
             errorMessage = error.localizedDescription

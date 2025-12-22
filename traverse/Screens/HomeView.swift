@@ -6,6 +6,22 @@ struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = HomeViewModel()
     @State private var navigationTitle = "Welcome back,"
+    @State private var titleIndex = 0
+    @State private var titleOpacity: Double = 1.0
+    @State private var titleBlur: CGFloat = 0
+    
+    private let titles = [
+        "Welcome back,",
+        "Ready to code?",
+        "Let's solve some problems!",
+        "Keep pushing forward!",
+        "You're doing great!",
+        "Time to level up!",
+        "Code like a boss!",
+        "One problem at a time!",
+        "Stay curious, keep coding!",
+        "Your journey continues..."
+    ]
     
     var body: some View {
         NavigationStack {
@@ -23,7 +39,7 @@ struct HomeView: View {
                     } else {
                         // Streak Card
                         if let solveStats = viewModel.solveStats {
-                            StreakCard(streak: solveStats.stats.totalStreakDays)
+                            StreakCard(streak: solveStats.stats.totalStreakDays, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves))
                         }
                         
                         // Main Stats Cards
@@ -66,7 +82,16 @@ struct HomeView: View {
                 .padding()
             }
             .background(Color.black)
-            .navigationTitle(navigationTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(navigationTitle)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .opacity(titleOpacity)
+                        .blur(radius: titleBlur)
+                }
+            }
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
                     await viewModel.loadData(username: username)
@@ -79,20 +104,55 @@ struct HomeView: View {
                     await viewModel.loadData(username: username)
                 }
             }
-            // Update navigation title after a brief delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                withAnimation {
-                    navigationTitle = authViewModel.currentUser?.username ?? "Home"
+            
+            // Start title animation cycle
+            startTitleAnimation()
+        }
+        .preferredColorScheme(.dark)
+    }
+    
+    private func hasSolvedToday(recentSolves: [Solve]?) -> Bool {
+        guard let solves = recentSolves else { return false }
+        
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        return solves.contains { solve in
+            // Parse the solvedAt date string
+            let formatter = ISO8601DateFormatter()
+            guard let solveDate = formatter.date(from: solve.solvedAt) else { return false }
+            let solveDay = calendar.startOfDay(for: solveDate)
+            return solveDay == today
+        }
+    }
+    
+    private func startTitleAnimation() {
+        Timer.scheduledTimer(withTimeInterval: 120.0, repeats: true) { _ in
+            // Fade out and blur
+            withAnimation(.easeIn(duration: 0.5)) {
+                titleOpacity = 0
+                titleBlur = 10
+            }
+            
+            // Change title in the middle
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                titleIndex = (titleIndex + 1) % titles.count
+                navigationTitle = titles[titleIndex]
+                
+                // Fade in and remove blur
+                withAnimation(.easeOut(duration: 0.5)) {
+                    titleOpacity = 1.0
+                    titleBlur = 0
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
 
 // MARK: - Streak Card
 struct StreakCard: View {
     let streak: Int
+    let solvedToday: Bool
     
     private var gradientColors: [Color] {
         if streak == 0 {
@@ -163,6 +223,17 @@ struct StreakCard: View {
         streak == 0 ? "0" : "\(streak)"
     }
     
+    private var streakMessage: String {
+        if solvedToday {
+            return "Well done! Keep it up!"
+        } else if streak == 0 {
+            return "Start your streak!"
+        } else {
+            return "Get back to work!"
+        }
+    }
+    
+    
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: streak == 0 ? "flame" : "flame.fill")
@@ -173,7 +244,7 @@ struct StreakCard: View {
                 Text(displayNumber)
                     .font(.system(size: 36, weight: .bold))
                     .foregroundStyle(.white)
-                Text(streak == 0 ? "Start your streak!" : "\(streak) day streak")
+                Text(streakMessage)
                     .font(.title3)
                     .foregroundStyle(.white.opacity(0.9))
             }
@@ -1080,6 +1151,16 @@ class HomeViewModel: ObservableObject {
     @Published var errorMessage: String?
     
     func loadData(username: String) async {
+        // Use cached data from DataManager if available
+        if DataManager.shared.hasData {
+            self.userStats = DataManager.shared.userStats
+            self.submissionStats = DataManager.shared.submissionStats
+            self.solveStats = DataManager.shared.solveStats
+            self.achievementStats = DataManager.shared.achievementStats
+            self.recentSolves = DataManager.shared.recentSolves
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
         
@@ -1103,6 +1184,13 @@ class HomeViewModel: ObservableObject {
             self.solveStats = solveStats
             self.achievementStats = achievementStats
             self.recentSolves = solvesResponse.solves
+            
+            // Update DataManager cache
+            DataManager.shared.userStats = userStats
+            DataManager.shared.submissionStats = submissionStats
+            DataManager.shared.solveStats = solveStats
+            DataManager.shared.achievementStats = achievementStats
+            DataManager.shared.recentSolves = solvesResponse.solves
             
         } catch {
             errorMessage = error.localizedDescription

@@ -60,7 +60,13 @@ struct SignInView: View {
                     try await authViewModel.login(username: authViewModel.username, password: authViewModel.password)
                 },
                 onFetchData: {
+                    // Fetch current user first
                     try await authViewModel.fetchCurrentUser()
+                    
+                    // Fetch and store all required data using DataManager
+                    if let username = authViewModel.currentUser?.username {
+                        try await DataManager.shared.fetchAllData(username: username)
+                    }
                 },
                 onComplete: {
                     Task {

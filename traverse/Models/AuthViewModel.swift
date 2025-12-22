@@ -80,6 +80,8 @@ class AuthViewModel: ObservableObject {
                 deleteLocalCatImage(for: userId)
                 UserDefaults.standard.removeObject(forKey: "catImageURL_\(userId)")
             }
+            // Clear DataManager cache
+            DataManager.shared.clearAllData()
             isAuthenticated = false
             currentUser = nil
             profileImageUrl = nil
@@ -93,6 +95,8 @@ class AuthViewModel: ObservableObject {
                 UserDefaults.standard.removeObject(forKey: "catImageURL_\(userId)")
             }
             KeychainHelper.shared.deleteToken()
+            // Clear DataManager cache
+            DataManager.shared.clearAllData()
             isAuthenticated = false
             currentUser = nil
             profileImageUrl = nil
