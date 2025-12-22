@@ -54,6 +54,7 @@ struct SettingsView: View {
                             Image(systemName: "person.circle.fill")
                                 .foregroundStyle(.blue)
                             Text("Edit Profile")
+                                .foregroundStyle(.primary)
                         }
                     }
                     
@@ -64,6 +65,7 @@ struct SettingsView: View {
                             Image(systemName: "lock.fill")
                                 .foregroundStyle(.blue)
                             Text("Change Password")
+                                .foregroundStyle(.primary)
                         }
                     }
                 }
