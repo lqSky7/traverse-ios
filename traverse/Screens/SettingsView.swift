@@ -14,20 +14,54 @@ struct SettingsView: View {
                 // User Profile Section
                 if let user = authViewModel.currentUser {
                     Section {
-                        HStack {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 40))
-                                .foregroundStyle(.blue)
+                        VStack {
+                            if let imageUrl = user.profileImageURL {
+                                AsyncImage(url: URL(string: imageUrl)) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView()
+                                            .frame(width: 120, height: 120)
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(Circle())
+                                    case .failure:
+                                        Image(systemName: "person.crop.circle.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 120, height: 120)
+                                            .foregroundStyle(.blue)
+                                    default:
+                                        Image(systemName: "person.crop.circle.fill")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 120, height: 120)
+                                            .foregroundStyle(.blue)
+                                    }
+                                }
+                            } else {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 120, height: 120)
+                                    .foregroundStyle(.blue)
+                            }
                             
-                            VStack(alignment: .leading) {
+                            VStack(spacing: 4) {
                                 Text(user.username)
-                                    .font(.headline)
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
                                 
                                 Text(user.email)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
+                            .padding(.top, 8)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical)
                         
                         HStack {
                             Text("Streak")
@@ -121,6 +155,7 @@ struct SettingsView: View {
             .disabled(isLoading)
         }
     }
+    
     private func handleLogout() async {
         isLoading = true
         do {
@@ -130,9 +165,4 @@ struct SettingsView: View {
         }
         isLoading = false
     }
-}
-
-#Preview {
-    SettingsView()
-        .environmentObject(AuthViewModel())
 }

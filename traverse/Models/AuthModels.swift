@@ -48,6 +48,7 @@ struct User: Codable {
     let currentStreak: Int
     let totalXp: Int
     let createdAt: String?
+    var profileImageURL: String?
 }
 
 struct AuthResponse: Codable {

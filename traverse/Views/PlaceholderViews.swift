@@ -2,21 +2,7 @@ import SwiftUI
 
 struct HomeTab: View {
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    Text("Home")
-                        .font(.largeTitle)
-                        .bold()
-                    
-                    Text("Your dashboard content will appear here")
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding()
-            }
-            .navigationTitle("Home")
-        }
+        HomeView()
     }
 }
 
