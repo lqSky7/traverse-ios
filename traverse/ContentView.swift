@@ -15,7 +15,8 @@ struct ContentView: View {
     var body: some View {
         Group {
             if authViewModel.isAuthenticated {
-                MainView(authViewModel: authViewModel)
+                MainTabView()
+                    .environmentObject(authViewModel)
                     .transition(.opacity.combined(with: .offset(y: 20)))
             } else if let accountType = accountType {
                 if accountType == .newAccount {
@@ -106,6 +107,8 @@ struct SignUpView: View {
             completion: CompletionStep(
                 title: "Creating your account",
                 description: "Hold tight while we set everything up",
+                loadingTitle: "Setting up your profile",
+                loadingDescription: "Personalizing your experience...",
                 completionTitle: "You're all set!",
                 completionDescription: "Welcome to Traverse. Let's start your journey!",
                 onSubmit: {
@@ -115,8 +118,11 @@ struct SignUpView: View {
                         print("Registration error: \(error.localizedDescription)")
                     }
                 },
+                onFetchData: {
+                    try await authViewModel.fetchCurrentUser()
+                },
                 onComplete: {
-                    // The view will automatically update when isAuthenticated changes
+                    authViewModel.isAuthenticated = true
                 }
             )
         )
@@ -153,7 +159,9 @@ struct MainView: View {
                 Spacer()
                 
                 Button(action: {
-                    authViewModel.logout()
+                    Task {
+                        try? await authViewModel.logout()
+                    }
                 }) {
                     Text("Logout")
                         .font(.headline)

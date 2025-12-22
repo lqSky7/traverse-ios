@@ -250,6 +250,10 @@ if #available(iOS 26.0, *) {
 - Modal/sheet presentations
 - Interactive elements that sit "above" content
 
+### Design System Consistency
+
+Liquid Glass should complement, not replace, standard iOS design patterns. Use it strategically to enhance the user experience while maintaining familiarity with platform conventions.
+
 ### When NOT to Use
 
 - Core content (list rows, table cells)
@@ -257,6 +261,11 @@ if #available(iOS 26.0, *) {
 - Media-rich content areas
 - Text-heavy sections
 - Decorative elements with no function
+- Settings and configuration screens
+- Form-based interfaces (use standard Form styling)
+- Administrative/account management views
+- Data entry and profile editing screens
+- Any screen requiring standard iOS accessibility patterns
 
 ### Best Practices
 
@@ -266,6 +275,9 @@ if #available(iOS 26.0, *) {
 - Maintain 4.5:1 contrast ratio (WCAG AA)
 - Use `.containerConcentric` corner radius for elements in containers
 - Monitor performance in scrollable lists on older iPhones
+- Prefer standard `Form` and `List` components for settings and data entry
+- Use liquid glass sparingly - reserve for navigation, floating elements, and interactive components
+- Maintain consistency with platform conventions (Form for settings, standard buttons for actions)
 
 ## Known Issues
 

@@ -50,13 +50,18 @@ struct SignInView: View {
             completion: CompletionStep(
                 title: "Signing you in",
                 description: "Hold tight, we're getting everything ready",
+                loadingTitle: "Fetching your data",
+                loadingDescription: "Almost there, loading your profile...",
                 completionTitle: "Welcome back!",
                 completionDescription: "Let's continue your journey!",
                 onSubmit: {
                     try await authViewModel.login(username: authViewModel.username, password: authViewModel.password)
                 },
+                onFetchData: {
+                    try await authViewModel.fetchCurrentUser()
+                },
                 onComplete: {
-                    // The view will automatically update when isAuthenticated changes
+                    authViewModel.isAuthenticated = true
                 }
             )
         )

@@ -18,6 +18,26 @@ struct LoginRequest: Codable {
     let password: String
 }
 
+struct UpdateProfileRequest: Codable {
+    let email: String?
+    let timezone: String?
+    let visibility: String?
+}
+
+struct ChangePasswordRequest: Codable {
+    let currentPassword: String
+    let newPassword: String
+}
+
+struct DeleteAccountRequest: Codable {
+    let password: String
+}
+
+struct RecoverAccountRequest: Codable {
+    let username: String
+    let password: String?
+}
+
 // MARK: - Response Models
 struct User: Codable {
     let id: Int
@@ -40,6 +60,19 @@ struct LoginResponse: Codable {
     let message: String
     let user: User
     let token: String?
+}
+
+struct UserResponse: Codable {
+    let user: User
+}
+
+struct MessageResponse: Codable {
+    let message: String
+}
+
+struct RecoveryResponse: Codable {
+    let message: String
+    let user: User
 }
 
 // MARK: - Error Response

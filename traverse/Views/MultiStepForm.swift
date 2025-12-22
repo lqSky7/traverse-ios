@@ -100,9 +100,12 @@ struct MultiStepForm: View {
                             CompletionStep(
                                 title: completionStep.title,
                                 description: completionStep.description,
+                                loadingTitle: completionStep.loadingTitle,
+                                loadingDescription: completionStep.loadingDescription,
                                 completionTitle: completionStep.completionTitle,
                                 completionDescription: completionStep.completionDescription,
                                 onSubmit: completionStep.onSubmit,
+                                onFetchData: completionStep.onFetchData,
                                 onComplete: completionStep.onComplete
                             )
                             .transition(.offset(y: 40).combined(with: .opacity))
