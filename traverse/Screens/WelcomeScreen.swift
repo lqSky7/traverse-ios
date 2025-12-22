@@ -17,6 +17,7 @@ struct WelcomeScreen: View {
     
     @State private var backTapped = 0
     @State private var continueTapped = 0
+    private let hapticManager = HapticManager()
     
     var body: some View {
         ZStack {
@@ -29,14 +30,14 @@ struct WelcomeScreen: View {
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.black)
                             .padding(12)
                     }
                     .sensoryFeedback(.impact(weight: .light), trigger: backTapped)
                     .glassEffect(.regular.interactive(), in: .circle)
                     Spacer()
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 16)
                 .padding(.top, 60)
                 Spacer()
             }
@@ -56,31 +57,30 @@ struct WelcomeScreen: View {
             .frame(maxHeight: .infinity, alignment: .topLeading)
             
             VStack(alignment: .leading, spacing: 20) {
-                Image(logo)
-                    .resizable()
-                    .scaledToFit()
-                    .font(.system(size: 48))
-                    .foregroundStyle(.white)
-                    .frame(width: 50)
                 
                 Text(title)
                     .font(.largeTitle)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.white.opacity(0.8))
+                    
                 
                 Text(description)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.ultraThinMaterial)
                 
                 Button(action: {
+                    continueTapped += 1
+                    hapticManager.playSoftRisingFeedback()
                     action()
                 }) {
                     Text("Continue")
                         .font(.headline)
                         .bold()
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.black.opacity(0.8))
                         .frame(maxWidth: .infinity)
                         .padding(16)
                         .background(.white)
                         .cornerRadius(.infinity)
+                        
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)

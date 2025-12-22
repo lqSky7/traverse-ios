@@ -57,7 +57,7 @@ struct SignUpView: View {
     var body: some View {
         OnboardingFlow(
             title: "Welcome to\nTraverse",
-            description: "Track your journey, build habits,\nand grow every day",
+            description: "We can't wait to have you on board",
             logo: "logo",
             startGradient: (.blue, .cyan, .purple),
             onBack: onBack,

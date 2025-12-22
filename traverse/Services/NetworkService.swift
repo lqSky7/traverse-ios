@@ -66,13 +66,19 @@ class NetworkService {
                 
                 return authResponse
             } catch {
+                print("Decoding error: \(error)")
                 throw NetworkError.decodingError
             }
         } else {
+            // Print response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Error response: \(responseString)")
+            }
+            
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
                 throw NetworkError.serverError(errorResponse.message)
             }
-            throw NetworkError.unknown
+            throw NetworkError.serverError("Registration failed (Status: \(httpResponse.statusCode))")
         }
     }
     
@@ -98,15 +104,27 @@ class NetworkService {
         if httpResponse.statusCode == 200 {
             do {
                 let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
+                
+                // Save token to Keychain if present
+                if let token = loginResponse.token {
+                    _ = KeychainHelper.shared.saveToken(token)
+                }
+                
                 return loginResponse
             } catch {
+                print("Decoding error: \(error)")
                 throw NetworkError.decodingError
             }
         } else {
+            // Print response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("Error response: \(responseString)")
+            }
+            
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
                 throw NetworkError.serverError(errorResponse.message)
             }
-            throw NetworkError.unknown
+            throw NetworkError.serverError("Authentication failed (Status: \(httpResponse.statusCode))")
         }
     }
     

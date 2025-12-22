@@ -53,11 +53,7 @@ struct SignInView: View {
                 completionTitle: "Welcome back!",
                 completionDescription: "Let's continue your journey!",
                 onSubmit: {
-                    do {
-                        try await authViewModel.login(username: authViewModel.username, password: authViewModel.password)
-                    } catch {
-                        print("Login error: \(error.localizedDescription)")
-                    }
+                    try await authViewModel.login(username: authViewModel.username, password: authViewModel.password)
                 },
                 onComplete: {
                     // The view will automatically update when isAuthenticated changes

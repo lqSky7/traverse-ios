@@ -12,23 +12,25 @@ struct CompletionStep: View {
     let completionTitle: String
     let completionDescription: String
     
-    let onSubmit: () async -> Void
+    let onSubmit: () async throws -> Void
     let onComplete: () -> Void
     
     @State private var isCompleted = false
     @State private var isInProgress = false
+    @State private var hasError = false
+    @State private var errorMessage = ""
     
     var body: some View {
         HStack(alignment: .top, spacing: 24) {
-            Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle.dashed")
+            Image(systemName: hasError ? "xmark.circle.fill" : isCompleted ? "checkmark.circle.fill" : "circle.dashed")
                 .id(isCompleted)
-                .rotationEffect(.degrees(isCompleted ? 0 : isInProgress ? 360 : 0))
+                .rotationEffect(.degrees(isCompleted ? 0 : isInProgress && !hasError ? 360 : 0))
                 .font(.system(size: 24))
-                .foregroundStyle(isCompleted ? .green : .purple)
+                .foregroundStyle(hasError ? .red : isCompleted ? .green : .purple)
                 .transition(.scale)
             
             VStack(alignment: .leading, spacing: 12) {
-                Text(isCompleted ? completionTitle : title)
+                Text(hasError ? "Error" : isCompleted ? completionTitle : title)
                     .id(isCompleted)
                     .font(.system(size: 24))
                     .bold()
@@ -41,7 +43,7 @@ struct CompletionStep: View {
                         )
                     )
                 
-                Text(isCompleted ? completionDescription : description)
+                Text(hasError ? errorMessage : isCompleted ? completionDescription : description)
                     .id(isCompleted)
                     .foregroundStyle(.black.opacity(0.3))
                     .fontWeight(.medium)
@@ -60,14 +62,21 @@ struct CompletionStep: View {
             }
             
             Task {
-                await onSubmit()
-                
-                withAnimation(.bouncy(duration: 1)) {
-                    isCompleted = true
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                    onComplete()
+                do {
+                    try await onSubmit()
+                    
+                    withAnimation(.bouncy(duration: 1)) {
+                        isCompleted = true
+                    }
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                        onComplete()
+                    }
+                } catch {
+                    withAnimation(.bouncy(duration: 1)) {
+                        hasError = true
+                        errorMessage = error.localizedDescription
+                    }
                 }
             }
         }

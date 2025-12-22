@@ -42,17 +42,19 @@ struct AccountTypeSelectionView: View {
                 VStack(spacing: 20) {
                     Image("logo")
                         .resizable()
-                        .scaledToFit()
-                        .frame(width: 80, height: 80)
+                        .scaledToFill()
+                        .frame(width: 100, height: 80)
                         .foregroundStyle(.primary)
                     
                     Text("Welcome to\nTraverse")
                         .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(.black.opacity(0.8))
+                        .foregroundStyle(.ultraThinMaterial)
                         .multilineTextAlignment(.center)
                     
-                    Text("Track your journey, build habits, and grow every day")
-                        .foregroundStyle(.white.opacity(0.8))
+                    Text("The Complete Learning Ecosystem")
+                        .foregroundColor(.black.opacity(0.4))
+                        .foregroundStyle(.ultraThinMaterial)
                         .multilineTextAlignment(.center)
                 }
                 
@@ -67,19 +69,19 @@ struct AccountTypeSelectionView: View {
                         Text("Create New Account")
                             .font(.headline)
                             .bold()
-                            .foregroundStyle(.black)
+                            .foregroundStyle(.black.opacity(0.8))
                             .frame(maxWidth: .infinity)
                             .padding(16)
                             .background(.white)
                             .cornerRadius(.infinity)
                     }
-                    .sensoryFeedback(.impact(weight: .medium), trigger: buttonTapped)
+                    .sensoryFeedback(.pathComplete, trigger: buttonTapped)
                     
                     Button(action: {
                         buttonTapped += 1
                         onSelect(.existingAccount)
                     }) {
-                        Text("I Already Have an Account")
+                        Text("Already Have an Account?")
                             .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
@@ -87,7 +89,7 @@ struct AccountTypeSelectionView: View {
                             .background(.white.opacity(0.2))
                             .cornerRadius(.infinity)
                     }
-                    .sensoryFeedback(.impact(weight: .medium), trigger: buttonTapped)
+                    .sensoryFeedback(.pathComplete, trigger: buttonTapped)
                 }
                 .padding(.horizontal, 42)
                 .padding(.bottom, 60)
@@ -97,3 +99,4 @@ struct AccountTypeSelectionView: View {
         .ignoresSafeArea(.container)
     }
 }
+

@@ -27,7 +27,7 @@ struct User: Codable {
     let visibility: String
     let currentStreak: Int
     let totalXp: Int
-    let createdAt: String
+    let createdAt: String?
 }
 
 struct AuthResponse: Codable {
@@ -39,6 +39,7 @@ struct AuthResponse: Codable {
 struct LoginResponse: Codable {
     let message: String
     let user: User
+    let token: String?
 }
 
 // MARK: - Error Response

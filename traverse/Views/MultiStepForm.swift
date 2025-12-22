@@ -77,7 +77,7 @@ struct MultiStepForm: View {
                         .glassEffect(.regular.interactive(), in: .circle)
                         Spacer()
                     }
-                    .padding(.horizontal, 42)
+                    .padding(.horizontal, 16)
                     .padding(.top, 60)
                     Spacer()
                 }
