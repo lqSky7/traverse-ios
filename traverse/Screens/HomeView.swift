@@ -5,6 +5,7 @@ import Combine
 struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = HomeViewModel()
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var navigationTitle = "Welcome back,"
     @State private var titleIndex = 0
     @State private var titleOpacity: Double = 1.0
@@ -33,30 +34,30 @@ struct HomeView: View {
                     } else if let error = viewModel.errorMessage {
                         ErrorView(message: error, retry: {
                             Task {
-                                await viewModel.loadData(username: authViewModel.currentUser?.username ?? "")
+                                await viewModel.loadData(username: authViewModel.currentUser?.username ?? "", forceRefresh: true)
                             }
                         })
                     } else {
                         // Streak Card
                         if let solveStats = viewModel.solveStats {
-                            StreakCard(streak: solveStats.stats.totalStreakDays, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves))
+                            StreakCard(streak: solveStats.stats.totalStreakDays, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves), paletteManager: paletteManager)
                         }
                         
                         // Main Stats Cards
                         if let solveStats = viewModel.solveStats {
-                            MainStatsCard(stats: solveStats.stats)
+                            MainStatsCard(stats: solveStats.stats, paletteManager: paletteManager)
                         }
                         
                         // Charts Section
                         VStack(spacing: 16) {
                             if let achievementStats = viewModel.achievementStats {
-                                AchievementStatsCard(stats: achievementStats.stats)
+                                AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
                             }
                             
                             if let solveStats = viewModel.solveStats {
                                 HStack(spacing: 16) {
-                                    DifficultyChartCard(stats: solveStats.stats)
-                                    PlatformChartCard(stats: solveStats.stats)
+                                    DifficultyChartCard(stats: solveStats.stats, paletteManager: paletteManager)
+                                    PlatformChartCard(stats: solveStats.stats, paletteManager: paletteManager)
                                 }
                             }
                             
@@ -66,20 +67,20 @@ struct HomeView: View {
                             
                             // New Charts
                             if let solveStats = viewModel.solveStats {
-                                DifficultyPieChartCard(stats: solveStats.stats)
+                                DifficultyPieChartCard(stats: solveStats.stats, paletteManager: paletteManager)
                             }
                             
                             if let submissionStats = viewModel.submissionStats {
-                                SubmissionBreakdownCard(stats: submissionStats.stats)
+                                SubmissionBreakdownCard(stats: submissionStats.stats, paletteManager: paletteManager)
                             }
                             
                             if let solves = viewModel.recentSolves, !solves.isEmpty {
-                                RecentSolvesCard(solves: solves)
+                                RecentSolvesCard(solves: solves, paletteManager: paletteManager)
                                 
                                 // New Performance Charts
-                                PerformanceMetricsCard(solves: solves)
+                                PerformanceMetricsCard(solves: solves, paletteManager: paletteManager)
                                 
-                                TriesDistributionCard(solves: solves)
+                                TriesDistributionCard(solves: solves, paletteManager: paletteManager)
                             }
                         }
                     }
@@ -99,7 +100,10 @@ struct HomeView: View {
             }
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
-                    await viewModel.loadData(username: username)
+                    // Use Task to prevent early cancellation from pull-to-refresh gesture
+                    await Task {
+                        await viewModel.loadData(username: username, forceRefresh: true)
+                    }.value
                 }
             }
         }
@@ -158,70 +162,11 @@ struct HomeView: View {
 struct StreakCard: View {
     let streak: Int
     let solvedToday: Bool
+    @ObservedObject var paletteManager: ColorPaletteManager
+    @State private var gradientOffset: CGFloat = -1
     
     private var gradientColors: [Color] {
-        if streak == 0 {
-            return [Color.gray.opacity(0.6), Color.gray.opacity(0.4)]
-        }
-        
-        // Define the color progression milestones
-        let colorStops: [(day: Int, color: Color)] = [
-            (1, .gray),
-            (25, .orange),
-            (60, .yellow),
-            (100, .red)
-        ]
-        
-        // Find which two color stops we're between
-        var startStop = colorStops[0]
-        var endStop = colorStops[1]
-        
-        for i in 0..<colorStops.count - 1 {
-            if streak >= colorStops[i].day && streak <= colorStops[i + 1].day {
-                startStop = colorStops[i]
-                endStop = colorStops[i + 1]
-                break
-            }
-        }
-        
-        // If streak is beyond the last milestone, use the last color
-        if streak > colorStops.last!.day {
-            return [.red, .red.opacity(0.8), .orange]
-        }
-        
-        // Calculate progress between the two stops (0.0 to 1.0)
-        let dayRange = endStop.day - startStop.day
-        let progress = Double(streak - startStop.day) / Double(dayRange)
-        
-        // Interpolate the colors
-        let startColor = startStop.color
-        let endColor = endStop.color
-        let interpolatedColor = lerpColor(from: startColor, to: endColor, progress: progress)
-        
-        // Create gradient with interpolated colors
-        return [startColor, interpolatedColor, endColor]
-    }
-    
-    // Linear interpolation between two colors
-    private func lerpColor(from startColor: Color, to endColor: Color, progress: Double) -> Color {
-        let clampedProgress = max(0, min(1, progress))
-        
-        let start = UIColor(startColor)
-        let end = UIColor(endColor)
-        
-        var startRed: CGFloat = 0, startGreen: CGFloat = 0, startBlue: CGFloat = 0, startAlpha: CGFloat = 0
-        var endRed: CGFloat = 0, endGreen: CGFloat = 0, endBlue: CGFloat = 0, endAlpha: CGFloat = 0
-        
-        start.getRed(&startRed, green: &startGreen, blue: &startBlue, alpha: &startAlpha)
-        end.getRed(&endRed, green: &endGreen, blue: &endBlue, alpha: &endAlpha)
-        
-        // Lerp each color component
-        let red = startRed + (endRed - startRed) * clampedProgress
-        let green = startGreen + (endGreen - startGreen) * clampedProgress
-        let blue = startBlue + (endBlue - startBlue) * clampedProgress
-        let alpha = startAlpha + (endAlpha - startAlpha) * clampedProgress
-        
-        return Color(red: red, green: green, blue: blue, opacity: alpha)
+        paletteManager.streakGradientColors(for: streak)
     }
     
     private var displayNumber: String {
@@ -265,15 +210,32 @@ struct StreakCard: View {
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
         .background(
-            LinearGradient(
-                colors: gradientColors,
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .overlay(.ultraThinMaterial.opacity(0.2))
+            AnimatedGradient(colors: gradientColors, offset: gradientOffset)
+                .overlay(.ultraThinMaterial.opacity(0.2))
         )
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
+        .onAppear {
+            withAnimation(.linear(duration: 3).repeatForever(autoreverses: true)) {
+                gradientOffset = 1
+            }
+        }
+    }
+}
+
+// MARK: - Animated Gradient View
+struct AnimatedGradient: View {
+    let colors: [Color]
+    let offset: CGFloat
+    
+    var body: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                colors: colors,
+                startPoint: UnitPoint(x: 0.5 + offset * 0.5, y: 0),
+                endPoint: UnitPoint(x: 0.5 - offset * 0.5, y: 1)
+            )
+        }
     }
 }
 
@@ -281,6 +243,7 @@ struct StreakCard: View {
 // MARK: - Main Stats Card
 struct MainStatsCard: View {
     let stats: SolveStatsData
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
         VStack(spacing: 0) {
@@ -298,7 +261,7 @@ struct MainStatsCard: View {
                     title: "Total Solves",
                     value: "\(stats.totalSolves)",
                     icon: "checkmark.seal.fill",
-                    color: .green
+                    color: paletteManager.color(at: 0)
                 )
                 
                 Divider()
@@ -308,7 +271,7 @@ struct MainStatsCard: View {
                     title: "Total XP",
                     value: "\(stats.totalXp)",
                     icon: "sparkles",
-                    color: .yellow
+                    color: paletteManager.color(at: 1)
                 )
                 
                 Divider()
@@ -318,7 +281,7 @@ struct MainStatsCard: View {
                     title: "Streak",
                     value: "\(stats.totalStreakDays)",
                     icon: "flame.fill",
-                    color: .orange
+                    color: paletteManager.color(at: 2)
                 )
             }
             .padding()
@@ -356,12 +319,13 @@ struct StatItem: View {
 // MARK: - Difficulty Chart Card
 struct DifficultyChartCard: View {
     let stats: SolveStatsData
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     private var chartData: [(String, Int, Color)] {
         [
-            ("Easy", stats.byDifficulty.easy, .green),
-            ("Medium", stats.byDifficulty.medium, .orange),
-            ("Hard", stats.byDifficulty.hard, .red)
+            ("Easy", stats.byDifficulty.easy, paletteManager.color(at: 0)),
+            ("Medium", stats.byDifficulty.medium, paletteManager.color(at: 1)),
+            ("Hard", stats.byDifficulty.hard, paletteManager.color(at: 2))
         ]
     }
     
@@ -421,6 +385,7 @@ struct DifficultyChartCard: View {
 // MARK: - Platform Chart Card
 struct PlatformChartCard: View {
     let stats: SolveStatsData
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     private var chartData: [(String, Int)] {
         stats.byPlatform.map { ($0.key.capitalized, $0.value) }
@@ -505,7 +470,7 @@ struct PlatformChartCard: View {
     }
     
     private func platformColor(for platform: String) -> Color {
-        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .red, .cyan]
+        let colors = paletteManager.selectedPalette.chartColors
         let hash = platform.hashValue
         return colors[abs(hash) % colors.count]
     }
@@ -514,6 +479,7 @@ struct PlatformChartCard: View {
 // MARK: - Achievement Stats Card
 struct AchievementStatsCard: View {
     let stats: AchievementStatsData
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -524,7 +490,7 @@ struct AchievementStatsCard: View {
                 NavigationLink(destination: AllAchievementsView(stats: stats)) {
                     Text("View All")
                         .font(.subheadline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
             }
             
@@ -541,7 +507,7 @@ struct AchievementStatsCard: View {
                         .trim(from: 0, to: CGFloat(stats.unlocked) / CGFloat(max(stats.total, 1)))
                         .stroke(
                             LinearGradient(
-                                colors: [.yellow, .orange],
+                                colors: [paletteManager.color(at: 3), paletteManager.color(at: 4)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -565,7 +531,7 @@ struct AchievementStatsCard: View {
                         Text(stats.percentage)
                             .font(.title2)
                             .bold()
-                            .foregroundStyle(.yellow)
+                            .foregroundStyle(paletteManager.color(at: 3))
                         Text("Complete")
                             .foregroundStyle(.secondary)
                     }
@@ -729,6 +695,7 @@ struct AllAchievementsView: View {
 // MARK: - Submission Stats Card
 struct SubmissionStatsCard: View {
     let stats: SubmissionStatsData
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -755,7 +722,7 @@ struct SubmissionStatsCard: View {
                     Text("\(stats.accepted)")
                         .font(.title2)
                         .bold()
-                        .foregroundStyle(.green)
+                        .foregroundStyle(paletteManager.color(at: 3))
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                     Text("Accepted")
@@ -768,7 +735,7 @@ struct SubmissionStatsCard: View {
                     Text("\(stats.failed)")
                         .font(.title2)
                         .bold()
-                        .foregroundStyle(.red)
+                        .foregroundStyle(paletteManager.color(at: 4))
                         .lineLimit(1)
                         .minimumScaleFactor(0.5)
                     Text("Failed")
@@ -782,13 +749,13 @@ struct SubmissionStatsCard: View {
                         Text(String(format: "%.0f", Double(stats.acceptanceRate.replacingOccurrences(of: "%", with: "")) ?? 0))
                             .font(.title2)
                             .bold()
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(paletteManager.color(at: 8))
                             .lineLimit(1)
                             .minimumScaleFactor(0.5)
                         Text("%")
                             .font(.title3)
                             .bold()
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(paletteManager.color(at: 8))
                     }
                     Text("Rate")
                         .font(.caption)
@@ -807,12 +774,13 @@ struct SubmissionStatsCard: View {
 // MARK: - Difficulty Pie Chart Card (NEW)
 struct DifficultyPieChartCard: View {
     let stats: SolveStatsData
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     private var chartData: [(String, Int, Color)] {
         [
-            ("Easy", stats.byDifficulty.easy, .green),
-            ("Medium", stats.byDifficulty.medium, .orange),
-            ("Hard", stats.byDifficulty.hard, .red)
+            ("Easy", stats.byDifficulty.easy, paletteManager.color(at: 0)),
+            ("Medium", stats.byDifficulty.medium, paletteManager.color(at: 1)),
+            ("Hard", stats.byDifficulty.hard, paletteManager.color(at: 2))
         ].filter { $0.1 > 0 }
     }
     
@@ -891,6 +859,7 @@ struct DifficultyPieChartCard: View {
 // MARK: - Submission Breakdown Card (NEW)
 struct SubmissionBreakdownCard: View {
     let stats: SubmissionStatsData
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -906,14 +875,14 @@ struct SubmissionBreakdownCard: View {
                     BarMark(
                         x: .value("Count", stats.accepted)
                     )
-                    .foregroundStyle(Color.green.gradient)
+                    .foregroundStyle(paletteManager.color(at: 3).gradient)
                     .cornerRadius(6)
                     
                     BarMark(
                         x: .value("Count", stats.failed),
                         stacking: .standard
                     )
-                    .foregroundStyle(Color.red.gradient)
+                    .foregroundStyle(paletteManager.color(at: 4).gradient)
                     .cornerRadius(6)
                 }
                 .frame(height: 60)
@@ -924,7 +893,7 @@ struct SubmissionBreakdownCard: View {
                 HStack(spacing: 20) {
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(Color.green)
+                            .fill(paletteManager.color(at: 3))
                             .frame(width: 12, height: 12)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Accepted")
@@ -944,7 +913,7 @@ struct SubmissionBreakdownCard: View {
                     
                     HStack(spacing: 8) {
                         Circle()
-                            .fill(Color.red)
+                            .fill(paletteManager.color(at: 4))
                             .frame(width: 12, height: 12)
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Failed")
@@ -974,6 +943,7 @@ struct SubmissionBreakdownCard: View {
 // MARK: - Recent Solves Card
 struct RecentSolvesCard: View {
     let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -984,7 +954,7 @@ struct RecentSolvesCard: View {
                 NavigationLink(destination: AllSolvesView(solves: solves)) {
                     Text("View All")
                         .font(.subheadline)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
             }
             
@@ -993,7 +963,7 @@ struct RecentSolvesCard: View {
             
             VStack(spacing: 12) {
                 ForEach(solves.prefix(5)) { solve in
-                    SolveRow(solve: solve)
+                    SolveRow(solve: solve, paletteManager: paletteManager)
                 }
             }
         }
@@ -1007,12 +977,13 @@ struct RecentSolvesCard: View {
 // MARK: - All Solves View
 struct AllSolvesView: View {
     let solves: [Solve]
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
                 ForEach(solves) { solve in
-                    SolveRow(solve: solve)
+                    SolveRow(solve: solve, paletteManager: paletteManager)
                 }
             }
             .padding()
@@ -1025,13 +996,14 @@ struct AllSolvesView: View {
 
 struct SolveRow: View {
     let solve: Solve
+    @ObservedObject var paletteManager: ColorPaletteManager
     @State private var isExpanded = false
     
     private var difficultyColor: Color {
         switch solve.problem.difficulty.lowercased() {
-        case "easy": return .green
-        case "medium": return .orange
-        case "hard": return .red
+        case "easy": return paletteManager.color(at: 0)
+        case "medium": return paletteManager.color(at: 1)
+        case "hard": return paletteManager.color(at: 2)
         default: return .gray
         }
     }
@@ -1058,25 +1030,9 @@ struct SolveRow: View {
                             Text("•")
                                 .foregroundStyle(.secondary)
                             
-                            Text(solve.submission.language.capitalized)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            Text("•")
-                                .foregroundStyle(.secondary)
-                            
                             Text(solve.problem.platform.capitalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            
-                            // Show metrics if available
-                            if let tries = solve.submission.numberOfTries, tries > 0 {
-                                Text("•")
-                                    .foregroundStyle(.secondary)
-                                Text("\(tries) tries")
-                                    .font(.caption)
-                                    .foregroundStyle(.blue)
-                            }
                         }
                     }
                     
@@ -1087,10 +1043,10 @@ struct SolveRow: View {
                             Text("+\(solve.xpAwarded)")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundStyle(.yellow)
+                                .foregroundStyle(paletteManager.color(at: 1))
                             Image(systemName: "star.fill")
                                 .font(.caption)
-                                .foregroundStyle(.yellow)
+                                .foregroundStyle(paletteManager.color(at: 1))
                         }
                         
                         Text(formatDate(solve.solvedAt))
@@ -1111,15 +1067,13 @@ struct SolveRow: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Divider()
                     
-                    // Time taken
-                    if let timeTaken = solve.submission.timeTaken {
-                        HStack(spacing: 8) {
-                            Image(systemName: "clock.fill")
-                                .foregroundStyle(.blue)
-                                .font(.caption)
-                            Text("Time: \(formatTime(timeTaken))")
-                                .font(.subheadline)
-                        }
+                    // Language
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left.forwardslash.chevron.right")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                        Text("Language: \(solve.submission.language.capitalized)")
+                            .font(.subheadline)
                     }
                     
                     // Number of tries
@@ -1129,6 +1083,17 @@ struct SolveRow: View {
                                 .foregroundStyle(.purple)
                                 .font(.caption)
                             Text("Attempts: \(tries)")
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    // Time taken
+                    if let timeTaken = solve.submission.timeTaken {
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock.fill")
+                                .foregroundStyle(.blue)
+                                .font(.caption)
+                            Text("Time: \(formatTime(timeTaken))")
                                 .font(.subheadline)
                         }
                     }
@@ -1233,6 +1198,7 @@ struct SolveRow: View {
 // MARK: - Performance Metrics Card (NEW - Line Chart)
 struct PerformanceMetricsCard: View {
     let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     private var timeData: [(String, Int)] {
         solves.compactMap { solve in
@@ -1245,7 +1211,7 @@ struct PerformanceMetricsCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "clock.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(paletteManager.color(at: 5))
                 Text("Time Performance")
                     .font(.headline)
             }
@@ -1263,7 +1229,7 @@ struct PerformanceMetricsCard: View {
                             Text(formatTime(averageTime()))
                                 .font(.title3)
                                 .bold()
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(paletteManager.color(at: 5))
                         }
                         
                         Spacer()
@@ -1275,7 +1241,7 @@ struct PerformanceMetricsCard: View {
                             Text(formatTime(fastestTime()))
                                 .font(.title3)
                                 .bold()
-                                .foregroundStyle(.green)
+                                .foregroundStyle(paletteManager.color(at: 6))
                         }
                     }
                     
@@ -1286,7 +1252,7 @@ struct PerformanceMetricsCard: View {
                         )
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.blue, .cyan],
+                                colors: [paletteManager.color(at: 5), paletteManager.color(at: 6)],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -1299,7 +1265,7 @@ struct PerformanceMetricsCard: View {
                         )
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.blue.opacity(0.3), .cyan.opacity(0.1)],
+                                colors: [paletteManager.color(at: 5).opacity(0.3), paletteManager.color(at: 6).opacity(0.1)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -1309,7 +1275,7 @@ struct PerformanceMetricsCard: View {
                             x: .value("Problem", index),
                             y: .value("Time", item.1)
                         )
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(paletteManager.color(at: 5))
                         .symbol(Circle())
                     }
                     .frame(height: 160)
@@ -1378,6 +1344,7 @@ struct PerformanceMetricsCard: View {
 // MARK: - Tries Distribution Card (NEW - Point Chart)
 struct TriesDistributionCard: View {
     let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
     
     private var triesData: [(String, Int, String)] {
         solves.compactMap { solve in
@@ -1390,7 +1357,7 @@ struct TriesDistributionCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "arrow.clockwise")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(paletteManager.color(at: 7))
                 Text("Attempts Analysis")
                     .font(.headline)
             }
@@ -1408,7 +1375,7 @@ struct TriesDistributionCard: View {
                             Text(String(format: "%.1f", averageTries()))
                                 .font(.title3)
                                 .bold()
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(paletteManager.color(at: 7))
                         }
                         
                         Spacer()
@@ -1420,7 +1387,7 @@ struct TriesDistributionCard: View {
                             Text("\(firstTryCount())")
                                 .font(.title3)
                                 .bold()
-                                .foregroundStyle(.green)
+                                .foregroundStyle(paletteManager.color(at: 0))
                         }
                     }
                     
@@ -1457,19 +1424,19 @@ struct TriesDistributionCard: View {
                     // Legend
                     HStack(spacing: 16) {
                         HStack(spacing: 4) {
-                            Circle().fill(.green).frame(width: 8, height: 8)
+                            Circle().fill(paletteManager.color(at: 0)).frame(width: 8, height: 8)
                             Text("Easy")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         HStack(spacing: 4) {
-                            Circle().fill(.orange).frame(width: 8, height: 8)
+                            Circle().fill(paletteManager.color(at: 1)).frame(width: 8, height: 8)
                             Text("Medium")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
                         HStack(spacing: 4) {
-                            Circle().fill(.red).frame(width: 8, height: 8)
+                            Circle().fill(paletteManager.color(at: 2)).frame(width: 8, height: 8)
                             Text("Hard")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -1501,9 +1468,9 @@ struct TriesDistributionCard: View {
     
     private func difficultyColor(_ difficulty: String) -> Color {
         switch difficulty.lowercased() {
-        case "easy": return .green
-        case "medium": return .orange
-        case "hard": return .red
+        case "easy": return paletteManager.color(at: 0)
+        case "medium": return paletteManager.color(at: 1)
+        case "hard": return paletteManager.color(at: 2)
         default: return .gray
         }
     }
@@ -1556,19 +1523,23 @@ class HomeViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
-    func loadData(username: String) async {
-        // Use cached data from DataManager if available
-        if DataManager.shared.hasData {
-            self.userStats = DataManager.shared.userStats
-            self.submissionStats = DataManager.shared.submissionStats
-            self.solveStats = DataManager.shared.solveStats
-            self.achievementStats = DataManager.shared.achievementStats
-            self.recentSolves = DataManager.shared.recentSolves
+    func loadData(username: String, forceRefresh: Bool = false) async {
+        // Use cached data from DataManager if available (unless force refresh)
+        if !forceRefresh && DataManager.shared.hasData {
+            await MainActor.run {
+                self.userStats = DataManager.shared.userStats
+                self.submissionStats = DataManager.shared.submissionStats
+                self.solveStats = DataManager.shared.solveStats
+                self.achievementStats = DataManager.shared.achievementStats
+                self.recentSolves = DataManager.shared.recentSolves
+            }
             return
         }
         
-        isLoading = true
-        errorMessage = nil
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
         
         do {
             async let userStatsTask = NetworkService.shared.getUserStats(username: username)
@@ -1585,11 +1556,13 @@ class HomeViewModel: ObservableObject {
                 recentSolvesTask
             )
             
-            self.userStats = userStats
-            self.submissionStats = submissionStats
-            self.solveStats = solveStats
-            self.achievementStats = achievementStats
-            self.recentSolves = solvesResponse.solves
+            await MainActor.run {
+                self.userStats = userStats
+                self.submissionStats = submissionStats
+                self.solveStats = solveStats
+                self.achievementStats = achievementStats
+                self.recentSolves = solvesResponse.solves
+            }
             
             // Update DataManager cache
             DataManager.shared.userStats = userStats
@@ -1598,11 +1571,20 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.achievementStats = achievementStats
             DataManager.shared.recentSolves = solvesResponse.solves
             
+        } catch is CancellationError {
+            // Ignore cancellation errors - user likely released pull-to-refresh
+            await MainActor.run {
+                isLoading = false
+            }
         } catch {
-            errorMessage = error.localizedDescription
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+            }
         }
         
-        isLoading = false
+        await MainActor.run {
+            isLoading = false
+        }
     }
 }
 

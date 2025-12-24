@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var selectedTab = 0
     
     var body: some View {
@@ -26,6 +27,7 @@ struct MainTabView: View {
                     .tag(2)
             }
             .tabBarMinimizeBehavior(.onScrollDown)
+            .tint(paletteManager.selectedPalette.primary)
         } else {
             TabView(selection: $selectedTab) {
                 HomeTab()
@@ -46,6 +48,7 @@ struct MainTabView: View {
                     }
                     .tag(2)
             }
+            .tint(paletteManager.selectedPalette.primary)
         }
     }
 }

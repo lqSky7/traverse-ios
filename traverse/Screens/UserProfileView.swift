@@ -7,6 +7,7 @@ import SwiftUI
 import Combine
 
 enum FriendshipStatus {
+    case self
     case notFriends
     case friends
     case requestSent
@@ -46,9 +47,23 @@ class UserProfileViewModel: ObservableObject {
             async let receivedRequests = NetworkService.shared.getReceivedFriendRequests()
             async let sentRequests = NetworkService.shared.getSentFriendRequests()
             
-            profile = try await profileData
+            let userProfile = try await profileData
+            profile = userProfile
+            
             let statsResponse = try await statsData
-            statistics = statsResponse.stats
+            // Combine profile data (currentStreak, totalXp) with stats data
+            statistics = UserStatistics(
+                currentStreak: userProfile.currentStreak,
+                totalXp: userProfile.totalXp,
+                totalSolves: statsResponse.stats.totalSolves,
+                totalSubmissions: statsResponse.stats.totalSubmissions,
+                totalStreakDays: statsResponse.stats.totalStreakDays,
+                problemsByDifficulty: UserProblemsByDifficulty(
+                    easy: statsResponse.stats.problemsByDifficulty.easy,
+                    medium: statsResponse.stats.problemsByDifficulty.medium,
+                    hard: statsResponse.stats.problemsByDifficulty.hard
+                )
+            )
             
             let friends = try await friendsData
             let received = try await receivedRequests
@@ -145,6 +160,8 @@ class UserProfileViewModel: ObservableObject {
 struct UserProfileView: View {
     let username: String
     @StateObject private var viewModel: UserProfileViewModel
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     init(username: String) {
         self.username = username
@@ -235,7 +252,7 @@ struct UserProfileView: View {
                         .foregroundStyle(.black)
                         .frame(maxWidth: .infinity)
                 }
-                .tint(.white)
+                .tint(paletteManager.selectedPalette.primary)
             }
             .applyGlassButtonStyle(.glassProminent)
             .padding(.horizontal)
@@ -287,11 +304,12 @@ struct UserProfileView: View {
 struct ProfileHeaderView: View {
     let profile: UserProfile
     let statistics: UserStatistics?
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
         VStack(spacing: 16) {
             Circle()
-                .fill(.teal.gradient)
+                .fill(paletteManager.selectedPalette.primary.gradient)
                 .frame(width: 100, height: 100)
                 .overlay {
                     Text(profile.username.prefix(1).uppercased())
@@ -314,7 +332,7 @@ struct ProfileHeaderView: View {
                         .bold()
                     Label("Streak", systemImage: "flame.fill")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
                 .frame(maxWidth: .infinity)
                 
@@ -326,7 +344,7 @@ struct ProfileHeaderView: View {
                         .bold()
                     Label("XP", systemImage: "star.fill")
                         .font(.caption)
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(paletteManager.selectedPalette.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 
@@ -429,20 +447,30 @@ struct DifficultyBadge: View {
     let difficulty: String
     let count: Int
     let color: Color
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    
+    var badgeColor: Color {
+        switch difficulty.lowercased() {
+        case "easy": return paletteManager.color(at: 1)
+        case "medium": return paletteManager.color(at: 2)
+        case "hard": return paletteManager.color(at: 0)
+        default: return color
+        }
+    }
     
     var body: some View {
         VStack(spacing: 4) {
             Text("\(count)")
                 .font(.title3)
                 .bold()
-                .foregroundStyle(color)
+                .foregroundStyle(badgeColor)
             Text(difficulty)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(color.opacity(0.1))
+        .background(badgeColor.opacity(0.1))
         .cornerRadius(8)
     }
 }
@@ -451,6 +479,7 @@ struct SolvesListView: View {
     let solves: [UserSolve]
     let canLoadMore: Bool
     let onLoadMore: () -> Void
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -479,7 +508,7 @@ struct SolvesListView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding()
                         }
-                        .tint(.white)
+                        .tint(paletteManager.selectedPalette.primary)
                     }
                     .applyGlassButtonStyle(.glassProminent)
                     .padding(.top, 8)
@@ -492,6 +521,7 @@ struct SolvesListView: View {
 
 struct SolveCard: View {
     let solve: UserSolve
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -511,12 +541,12 @@ struct SolveCard: View {
                 
                 Label("\(solve.xpAwarded) XP", systemImage: "star.fill")
                     .font(.caption)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(paletteManager.selectedPalette.secondary)
                 
                 if let submission = solve.submission {
                     Label(submission.language, systemImage: "chevron.left.forwardslash.chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
             }
             
@@ -542,12 +572,13 @@ struct SolveCard: View {
 
 struct DifficultyTag: View {
     let difficulty: String
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var color: Color {
         switch difficulty.lowercased() {
-        case "easy": return .green
-        case "medium": return .orange
-        case "hard": return .red
+        case "easy": return paletteManager.color(at: 1)
+        case "medium": return paletteManager.color(at: 2)
+        case "hard": return paletteManager.color(at: 0)
         default: return .gray
         }
     }
@@ -591,6 +622,7 @@ struct AchievementsListView: View {
 
 struct AchievementCard: View {
     let achievement: Achievement
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var categoryIcon: String {
         switch achievement.category.lowercased() {
@@ -603,10 +635,10 @@ struct AchievementCard: View {
     
     var categoryColor: Color {
         switch achievement.category.lowercased() {
-        case "solve": return .green
-        case "streak": return .orange
-        case "social": return .blue
-        default: return .purple
+        case "solve": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
+        case "social": return paletteManager.color(at: 2)
+        default: return paletteManager.color(at: 3)
         }
     }
     

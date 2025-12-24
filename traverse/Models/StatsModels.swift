@@ -12,6 +12,8 @@ struct UserStats: Codable {
 }
 
 struct UserStatsData: Codable {
+    let currentStreak: Int
+    let totalXp: Int
     let totalSolves: Int
     let totalSubmissions: Int
     let totalStreakDays: Int

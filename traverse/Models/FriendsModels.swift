@@ -33,6 +33,8 @@ struct UserProfileResponse: Codable {
 
 // MARK: - Statistics Models
 struct UserStatistics: Codable {
+    let currentStreak: Int
+    let totalXp: Int
     let totalSolves: Int
     let totalSubmissions: Int
     let totalStreakDays: Int
@@ -55,6 +57,7 @@ struct UserSolve: Codable, Identifiable {
     let id: Int
     let xpAwarded: Int
     let solvedAt: String
+    let aiAnalysis: String?
     let problem: Problem
     let submission: Submission?
     let highlight: Highlight?

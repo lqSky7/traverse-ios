@@ -609,7 +609,7 @@ class NetworkService {
     }
     
     // MARK: - Get User Statistics (Public)
-    func getUserStatistics(username: String) async throws -> UserStatisticsResponse {
+    func getUserStatistics(username: String) async throws -> UserStats {
         guard let url = URL(string: "\(baseURL)/users/\(username)/stats") else {
             throw NetworkError.invalidURL
         }
@@ -625,7 +625,7 @@ class NetworkService {
         
         if httpResponse.statusCode == 200 {
             do {
-                let statsResponse = try JSONDecoder().decode(UserStatisticsResponse.self, from: data)
+                let statsResponse = try JSONDecoder().decode(UserStats.self, from: data)
                 return statsResponse
             } catch {
                 print("Decoding error: \(error)")

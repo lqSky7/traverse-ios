@@ -8,6 +8,7 @@ import SwiftUI
 struct FriendRequestsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: FriendsViewModel
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     @State private var selectedTab = 0
     
     var body: some View {
@@ -89,13 +90,14 @@ struct ReceivedRequestRow: View {
     let request: FriendRequest
     let requester: UserBasic
     @ObservedObject var viewModel: FriendsViewModel
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var isProcessing = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Circle()
-                    .fill(.blue.gradient)
+                    .fill(paletteManager.selectedPalette.primary.gradient)
                     .frame(width: 44, height: 44)
                     .overlay {
                         Text(requester.username.prefix(1).uppercased())
@@ -110,11 +112,11 @@ struct ReceivedRequestRow: View {
                     HStack(spacing: 12) {
                         Label("\(requester.currentStreak)", systemImage: "flame.fill")
                             .font(.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(paletteManager.color(at: 0))
                         
                         Label("\(requester.totalXp) XP", systemImage: "star.fill")
                             .font(.caption)
-                            .foregroundStyle(.yellow)
+                            .foregroundStyle(paletteManager.color(at: 1))
                     }
                     
                     Text(formatDate(request.createdAt))
@@ -138,7 +140,7 @@ struct ReceivedRequestRow: View {
                             .foregroundStyle(.black)
                             .frame(maxWidth: .infinity)
                     }
-                    .tint(.white)
+                    .tint(paletteManager.selectedPalette.primary)
                     .disabled(isProcessing)
                 }
                 .applyButtonStyle(.glassProminent)
@@ -154,7 +156,7 @@ struct ReceivedRequestRow: View {
                         Text("Reject")
                             .frame(maxWidth: .infinity)
                     }
-                    .tint(Color(red: 1.0, green: 0.7, blue: 0.7))
+                    .tint(paletteManager.selectedPalette.secondary)
                     .disabled(isProcessing)
                 }
                 .applyButtonStyle(.glass)
@@ -177,13 +179,14 @@ struct SentRequestRow: View {
     let request: FriendRequest
     let addressee: UserBasic
     @ObservedObject var viewModel: FriendsViewModel
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var isProcessing = false
     @State private var showingCancelConfirmation = false
     
     var body: some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(.purple.gradient)
+                .fill(paletteManager.color(at: 2).gradient)
                 .frame(width: 44, height: 44)
                 .overlay {
                     Text(addressee.username.prefix(1).uppercased())
@@ -198,11 +201,11 @@ struct SentRequestRow: View {
                 HStack(spacing: 12) {
                     Label("\(addressee.currentStreak)", systemImage: "flame.fill")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(paletteManager.color(at: 0))
                     
                     Label("\(addressee.totalXp) XP", systemImage: "star.fill")
                         .font(.caption)
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(paletteManager.color(at: 1))
                 }
                 
                 HStack(spacing: 8) {
