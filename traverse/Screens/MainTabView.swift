@@ -14,20 +14,29 @@ struct MainTabView: View {
                     }
                     .tag(0)
                 
+                RevisionsView()
+                    .tabItem {
+                        Label("Revisions", systemImage: "calendar.badge.clock")
+                    }
+                    .tag(1)
+                
                 FriendsTab()
                     .tabItem {
                         Label("Friends", systemImage: "person.2.fill")
                     }
-                    .tag(1)
+                    .tag(2)
                 
                 SettingsView()
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
-                    .tag(2)
+                    .tag(3)
             }
             .tabBarMinimizeBehavior(.onScrollDown)
             .tint(paletteManager.selectedPalette.primary)
+            .onAppear {
+                setupNotificationObserver()
+            }
         } else {
             TabView(selection: $selectedTab) {
                 HomeTab()
@@ -36,19 +45,40 @@ struct MainTabView: View {
                     }
                     .tag(0)
                 
+                RevisionsView()
+                    .tabItem {
+                        Label("Revisions", systemImage: "calendar.badge.clock")
+                    }
+                    .tag(1)
+                
                 FriendsTab()
                     .tabItem {
                         Label("Friends", systemImage: "person.2.fill")
                     }
-                    .tag(1)
+                    .tag(2)
                 
                 SettingsView()
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
-                    .tag(2)
+                    .tag(3)
             }
             .tint(paletteManager.selectedPalette.primary)
+            .onAppear {
+                setupNotificationObserver()
+            }
+        }
+    }
+}
+
+extension MainTabView {
+    private func setupNotificationObserver() {
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("OpenRevisionsTab"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            selectedTab = 1 // Navigate to Revisions tab
         }
     }
 }

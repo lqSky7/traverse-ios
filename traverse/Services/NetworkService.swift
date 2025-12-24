@@ -1091,4 +1091,167 @@ class NetworkService {
             throw NetworkError.serverError("Failed to get friend's achievements (Status: \(httpResponse.statusCode))")
         }
     }
+    
+    // MARK: - Get Revisions
+    func getRevisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0) async throws -> RevisionsResponse {
+        var urlComponents = URLComponents(string: "\(baseURL)/revisions")!
+        var queryItems: [URLQueryItem] = []
+        
+        if upcoming {
+            queryItems.append(URLQueryItem(name: "upcoming", value: "true"))
+        }
+        if overdue {
+            queryItems.append(URLQueryItem(name: "overdue", value: "true"))
+        }
+        queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        queryItems.append(URLQueryItem(name: "offset", value: String(offset)))
+        
+        urlComponents.queryItems = queryItems
+        
+        guard let url = urlComponents.url else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let revisionsResponse = try JSONDecoder().decode(RevisionsResponse.self, from: data)
+                return revisionsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get revisions (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Grouped Revisions
+    func getGroupedRevisions(includeCompleted: Bool = false) async throws -> GroupedRevisionsResponse {
+        var urlComponents = URLComponents(string: "\(baseURL)/revisions/grouped")!
+        urlComponents.queryItems = [
+            URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false")
+        ]
+        
+        guard let url = urlComponents.url else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let groupedResponse = try JSONDecoder().decode(GroupedRevisionsResponse.self, from: data)
+                return groupedResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get grouped revisions (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Get Revision Stats
+    func getRevisionStats() async throws -> RevisionStatsResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/stats") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let statsResponse = try JSONDecoder().decode(RevisionStatsResponse.self, from: data)
+                return statsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get revision stats (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Complete Revision
+    func completeRevision(id: Int) async throws -> CompleteRevisionResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/\(id)/complete") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let completeResponse = try JSONDecoder().decode(CompleteRevisionResponse.self, from: data)
+                return completeResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to complete revision (Status: \(httpResponse.statusCode))")
+        }
+    }
 }

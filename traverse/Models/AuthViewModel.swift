@@ -173,7 +173,7 @@ class AuthViewModel: ObservableObject {
     
     func deleteAccount(password: String) async throws {
         do {
-            let message = try await networkService.deleteAccount(password: password)
+            _ = try await networkService.deleteAccount(password: password)
             // Account deleted - logout
             isAuthenticated = false
             currentUser = nil
