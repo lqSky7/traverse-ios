@@ -75,6 +75,11 @@ struct HomeView: View {
                             
                             if let solves = viewModel.recentSolves, !solves.isEmpty {
                                 RecentSolvesCard(solves: solves)
+                                
+                                // New Performance Charts
+                                PerformanceMetricsCard(solves: solves)
+                                
+                                TriesDistributionCard(solves: solves)
                             }
                         }
                     }
@@ -1020,6 +1025,7 @@ struct AllSolvesView: View {
 
 struct SolveRow: View {
     let solve: Solve
+    @State private var isExpanded = false
     
     private var difficultyColor: Color {
         switch solve.problem.difficulty.lowercased() {
@@ -1031,53 +1037,160 @@ struct SolveRow: View {
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(solve.problem.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
-                
-                HStack(spacing: 8) {
-                    Text(solve.problem.difficulty.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(difficultyColor)
-                    
-                    Text("•")
-                        .foregroundStyle(.secondary)
-                    
-                    Text(solve.submission.language.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    Text("•")
-                        .foregroundStyle(.secondary)
-                    
-                    Text(solve.problem.platform.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded.toggle()
                 }
+            }) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(solve.problem.title)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                        
+                        HStack(spacing: 8) {
+                            Text(solve.problem.difficulty.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(difficultyColor)
+                            
+                            Text("•")
+                                .foregroundStyle(.secondary)
+                            
+                            Text(solve.submission.language.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            Text("•")
+                                .foregroundStyle(.secondary)
+                            
+                            Text(solve.problem.platform.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            // Show metrics if available
+                            if let tries = solve.submission.numberOfTries, tries > 0 {
+                                Text("•")
+                                    .foregroundStyle(.secondary)
+                                Text("\(tries) tries")
+                                    .font(.caption)
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Text("+\(solve.xpAwarded)")
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundStyle(.yellow)
+                            Image(systemName: "star.fill")
+                                .font(.caption)
+                                .foregroundStyle(.yellow)
+                        }
+                        
+                        Text(formatDate(solve.solvedAt))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                }
+                .padding(12)
             }
+            .buttonStyle(PlainButtonStyle())
             
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text("+\(solve.xpAwarded)")
-                        .font(.subheadline)
-                        .bold()
-                        .foregroundStyle(.yellow)
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundStyle(.yellow)
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 12) {
+                    Divider()
+                    
+                    // Time taken
+                    if let timeTaken = solve.submission.timeTaken {
+                        HStack(spacing: 8) {
+                            Image(systemName: "clock.fill")
+                                .foregroundStyle(.blue)
+                                .font(.caption)
+                            Text("Time: \(formatTime(timeTaken))")
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    // Number of tries
+                    if let tries = solve.submission.numberOfTries {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundStyle(.purple)
+                                .font(.caption)
+                            Text("Attempts: \(tries)")
+                                .font(.subheadline)
+                        }
+                    }
+                    
+                    // AI Analysis
+                    if let analysis = solve.aiAnalysis ?? solve.submission.aiAnalysis, !analysis.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "sparkles")
+                                    .foregroundStyle(.yellow)
+                                    .font(.caption)
+                                Text("AI Analysis")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            Text(analysis)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(5)
+                        }
+                        .padding(.top, 4)
+                    }
+                    
+                    // Highlight
+                    if let highlight = solve.highlight {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "note.text")
+                                    .foregroundStyle(.green)
+                                    .font(.caption)
+                                Text("Your Note")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            Text(highlight.note)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            if !highlight.tags.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(highlight.tags, id: \.self) { tag in
+                                            Text(tag)
+                                                .font(.caption2)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.blue.opacity(0.2))
+                                                .foregroundStyle(.blue)
+                                                .cornerRadius(6)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                
-                Text(formatDate(solve.solvedAt))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
             }
         }
-        .padding(12)
         .background(.ultraThinMaterial)
         .cornerRadius(12)
     }
@@ -1099,6 +1212,299 @@ struct SolveRow: View {
             return "\(minutes)m ago"
         } else {
             return "Just now"
+        }
+    }
+    
+    private func formatTime(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m \(secs)s"
+        } else {
+            return "\(secs)s"
+        }
+    }
+}
+
+// MARK: - Performance Metrics Card (NEW - Line Chart)
+struct PerformanceMetricsCard: View {
+    let solves: [Solve]
+    
+    private var timeData: [(String, Int)] {
+        solves.compactMap { solve in
+            guard let timeTaken = solve.submission.timeTaken else { return nil }
+            return (solve.problem.title, timeTaken)
+        }.reversed()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "clock.fill")
+                    .foregroundStyle(.blue)
+                Text("Time Performance")
+                    .font(.headline)
+            }
+            
+            Divider()
+                .background(Color.gray.opacity(0.3))
+            
+            if !timeData.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Average Time")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(formatTime(averageTime()))
+                                .font(.title3)
+                                .bold()
+                                .foregroundStyle(.blue)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Fastest")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(formatTime(fastestTime()))
+                                .font(.title3)
+                                .bold()
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    
+                    Chart(Array(timeData.enumerated()), id: \.offset) { index, item in
+                        LineMark(
+                            x: .value("Problem", index),
+                            y: .value("Time", item.1)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .cyan],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
+                        
+                        AreaMark(
+                            x: .value("Problem", index),
+                            y: .value("Time", item.1)
+                        )
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue.opacity(0.3), .cyan.opacity(0.1)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        
+                        PointMark(
+                            x: .value("Problem", index),
+                            y: .value("Time", item.1)
+                        )
+                        .foregroundStyle(.blue)
+                        .symbol(Circle())
+                    }
+                    .frame(height: 160)
+                    .chartXAxis(.hidden)
+                    .chartYAxis {
+                        AxisMarks(position: .leading) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+                                .foregroundStyle(Color.gray.opacity(0.3))
+                            AxisValueLabel {
+                                if let seconds = value.as(Int.self) {
+                                    Text(formatTimeShort(seconds))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("No time data available")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 40)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+    
+    private func averageTime() -> Int {
+        let times = timeData.map { $0.1 }
+        guard !times.isEmpty else { return 0 }
+        return times.reduce(0, +) / times.count
+    }
+    
+    private func fastestTime() -> Int {
+        timeData.map { $0.1 }.min() ?? 0
+    }
+    
+    private func formatTime(_ seconds: Int) -> String {
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m \(secs)s"
+        } else {
+            return "\(secs)s"
+        }
+    }
+    
+    private func formatTimeShort(_ seconds: Int) -> String {
+        let minutes = seconds / 60
+        if minutes > 0 {
+            return "\(minutes)m"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+// MARK: - Tries Distribution Card (NEW - Point Chart)
+struct TriesDistributionCard: View {
+    let solves: [Solve]
+    
+    private var triesData: [(String, Int, String)] {
+        solves.compactMap { solve in
+            guard let tries = solve.submission.numberOfTries, tries > 0 else { return nil }
+            return (solve.problem.title, tries, solve.problem.difficulty)
+        }.reversed()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "arrow.clockwise")
+                    .foregroundStyle(.purple)
+                Text("Attempts Analysis")
+                    .font(.headline)
+            }
+            
+            Divider()
+                .background(Color.gray.opacity(0.3))
+            
+            if !triesData.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 20) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Average Tries")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(String(format: "%.1f", averageTries()))
+                                .font(.title3)
+                                .bold()
+                                .foregroundStyle(.purple)
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Best (1st try)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("\(firstTryCount())")
+                                .font(.title3)
+                                .bold()
+                                .foregroundStyle(.green)
+                        }
+                    }
+                    
+                    Chart(Array(triesData.enumerated()), id: \.offset) { index, item in
+                        PointMark(
+                            x: .value("Problem", index),
+                            y: .value("Tries", item.1)
+                        )
+                        .foregroundStyle(difficultyColor(item.2))
+                        .symbol {
+                            Circle()
+                                .fill(difficultyColor(item.2))
+                                .frame(width: item.1 == 1 ? 12 : 8, height: item.1 == 1 ? 12 : 8)
+                        }
+                        
+                        if item.1 > 3 {
+                            RuleMark(y: .value("Tries", item.1))
+                                .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+                                .foregroundStyle(difficultyColor(item.2).opacity(0.3))
+                        }
+                    }
+                    .frame(height: 140)
+                    .chartXAxis(.hidden)
+                    .chartYAxis {
+                        AxisMarks(position: .leading, values: [1, 2, 3, 4, 5]) { value in
+                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+                                .foregroundStyle(Color.gray.opacity(0.3))
+                            AxisValueLabel()
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    
+                    // Legend
+                    HStack(spacing: 16) {
+                        HStack(spacing: 4) {
+                            Circle().fill(.green).frame(width: 8, height: 8)
+                            Text("Easy")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack(spacing: 4) {
+                            Circle().fill(.orange).frame(width: 8, height: 8)
+                            Text("Medium")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        HStack(spacing: 4) {
+                            Circle().fill(.red).frame(width: 8, height: 8)
+                            Text("Hard")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            } else {
+                Text("No attempts data available")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 40)
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+    
+    private func averageTries() -> Double {
+        let tries = triesData.map { Double($0.1) }
+        guard !tries.isEmpty else { return 0 }
+        return tries.reduce(0, +) / Double(tries.count)
+    }
+    
+    private func firstTryCount() -> Int {
+        triesData.filter { $0.1 == 1 }.count
+    }
+    
+    private func difficultyColor(_ difficulty: String) -> Color {
+        switch difficulty.lowercased() {
+        case "easy": return .green
+        case "medium": return .orange
+        case "hard": return .red
+        default: return .gray
         }
     }
 }

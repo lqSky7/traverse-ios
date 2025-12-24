@@ -22,6 +22,13 @@ struct ProblemsByDifficulty: Codable {
     let easy: Int
     let medium: Int
     let hard: Int
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        easy = try container.decodeIfPresent(Int.self, forKey: .easy) ?? 0
+        medium = try container.decodeIfPresent(Int.self, forKey: .medium) ?? 0
+        hard = try container.decodeIfPresent(Int.self, forKey: .hard) ?? 0
+    }
 }
 
 // MARK: - Submission Statistics
@@ -66,6 +73,7 @@ struct Solve: Codable, Identifiable {
     let id: Int
     let xpAwarded: Int
     let solvedAt: String
+    let aiAnalysis: String?
     let problem: Problem
     let submission: Submission
     let highlight: Highlight?
@@ -81,6 +89,9 @@ struct Problem: Codable {
 struct Submission: Codable {
     let language: String
     let happenedAt: String
+    let aiAnalysis: String?
+    let numberOfTries: Int?
+    let timeTaken: Int?
 }
 
 struct Highlight: Codable {
