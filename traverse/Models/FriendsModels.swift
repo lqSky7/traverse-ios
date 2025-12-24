@@ -45,11 +45,31 @@ struct UserProblemsByDifficulty: Codable {
     let easy: Int
     let medium: Int
     let hard: Int
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        easy = try container.decodeIfPresent(Int.self, forKey: .easy) ?? 0
+        medium = try container.decodeIfPresent(Int.self, forKey: .medium) ?? 0
+        hard = try container.decodeIfPresent(Int.self, forKey: .hard) ?? 0
+    }
+    
+    init(easy: Int, medium: Int, hard: Int) {
+        self.easy = easy
+        self.medium = medium
+        self.hard = hard
+    }
+}
+
+struct UserStatisticsData: Codable {
+    let totalSolves: Int
+    let totalSubmissions: Int
+    let totalStreakDays: Int
+    let problemsByDifficulty: UserProblemsByDifficulty
 }
 
 struct UserStatisticsResponse: Codable {
     let username: String
-    let stats: UserStatistics
+    let stats: UserStatisticsData
 }
 
 // MARK: - Solves Models

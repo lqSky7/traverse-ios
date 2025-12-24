@@ -351,9 +351,9 @@ class NetworkService {
         }
     }
     
-    // MARK: - Get User Statistics
+    // MARK: - Get User Statistics (Authenticated - for own stats)
     func getUserStats(username: String) async throws -> UserStats {
-        guard let url = URL(string: "\(baseURL)/users/\(username)/stats") else {
+        guard let url = URL(string: "\(baseURL)/auth/me/stats") else {
             throw NetworkError.invalidURL
         }
         
@@ -609,7 +609,7 @@ class NetworkService {
     }
     
     // MARK: - Get User Statistics (Public)
-    func getUserStatistics(username: String) async throws -> UserStats {
+    func getUserStatistics(username: String) async throws -> UserStatisticsResponse {
         guard let url = URL(string: "\(baseURL)/users/\(username)/stats") else {
             throw NetworkError.invalidURL
         }
@@ -625,7 +625,7 @@ class NetworkService {
         
         if httpResponse.statusCode == 200 {
             do {
-                let statsResponse = try JSONDecoder().decode(UserStats.self, from: data)
+                let statsResponse = try JSONDecoder().decode(UserStatisticsResponse.self, from: data)
                 return statsResponse
             } catch {
                 print("Decoding error: \(error)")
@@ -741,8 +741,11 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                print("Friend request error (\(httpResponse.statusCode)): \(errorResponse.message)")
                 throw NetworkError.serverError(errorResponse.message)
             }
+            let responseString = String(data: data, encoding: .utf8) ?? "unknown"
+            print("Failed to send friend request. Status: \(httpResponse.statusCode), Response: \(responseString)")
             throw NetworkError.serverError("Failed to send friend request (Status: \(httpResponse.statusCode))")
         }
     }

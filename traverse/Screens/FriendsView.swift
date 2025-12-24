@@ -190,6 +190,15 @@ struct FriendsView: View {
                 await viewModel.loadFriends()
                 await viewModel.loadRequests()
             }
+            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+                Button("OK") {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                }
+            }
         }
     }
     
@@ -222,12 +231,13 @@ struct FriendsView: View {
 
 struct FriendCard: View {
     let friend: Friend
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Circle()
-                    .fill(.blue.gradient)
+                    .fill(paletteManager.selectedPalette.primary.gradient)
                     .frame(width: 50, height: 50)
                     .overlay {
                         Text(friend.username.prefix(1).uppercased())
@@ -261,7 +271,7 @@ struct FriendCard: View {
                     title: "Streak",
                     value: "\(friend.currentStreak)",
                     icon: "flame.fill",
-                    color: .orange
+                    color: paletteManager.selectedPalette.secondary
                 )
                 
                 Divider()
@@ -271,7 +281,7 @@ struct FriendCard: View {
                     title: "Total XP",
                     value: "\(friend.totalXp)",
                     icon: "star.fill",
-                    color: .yellow
+                    color: paletteManager.selectedPalette.primary
                 )
             }
             .padding()

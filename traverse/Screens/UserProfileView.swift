@@ -7,7 +7,7 @@ import SwiftUI
 import Combine
 
 enum FriendshipStatus {
-    case self
+    case currentUser
     case notFriends
     case friends
     case requestSent
@@ -31,6 +31,7 @@ class UserProfileViewModel: ObservableObject {
     private var hasLoadedAchievements = false
     
     let username: String
+    var currentUsername: String?
     
     init(username: String) {
         self.username = username
@@ -39,6 +40,13 @@ class UserProfileViewModel: ObservableObject {
     func loadProfile() async {
         isLoading = true
         errorMessage = nil
+        
+        // Check if viewing own profile
+        if username == currentUsername {
+            friendshipStatus = .currentUser
+            isLoading = false
+            return
+        }
         
         do {
             async let profileData = NetworkService.shared.getUserProfile(username: username)
@@ -140,7 +148,12 @@ class UserProfileViewModel: ObservableObject {
             friendshipStatus = .requestSent
             HapticManager.shared.success()
         } catch {
-            errorMessage = error.localizedDescription
+            let errorMsg = error.localizedDescription
+            // If the error says "already friends", reload profile to update status
+            if errorMsg.lowercased().contains("already friends") {
+                await loadProfile()
+            }
+            errorMessage = errorMsg
             HapticManager.shared.error()
         }
     }
@@ -236,11 +249,26 @@ struct UserProfileView: View {
                 }
             }
         }
+        .onAppear {
+            viewModel.currentUsername = authViewModel.currentUser?.username
+        }
+        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                viewModel.errorMessage = nil
+            }
+        } message: {
+            if let error = viewModel.errorMessage {
+                Text(error)
+            }
+        }
     }
     
     @ViewBuilder
     private var friendActionButton: some View {
         switch viewModel.friendshipStatus {
+        case .currentUser:
+            EmptyView()
+            
         case .notFriends:
             Group {
                 Button {
