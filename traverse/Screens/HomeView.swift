@@ -903,7 +903,7 @@ struct SubmissionBreakdownCard: View {
                                 Text("\(stats.accepted)")
                                     .font(.headline)
                                     .bold()
-                                Text("(\(Int((Double(stats.accepted) / Double(stats.total)) * 100))%)")
+                                Text("(\(stats.total > 0 ? Int((Double(stats.accepted) / Double(stats.total)) * 100) : 0)%)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -923,7 +923,7 @@ struct SubmissionBreakdownCard: View {
                                 Text("\(stats.failed)")
                                     .font(.headline)
                                     .bold()
-                                Text("(\(Int((Double(stats.failed) / Double(stats.total)) * 100))%)")
+                                Text("(\(stats.total > 0 ? Int((Double(stats.failed) / Double(stats.total)) * 100) : 0)%)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
