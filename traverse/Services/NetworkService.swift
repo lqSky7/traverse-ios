@@ -540,6 +540,42 @@ class NetworkService {
         }
     }
     
+    // MARK: - Get All Achievements
+    func getAllAchievements() async throws -> AllAchievementsResponse {
+        guard let url = URL(string: "\(baseURL)/achievements") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let achievementsResponse = try JSONDecoder().decode(AllAchievementsResponse.self, from: data)
+                return achievementsResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to get achievements (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
     // MARK: - Search Users
     func searchUsers(query: String, limit: Int = 10) async throws -> UsersSearchResponse {
         var components = URLComponents(string: "\(baseURL)/users")

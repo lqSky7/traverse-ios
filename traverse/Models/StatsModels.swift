@@ -120,3 +120,19 @@ struct AchievementStatsData: Codable {
     let percentage: String
     let byCategory: [String: Int]
 }
+
+// MARK: - All Achievements
+struct AllAchievementsResponse: Codable {
+    let achievements: [AchievementDetail]
+}
+
+struct AchievementDetail: Codable, Identifiable {
+    let id: Int
+    let key: String
+    let name: String
+    let description: String
+    let icon: String?
+    let category: String
+    let unlocked: Bool
+    let unlockedAt: String?
+}

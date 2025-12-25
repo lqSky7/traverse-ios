@@ -25,6 +25,7 @@ struct ContentView: View {
                             self.accountType = nil 
                         }
                     })
+                    .preferredColorScheme(.dark)
                     .transition(.opacity.combined(with: .offset(y: 20)))
                 } else {
                     SignInView(authViewModel: authViewModel, onBack: { 
@@ -32,6 +33,7 @@ struct ContentView: View {
                             self.accountType = nil 
                         }
                     })
+                    .preferredColorScheme(.dark)
                     .transition(.opacity.combined(with: .offset(y: 20)))
                 }
             } else {
@@ -40,6 +42,7 @@ struct ContentView: View {
                         accountType = type
                     }
                 })
+                .preferredColorScheme(.dark)
                 .transition(.opacity.combined(with: .offset(y: 20)))
             }
         }

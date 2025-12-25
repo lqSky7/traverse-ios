@@ -494,7 +494,7 @@ struct AchievementStatsCard: View {
                 Text("Achievements")
                     .font(.headline)
                 Spacer()
-                NavigationLink(destination: AllAchievementsView(stats: stats)) {
+                NavigationLink(destination: AllAchievementsView()) {
                     Text("View All")
                         .font(.subheadline)
                         .foregroundStyle(paletteManager.selectedPalette.primary)
@@ -532,6 +532,11 @@ struct AchievementStatsCard: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                
+                // Vertical divider
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 1)
                 
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -581,120 +586,431 @@ struct AchievementStatsCard: View {
 
 // MARK: - All Achievements View
 struct AllAchievementsView: View {
-    let stats: AchievementStatsData
+    @StateObject private var viewModel = AchievementsViewModel()
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
+    @State private var expandedCategories: Set<String> = []
+    @State private var gradientPhase: CGFloat = 0
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Summary Card
-                VStack(spacing: 16) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(stats.unlocked)")
-                                .font(.system(size: 48, weight: .bold))
-                                .foregroundStyle(.yellow)
-                            Text("Achievements Unlocked")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Image(systemName: "trophy.fill")
-                            .font(.system(size: 60))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.yellow, .orange],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    }
-                    
-                    Divider()
-                    
-                    HStack(spacing: 30) {
-                        VStack(spacing: 4) {
-                            Text("\(stats.total)")
-                                .font(.title)
-                                .bold()
-                            Text("Total")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        VStack(spacing: 4) {
-                            Text(stats.percentage)
-                                .font(.title)
-                                .bold()
-                                .foregroundStyle(.yellow)
-                            Text("Progress")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        VStack(spacing: 4) {
-                            Text("\(stats.total - stats.unlocked)")
-                                .font(.title)
-                                .bold()
-                                .foregroundStyle(.gray)
-                            Text("Remaining")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .cornerRadius(16)
-                
-                // Category Breakdown
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("By Category")
-                        .font(.headline)
-                    
-                    ForEach(stats.byCategory.sorted(by: { $0.value > $1.value }), id: \.key) { category, count in
-                        HStack {
-                            Image(systemName: getCategoryIcon(category))
-                                .font(.title3)
-                                .foregroundStyle(.yellow)
-                                .frame(width: 40, height: 40)
-                                .background(.ultraThinMaterial)
-                                .cornerRadius(10)
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(category.capitalized)
-                                    .font(.headline)
-                                Text("\(count) achievements")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+        ZStack(alignment: .top) {
+            // Background gradient
+            MeshGradientBackground(paletteManager: paletteManager, phase: gradientPhase)
+                .ignoresSafeArea()
+            
+            // Scrollable content
+            ScrollView {
+                VStack(spacing: 20) {
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .padding(.top, 100)
+                    } else if let error = viewModel.errorMessage {
+                        ErrorView(message: error, retry: {
+                            Task {
+                                await viewModel.loadAchievements()
                             }
-                            
-                            Spacer()
-                            
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
+                        })
+                    } else if let achievements = viewModel.achievements {
+                        // Spacer for sticky card
+                        Color.clear
+                            .frame(height: 130)
+                        
+                        // Categories with expandable achievements
+                        CategoriesSection(achievements: achievements, expandedCategories: $expandedCategories, paletteManager: paletteManager)
+                            .padding(.horizontal)
+                            .padding(.bottom)
                     }
                 }
-                .padding()
-                .background(.ultraThinMaterial)
-                .cornerRadius(16)
             }
-            .padding()
+            
+            // Sticky Summary Card
+            if let achievements = viewModel.achievements {
+                VStack {
+                    SummaryCard(
+                        achievements: achievements,
+                        paletteManager: paletteManager
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 20)
+                    
+                    Spacer()
+                }
+            }
         }
-        .background(Color.black)
         .navigationTitle("All Achievements")
         .navigationBarTitleDisplayMode(.large)
+        .onAppear {
+            if viewModel.achievements == nil {
+                Task {
+                    await viewModel.loadAchievements()
+                }
+            }
+            // Start gradient animation
+            withAnimation(.linear(duration: 8).repeatForever(autoreverses: true)) {
+                gradientPhase = 1
+            }
+        }
+    }
+}
+
+// MARK: - Scroll Offset Preference Key
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+// MARK: - Summary Card
+struct SummaryCard: View {
+    let achievements: [AchievementDetail]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private var unlockedCount: Int {
+        achievements.filter { $0.unlocked }.count
     }
     
-    private func getCategoryIcon(_ category: String) -> String {
+    private var totalCount: Int {
+        achievements.count
+    }
+    
+    private var progressPercentage: Int {
+        guard totalCount > 0 else { return 0 }
+        return Int((Double(unlockedCount) / Double(totalCount)) * 100)
+    }
+    
+    private var remainingCount: Int {
+        totalCount - unlockedCount
+    }
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            // Progress with vertical separators
+            HStack(spacing: 0) {
+                VStack(spacing: 4) {
+                    Text("\(totalCount)")
+                        .font(.title)
+                        .bold()
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("Total")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                
+                // Vertical separator
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 1, height: 40)
+                
+                VStack(spacing: 4) {
+                    Text("\(progressPercentage)%")
+                        .font(.title)
+                        .bold()
+                        .foregroundStyle(paletteManager.color(at: 3))
+                    Text("Progress")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                
+                // Vertical separator
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(width: 1, height: 40)
+                
+                VStack(spacing: 4) {
+                    Text("\(remainingCount)")
+                        .font(.title)
+                        .bold()
+                        .foregroundStyle(.gray)
+                    Text("Remaining")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding()
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+// MARK: - Mesh Gradient Background
+struct MeshGradientBackground: View {
+    @ObservedObject var paletteManager: ColorPaletteManager
+    let phase: CGFloat
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+                
+                // Multiple gradient layers for mesh effect
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    paletteManager.color(at: index).opacity(0.3),
+                                    paletteManager.color(at: index).opacity(0.15),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 300
+                            )
+                        )
+                        .frame(width: 400, height: 400)
+                        .offset(
+                            x: geometry.size.width * (0.3 + CGFloat(index) * 0.2) * (1 + phase * 0.3) - 200,
+                            y: geometry.size.height * (0.2 + CGFloat(index) * 0.3) * (1 - phase * 0.2) - 200
+                        )
+                        .blur(radius: 60)
+                }
+                
+                // Additional moving gradient layer
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                paletteManager.color(at: 4).opacity(0.25),
+                                paletteManager.color(at: 3).opacity(0.12),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 350
+                        )
+                    )
+                    .frame(width: 500, height: 500)
+                    .offset(
+                        x: geometry.size.width * 0.7 * (1 - phase * 0.4) - 250,
+                        y: geometry.size.height * 0.6 * (1 + phase * 0.3) - 250
+                    )
+                    .blur(radius: 80)
+            }
+        }
+    }
+}
+
+// MARK: - Categories Section
+struct CategoriesSection: View {
+    let achievements: [AchievementDetail]
+    @Binding var expandedCategories: Set<String>
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private var groupedAchievements: [String: [AchievementDetail]] {
+        Dictionary(grouping: achievements) { $0.category }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Achievements by Category")
+                .font(.headline)
+            
+            ForEach(groupedAchievements.sorted(by: { $0.key < $1.key }), id: \.key) { category, categoryAchievements in
+                AchievementCategoryCard(
+                    category: category,
+                    achievements: categoryAchievements,
+                    isExpanded: expandedCategories.contains(category),
+                    paletteManager: paletteManager,
+                    onToggle: {
+                        if expandedCategories.contains(category) {
+                            expandedCategories.remove(category)
+                        } else {
+                            expandedCategories.insert(category)
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Achievement Category Card
+struct AchievementCategoryCard: View {
+    let category: String
+    let achievements: [AchievementDetail]
+    let isExpanded: Bool
+    @ObservedObject var paletteManager: ColorPaletteManager
+    let onToggle: () -> Void
+    
+    private var unlockedCount: Int {
+        achievements.filter { $0.unlocked }.count
+    }
+    
+    private var categoryIcon: String {
         switch category.lowercased() {
         case "solve": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
-        case "submission": return "arrow.up.doc.fill"
+        case "social": return "person.2.fill"
         default: return "sparkles"
+        }
+    }
+    
+    private var categoryColor: Color {
+        switch category.lowercased() {
+        case "solve": return paletteManager.color(at: 0)
+        case "streak": return paletteManager.color(at: 1)
+        case "social": return paletteManager.color(at: 2)
+        default: return paletteManager.color(at: 3)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Category Header
+            Button(action: onToggle) {
+                HStack {
+                    ZStack {
+                        Circle()
+                            .fill(categoryColor.opacity(0.2))
+                            .frame(width: 50, height: 50)
+                        Image(systemName: categoryIcon)
+                            .font(.title2)
+                            .foregroundStyle(categoryColor)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(category.capitalized)
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text("\(unlockedCount) of \(achievements.count) unlocked")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(.secondary)
+                        .font(.title3)
+                }
+                .padding()
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Expandable Achievements List
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider()
+                    
+                    ForEach(achievements.sorted(by: { $0.unlocked && !$1.unlocked }), id: \.id) { achievement in
+                        AchievementRow(achievement: achievement, paletteManager: paletteManager)
+                        
+                        if achievement.id != achievements.last?.id {
+                            Divider()
+                                .padding(.leading, 70)
+                        }
+                    }
+                }
+            }
+        }
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
+// MARK: - Achievement Row
+struct AchievementRow: View {
+    let achievement: AchievementDetail
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(achievement.unlocked ? paletteManager.color(at: 3).opacity(0.2) : Color.gray.opacity(0.2))
+                    .frame(width: 40, height: 40)
+                
+                if achievement.unlocked {
+                    Image(systemName: "checkmark")
+                        .font(.title3)
+                        .foregroundStyle(paletteManager.color(at: 3))
+                } else {
+                    Image(systemName: "lock.fill")
+                        .font(.title3)
+                        .foregroundStyle(.gray)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(achievement.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(achievement.unlocked ? .white : .gray)
+                
+                Text(achievement.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                
+                if achievement.unlocked, let unlockedAt = achievement.unlockedAt {
+                    Text("Unlocked \(formatDate(unlockedAt))")
+                        .font(.caption2)
+                        .foregroundStyle(paletteManager.color(at: 3))
+                }
+            }
+            
+            Spacer()
+            
+            if let icon = achievement.icon {
+                Text(icon)
+                    .font(.title2)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .opacity(achievement.unlocked ? 1.0 : 0.6)
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: dateString) else {
+            return "recently"
+        }
+        
+        let now = Date()
+        let components = Calendar.current.dateComponents([.day, .hour, .minute], from: date, to: now)
+        
+        if let days = components.day, days > 0 {
+            return "\(days)d ago"
+        } else if let hours = components.hour, hours > 0 {
+            return "\(hours)h ago"
+        } else if let minutes = components.minute, minutes > 0 {
+            return "\(minutes)m ago"
+        } else {
+            return "just now"
+        }
+    }
+}
+
+// MARK: - Achievements View Model
+class AchievementsViewModel: ObservableObject {
+    @Published var achievements: [AchievementDetail]?
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    
+    func loadAchievements() async {
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        
+        do {
+            let response = try await NetworkService.shared.getAllAchievements()
+            await MainActor.run {
+                self.achievements = response.achievements
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+            }
+        }
+        
+        await MainActor.run {
+            isLoading = false
         }
     }
 }
