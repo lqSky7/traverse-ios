@@ -117,6 +117,13 @@ struct HomeView: View {
             // Start title animation cycle
             startTitleAnimation()
         }
+        .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
+            if let username = newUsername, viewModel.solveStats == nil {
+                Task {
+                    await viewModel.loadData(username: username)
+                }
+            }
+        }
         .preferredColorScheme(.dark)
     }
     
@@ -1523,6 +1530,17 @@ class HomeViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    init() {
+        // Load persisted data immediately if available
+        if DataManager.shared.hasData {
+            self.userStats = DataManager.shared.userStats
+            self.submissionStats = DataManager.shared.submissionStats
+            self.solveStats = DataManager.shared.solveStats
+            self.achievementStats = DataManager.shared.achievementStats
+            self.recentSolves = DataManager.shared.recentSolves
+        }
+    }
+    
     func loadData(username: String, forceRefresh: Bool = false) async {
         // Use cached data from DataManager if available (unless force refresh)
         if !forceRefresh && DataManager.shared.hasData {
@@ -1570,6 +1588,9 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.solveStats = solveStats
             DataManager.shared.achievementStats = achievementStats
             DataManager.shared.recentSolves = solvesResponse.solves
+            
+            // Persist the data
+            DataManager.shared.persistData()
             
         } catch is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh
