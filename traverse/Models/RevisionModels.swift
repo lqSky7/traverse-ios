@@ -90,3 +90,40 @@ struct CompleteRevisionResponse: Codable {
     let message: String
     let revision: Revision
 }
+
+// MARK: - ML Revision Attempt
+struct RevisionAttemptRequest: Codable {
+    let outcome: Int // 0 = failed, 1 = success
+    let numTries: Int
+    let timeSpentMinutes: Double
+}
+
+struct RevisionAttemptResponse: Codable {
+    let message: String
+    let attempt: RevisionAttempt
+    let prediction: MLPrediction
+    let nextRevision: Revision?
+}
+
+struct RevisionAttempt: Codable {
+    let id: Int
+    let revisionId: Int
+    let userId: Int
+    let problemId: Int
+    let attemptNumber: Int
+    let daysSinceLastAttempt: Double
+    let outcome: Int
+    let numTries: Int
+    let timeSpentMinutes: Double
+    let attemptedAt: String
+}
+
+struct MLPrediction: Codable {
+    let nextReviewIntervalDays: Double
+    let confidence: String
+    
+    enum CodingKeys: String, CodingKey {
+        case nextReviewIntervalDays = "next_review_interval_days"
+        case confidence
+    }
+}

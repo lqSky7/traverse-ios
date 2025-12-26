@@ -1129,7 +1129,7 @@ class NetworkService {
     }
     
     // MARK: - Get Revisions
-    func getRevisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0) async throws -> RevisionsResponse {
+    func getRevisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0, type: String = "normal") async throws -> RevisionsResponse {
         var urlComponents = URLComponents(string: "\(baseURL)/revisions")!
         var queryItems: [URLQueryItem] = []
         
@@ -1141,6 +1141,7 @@ class NetworkService {
         }
         queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
         queryItems.append(URLQueryItem(name: "offset", value: String(offset)))
+        queryItems.append(URLQueryItem(name: "type", value: type))
         
         urlComponents.queryItems = queryItems
         
@@ -1179,10 +1180,11 @@ class NetworkService {
     }
     
     // MARK: - Get Grouped Revisions
-    func getGroupedRevisions(includeCompleted: Bool = false) async throws -> GroupedRevisionsResponse {
+    func getGroupedRevisions(includeCompleted: Bool = false, type: String = "normal") async throws -> GroupedRevisionsResponse {
         var urlComponents = URLComponents(string: "\(baseURL)/revisions/grouped")!
         urlComponents.queryItems = [
-            URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false")
+            URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false"),
+            URLQueryItem(name: "type", value: type)
         ]
         
         guard let url = urlComponents.url else {
@@ -1220,8 +1222,13 @@ class NetworkService {
     }
     
     // MARK: - Get Revision Stats
-    func getRevisionStats() async throws -> RevisionStatsResponse {
-        guard let url = URL(string: "\(baseURL)/revisions/stats") else {
+    func getRevisionStats(type: String = "normal") async throws -> RevisionStatsResponse {
+        var components = URLComponents(string: "\(baseURL)/revisions/stats")!
+        components.queryItems = [
+            URLQueryItem(name: "type", value: type)
+        ]
+        
+        guard let url = components.url else {
             throw NetworkError.invalidURL
         }
         
@@ -1288,6 +1295,50 @@ class NetworkService {
                 throw NetworkError.serverError(errorResponse.message)
             }
             throw NetworkError.serverError("Failed to complete revision (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Record ML Revision Attempt
+    func recordRevisionAttempt(id: Int, outcome: Int, numTries: Int, timeSpentMinutes: Double) async throws -> RevisionAttemptResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/\(id)/attempt") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        let requestBody = RevisionAttemptRequest(
+            outcome: outcome,
+            numTries: numTries,
+            timeSpentMinutes: timeSpentMinutes
+        )
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let attemptResponse = try JSONDecoder().decode(RevisionAttemptResponse.self, from: data)
+                return attemptResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.message)
+            }
+            throw NetworkError.serverError("Failed to record revision attempt (Status: \(httpResponse.statusCode))")
         }
     }
 }
