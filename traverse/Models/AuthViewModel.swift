@@ -82,6 +82,11 @@ class AuthViewModel: ObservableObject {
             }
             // Clear DataManager cache
             DataManager.shared.clearAllData()
+            // Clear widget data
+            if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
+                sharedDefaults.removeObject(forKey: "widgetData")
+                sharedDefaults.synchronize()
+            }
             isAuthenticated = false
             currentUser = nil
             profileImageUrl = nil
@@ -97,6 +102,11 @@ class AuthViewModel: ObservableObject {
             KeychainHelper.shared.deleteToken()
             // Clear DataManager cache
             DataManager.shared.clearAllData()
+            // Clear widget data
+            if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
+                sharedDefaults.removeObject(forKey: "widgetData")
+                sharedDefaults.synchronize()
+            }
             isAuthenticated = false
             currentUser = nil
             profileImageUrl = nil

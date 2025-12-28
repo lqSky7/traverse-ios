@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import Combine
+import WidgetKit
 
 struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -39,8 +40,8 @@ struct HomeView: View {
                         })
                     } else {
                         // Streak Card
-                        if let solveStats = viewModel.solveStats {
-                            StreakCard(streak: solveStats.stats.totalStreakDays, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves), paletteManager: paletteManager)
+                        if let userStats = viewModel.userStats {
+                            StreakCard(streak: userStats.stats.currentStreak, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves), paletteManager: paletteManager)
                         }
                         
                         // Main Stats Cards
@@ -108,8 +109,9 @@ struct HomeView: View {
             }
         }
         .onAppear {
-            if viewModel.solveStats == nil, let username = authViewModel.currentUser?.username {
+            if let username = authViewModel.currentUser?.username {
                 Task {
+                    // Always load to update widgets, even if data is cached
                     await viewModel.loadData(username: username)
                 }
             }
@@ -1843,6 +1845,7 @@ class HomeViewModel: ObservableObject {
     @Published var solveStats: SolveStats?
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
+    @Published var todayRevisions: [Revision] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -1858,17 +1861,8 @@ class HomeViewModel: ObservableObject {
     }
     
     func loadData(username: String, forceRefresh: Bool = false) async {
-        // Use cached data from DataManager if available (unless force refresh)
-        if !forceRefresh && DataManager.shared.hasData {
-            await MainActor.run {
-                self.userStats = DataManager.shared.userStats
-                self.submissionStats = DataManager.shared.submissionStats
-                self.solveStats = DataManager.shared.solveStats
-                self.achievementStats = DataManager.shared.achievementStats
-                self.recentSolves = DataManager.shared.recentSolves
-            }
-            return
-        }
+        // Always fetch fresh data for widgets - don't use cache for initial load
+        // Cache is only used within the same app session after first load
         
         await MainActor.run {
             isLoading = true
@@ -1881,21 +1875,34 @@ class HomeViewModel: ObservableObject {
             async let solveStatsTask = NetworkService.shared.getSolveStats()
             async let achievementStatsTask = NetworkService.shared.getAchievementStats()
             async let recentSolvesTask = NetworkService.shared.getSolves(limit: 10)
+            // Fetch upcoming only - backend filters for incomplete revisions
+            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50)
             
-            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse) = try await (
+            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse) = try await (
                 userStatsTask,
                 submissionStatsTask,
                 solveStatsTask,
                 achievementStatsTask,
-                recentSolvesTask
+                recentSolvesTask,
+                revisionsTask
             )
             
-            await MainActor.run {
-                self.userStats = userStats
+            // Filter for today + overdue only (upcoming includes future dates we don't want)
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            
+            let todayAndOverdue = revisionsResponse.revisions.filter { revision in
+                let revisionDate = calendar.startOfDay(for: revision.scheduledDate)
+                return revisionDate <= today
+            }
+            
+            print("🔥 WIDGET UPDATE: Passing \(todayAndOverdue.count) revisions to widget")
+            
                 self.submissionStats = submissionStats
                 self.solveStats = solveStats
                 self.achievementStats = achievementStats
                 self.recentSolves = solvesResponse.solves
+                self.todayRevisions = todayAndOverdue
             }
             
             // Update DataManager cache
@@ -1907,6 +1914,9 @@ class HomeViewModel: ObservableObject {
             
             // Persist the data
             DataManager.shared.persistData()
+            
+            // Update widgets - send exactly what we want to display (today + overdue)
+            updateWidgets(userStats: userStats.stats, recentSolve: solvesResponse.solves.first, revisions: todayAndOverdue)
             
         } catch is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh
@@ -1922,6 +1932,59 @@ class HomeViewModel: ObservableObject {
         await MainActor.run {
             isLoading = false
         }
+    }
+    
+    private func hasSolvedToday(recentSolves: [Solve]?) -> Bool {
+        guard let solves = recentSolves else { return false }
+        
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        return solves.contains { solve in
+            let formatter = ISO8601DateFormatter()
+            guard let solveDate = formatter.date(from: solve.solvedAt) else { return false }
+            let solveDay = calendar.startOfDay(for: solveDate)
+            return solveDay == today
+        }
+    }
+    
+    private func updateWidgets(userStats: UserStatsData, recentSolve: Solve?, revisions: [Revision]) {
+        // Update streak widget
+        let solvedToday = hasSolvedToday(recentSolves: self.recentSolves)
+        WidgetDataUpdater.shared.updateStreakStatus(
+            solvedToday: solvedToday,
+            currentStreak: userStats.currentStreak,
+            totalXp: userStats.totalXp,
+            totalSolves: userStats.totalSolves
+        )
+        
+        // Update all widgets with complete data
+        WidgetDataUpdater.shared.updateWidgetData(
+            userStats: userStats,
+            recentSolve: recentSolve,
+            revisions: revisions
+        )
+    }
+    
+    func refreshWidgets() {
+        // Refresh widgets with current cached data when app is opened
+        guard let userStats = self.userStats?.stats else { return }
+        
+        // Recalculate solvedToday in case it changed
+        let solvedToday = hasSolvedToday(recentSolves: self.recentSolves)
+        
+        WidgetDataUpdater.shared.updateStreakStatus(
+            solvedToday: solvedToday,
+            currentStreak: userStats.currentStreak,
+            totalXp: userStats.totalXp,
+            totalSolves: userStats.totalSolves
+        )
+        
+        WidgetDataUpdater.shared.updateWidgetData(
+            userStats: userStats,
+            recentSolve: self.recentSolves?.first,
+            revisions: self.todayRevisions
+        )
     }
 }
 

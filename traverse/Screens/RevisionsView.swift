@@ -17,6 +17,7 @@ struct RevisionsView: View {
     @State private var selectedRevision: Revision?
     @State private var showMLAttemptSheet = false
     @AppStorage("revisionMode") private var revisionMode: String = "normal"
+    @State private var loadTask: Task<Void, Never>?
     
     var body: some View {
         NavigationStack {
@@ -109,7 +110,7 @@ struct RevisionsView: View {
                             Label("Show Completed", systemImage: showCompletedRevisions ? "checkmark.circle.fill" : "circle")
                         }
                         .onChange(of: showCompletedRevisions) { _, _ in
-                            Task { await loadRevisions() }
+                            Task { await loadData() }
                         }
                         
                         Toggle(isOn: $useMLRevision) {
@@ -117,6 +118,8 @@ struct RevisionsView: View {
                         }
                         .onChange(of: useMLRevision) { _, newValue in
                             revisionMode = newValue ? "ml" : "normal"
+                            let typeToLoad = newValue ? "ml" : "normal"
+                            Task { await loadData(forceType: typeToLoad) }
                         }
                         
                         Divider()
@@ -156,29 +159,38 @@ struct RevisionsView: View {
         }
     }
     
-    private func loadData() async {
-        await loadStats()
-        await loadRevisions()
+    private func loadData(forceType: String? = nil) async {
+        loadTask?.cancel()
+        
+        let revisionType = forceType ?? (useMLRevision ? "ml" : "normal")
+        
+        loadTask = Task {
+            guard !Task.isCancelled else { return }
+            await loadStats(type: revisionType)
+            
+            guard !Task.isCancelled else { return }
+            await loadRevisions(type: revisionType)
+        }
+        
+        await loadTask?.value
     }
     
-    private func loadStats() async {
+    private func loadStats(type: String) async {
         do {
-            let revisionType = useMLRevision ? "ml" : "normal"
-            stats = try await NetworkService.shared.getRevisionStats(type: revisionType)
+            stats = try await NetworkService.shared.getRevisionStats(type: type)
         } catch {
             print("Failed to load revision stats: \(error.localizedDescription)")
         }
     }
     
-    private func loadRevisions() async {
+    private func loadRevisions(type: String) async {
         isLoading = true
         errorMessage = nil
         
         do {
-            let revisionType = useMLRevision ? "ml" : "normal"
             let response = try await NetworkService.shared.getGroupedRevisions(
                 includeCompleted: showCompletedRevisions,
-                type: revisionType
+                type: type
             )
             revisionGroups = response.groups
             
@@ -189,6 +201,10 @@ struct RevisionsView: View {
         } catch let error as NetworkError {
             errorMessage = error.errorDescription
         } catch {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+                return
+            }
             errorMessage = "Failed to load revisions"
         }
         

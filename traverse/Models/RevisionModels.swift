@@ -19,7 +19,49 @@ struct Revision: Codable, Identifiable {
     let solve: RevisionSolve
     
     var scheduledDate: Date {
-        ISO8601DateFormatter().date(from: scheduledFor) ?? Date()
+        // Try multiple date formats since backend may return different formats
+        let formatters: [DateFormatter] = {
+            let iso = ISO8601DateFormatter()
+            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            let isoBasic = ISO8601DateFormatter()
+            isoBasic.formatOptions = [.withInternetDateTime]
+            
+            // Custom formatter for date-only format like "2024-12-28"
+            let dateOnly = DateFormatter()
+            dateOnly.dateFormat = "yyyy-MM-dd"
+            dateOnly.timeZone = TimeZone(identifier: "UTC")
+            
+            // Full datetime with timezone
+            let fullDateTime = DateFormatter()
+            fullDateTime.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+            fullDateTime.timeZone = TimeZone(identifier: "UTC")
+            
+            return [dateOnly, fullDateTime]
+        }()
+        
+        // Try ISO8601 first (handles most cases)
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: scheduledFor) {
+            return date
+        }
+        
+        // Try without fractional seconds
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+        if let date = isoBasic.date(from: scheduledFor) {
+            return date
+        }
+        
+        // Try other formats
+        for formatter in formatters {
+            if let date = formatter.date(from: scheduledFor) {
+                return date
+            }
+        }
+        
+        return Date()
     }
     
     var completedDate: Date? {
