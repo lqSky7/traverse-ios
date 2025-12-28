@@ -1898,6 +1898,8 @@ class HomeViewModel: ObservableObject {
             
             print("🔥 WIDGET UPDATE: Passing \(todayAndOverdue.count) revisions to widget")
             
+            await MainActor.run {
+                self.userStats = userStats
                 self.submissionStats = submissionStats
                 self.solveStats = solveStats
                 self.achievementStats = achievementStats
@@ -1918,7 +1920,7 @@ class HomeViewModel: ObservableObject {
             // Update widgets - send exactly what we want to display (today + overdue)
             updateWidgets(userStats: userStats.stats, recentSolve: solvesResponse.solves.first, revisions: todayAndOverdue)
             
-        } catch is CancellationError {
+        } catch let error where error is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh
             await MainActor.run {
                 isLoading = false

@@ -11,10 +11,19 @@ import UserNotifications
 @main
 struct traverseApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) var scenePhase
     
     var body: some Scene {
         WindowGroup {
             ContentView()
+        }
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            if newPhase == .active {
+                // Check streak reminder when app becomes active
+                Task {
+                    await DataManager.shared.checkAndScheduleStreakReminder()
+                }
+            }
         }
     }
 }

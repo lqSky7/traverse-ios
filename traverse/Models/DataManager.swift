@@ -152,6 +152,31 @@ class DataManager: ObservableObject {
         
         // Persist the data
         persistData()
+        
+        // Check if user has solved today and end Live Activity if active
+        checkSolvedTodayAndEndActivity()
+    }
+    
+    private func checkSolvedTodayAndEndActivity() {
+        // Check if user solved today based on recent solves
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        if let recentSolves = recentSolves {
+            let solvedToday = recentSolves.contains { solve in
+                if let date = ISO8601DateFormatter().date(from: solve.solvedAt) {
+                    return calendar.isDate(date, inSameDayAs: today)
+                }
+                return false
+            }
+            
+            // If solved today, end the Live Activity
+            if solvedToday {
+                if #available(iOS 16.1, *) {
+                    LiveActivityManager.shared.endActivity()
+                }
+            }
+        }
     }
     
     func clearAllData() {
@@ -168,5 +193,49 @@ class DataManager: ObservableObject {
     
     var hasData: Bool {
         hasFetchedInitialData
+    }
+    
+    // MARK: - Streak Reminder Management
+    func checkAndScheduleStreakReminder() async {
+        // Check if user has solved today based on recent solves
+        let calendar = Calendar.current
+        let now = Date()
+        let today = calendar.startOfDay(for: now)
+        let hour = calendar.component(.hour, from: now)
+        
+        // Check if solved today from cached data
+        let solvedToday: Bool
+        if let recentSolves = self.recentSolves {
+            solvedToday = recentSolves.contains { solve in
+                if let date = ISO8601DateFormatter().date(from: solve.solvedAt) {
+                    let solveDay = calendar.startOfDay(for: date)
+                    return solveDay == today
+                }
+                return false
+            }
+        } else {
+            solvedToday = false
+        }
+        
+        // If user hasn't solved today and it's after 6 PM
+        if !solvedToday && hour >= 18 {
+            // Calculate hours remaining until midnight
+            var tomorrow = calendar.startOfDay(for: now)
+            tomorrow = calendar.date(byAdding: .day, value: 1, to: tomorrow)!
+            
+            let msRemaining = tomorrow.timeIntervalSince(now)
+            let hoursRemaining = Int(msRemaining / 3600)
+            
+            let currentStreak = self.userStats?.stats.currentStreak ?? 0
+            
+            // Start Live Activity
+            if #available(iOS 16.1, *) {
+                LiveActivityManager.shared.startStreakReminder(
+                    hoursRemaining: hoursRemaining,
+                    currentStreak: currentStreak,
+                    streakEndsAt: tomorrow
+                )
+            }
+        }
     }
 }

@@ -12,5 +12,6 @@ struct TraverseWidgetBundle: WidgetBundle {
         StreakWidget()
         RecentSolveWidget()
         RevisionsWidget()
+        StreakReminderLiveActivity()
     }
 }
