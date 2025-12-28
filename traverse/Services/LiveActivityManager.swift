@@ -12,11 +12,18 @@ class LiveActivityManager {
     
     // Start a streak reminder Live Activity
     func startStreakReminder(hoursRemaining: Int, currentStreak: Int, streakEndsAt: Date) {
-        // End any existing activity first
-        endActivity()
-        
         // Check if Live Activities are supported
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            return
+        }
+        
+        // Check if there's already an active live activity
+        let existingActivities = Activity<StreakReminderAttributes>.activities
+        
+        // If there's an active activity, update it instead of creating a new one
+        if let existingActivity = existingActivities.first ?? currentActivity {
+            currentActivity = existingActivity
+            updateActivity(hoursRemaining: hoursRemaining, currentStreak: currentStreak)
             return
         }
         
