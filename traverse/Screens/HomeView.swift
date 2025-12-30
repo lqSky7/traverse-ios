@@ -12,18 +12,19 @@ struct HomeView: View {
     @State private var titleOpacity: Double = 1.0
     @State private var titleBlur: CGFloat = 0
     
-    private let titles = [
-        "Welcome back,",
-        "Ready to code?",
-        "Let's solve some problems!",
-        "Keep pushing forward!",
-        "You're doing great!",
-        "Time to level up!",
-        "Code like a boss!",
-        "One problem at a time!",
-        "Stay curious, keep coding!",
-        "Your journey continues..."
-    ]
+private let titles = [
+    "Hi Hungry",
+    "I Tried",
+    "Nailed It",
+    "Close Enough",
+    "Math Exists",
+    "Free Bug",
+    "Ask Later",
+    "Coffee Counts",
+    "Read Docs",
+    "Turn Off"
+]
+
     
     var body: some View {
         NavigationStack {
@@ -105,7 +106,6 @@ struct HomeView: View {
                 .padding()
             }
             .background(Color.black)
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(navigationTitle)
