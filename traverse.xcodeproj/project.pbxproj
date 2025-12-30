@@ -55,8 +55,8 @@
 		6A07DEC62F01684A009A4EB8 /* Exceptions for "TraverseWidget" folder in "traverse" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				WidgetDataModels.swift,
 				StreakReminderActivity.swift,
+				WidgetDataModels.swift,
 			);
 			target = 6AAF62C72EF90FE6006944A1 /* traverse */;
 		};

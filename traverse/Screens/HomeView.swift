@@ -83,6 +83,22 @@ struct HomeView: View {
                                 
                                 TriesDistributionCard(solves: solves, paletteManager: paletteManager)
                             }
+                            
+                            // Intelligence Summary Card (iOS 18.2+)
+                            if #available(iOS 18.2, *) {
+                                if let userStats = viewModel.userStats,
+                                   let recentSolves = viewModel.recentSolves,
+                                   let solveStats = viewModel.solveStats {
+                                    IntelligenceSummaryCard(
+                                        streak: userStats.stats.currentStreak,
+                                        solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves),
+                                        totalSolves: userStats.stats.totalSolves,
+                                        recentSolves: recentSolves,
+                                        difficulty: solveStats.stats.byDifficulty,
+                                        paletteManager: paletteManager
+                                    )
+                                }
+                            }
                         }
                     }
                 }

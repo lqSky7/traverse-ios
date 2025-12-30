@@ -300,5 +300,21 @@ extension Color {
         let index = Int(luminance * Double(lightAlternatives.count))
         return lightAlternatives[index % lightAlternatives.count]
     }
+    
+    func toHex() -> String {
+        let uiColor = UIColor(self)
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        
+        uiColor.getRed(&r, green: &g, blue: &b, alpha: &a)
+        
+        let red = Int(r * 255)
+        let green = Int(g * 255)
+        let blue = Int(b * 255)
+        
+        return String(format: "%02X%02X%02X", red, green, blue)
+    }
 }
 

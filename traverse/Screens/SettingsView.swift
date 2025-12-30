@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var paletteInput = ""
     @State private var importError: String?
     @State private var isLoading = false
+    @State private var showingDreamPicker = false
 
     var body: some View {
         NavigationStack {
@@ -113,6 +114,17 @@ struct SettingsView: View {
                                 .foregroundStyle(.primary)
                         }
                     }
+                    
+                    Button {
+                        showingDreamPicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "paintpalette.fill")
+                                .foregroundStyle(.purple)
+                            Text("Pick a Hue, Any Hue")
+                                .foregroundStyle(.primary)
+                        }
+                    }
                 }
 
                 // Account Settings
@@ -188,6 +200,10 @@ struct SettingsView: View {
                         importError = "Invalid palette format. Please provide a coolors.co URL or SCSS colors."
                     }
                 })
+            }
+            .sheet(isPresented: $showingDreamPicker) {
+                HuePickerSheet()
+                    .presentationDetents([.medium])
             }
             .alert("Logout", isPresented: $showingLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }
