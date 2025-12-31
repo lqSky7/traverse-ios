@@ -35,21 +35,12 @@ struct ColorPalette: Identifiable, Codable, Equatable, Hashable {
     
     static let allPalettes: [ColorPalette] = [
         ColorPalette(
-            id: 1,
-            name: "Apple Fitness",
-            colors: ["FA114F", "92E82A", "00C7BE", "FCD12A", "B7B3FF"]
-        ),
-        ColorPalette(
-            id: 2,
-            name: "Ocean Breeze",
-            colors: ["E63946", "F1FAEE", "A8DADC", "457B9D", "1D3557"]
-        ),
-        ColorPalette(
             id: 4,
             name: "Candy Dream",
             colors: ["CDB4DB", "FFC8DD", "FFAFCC", "BDE0FE", "A2D2FF"]
         )
     ]
+
 }
 
 // MARK: - Color Palette Manager

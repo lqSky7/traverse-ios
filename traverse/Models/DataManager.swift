@@ -21,8 +21,15 @@ class DataManager: ObservableObject {
     @Published var solveStats: SolveStats?
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
+    @Published var lastFetchTimestamp: Date?
     
     private var hasFetchedInitialData = false
+    
+    var isCacheFresh: Bool {
+        guard let timestamp = lastFetchTimestamp else { return false }
+        let cacheAge = Date().timeIntervalSince(timestamp)
+        return cacheAge < 7200 // 2 hours in seconds
+    }
     
     private init() {
         loadPersistedData()
@@ -77,6 +84,12 @@ class DataManager: ObservableObject {
             self.recentSolves = decodedSolves
         }
         
+        // Load timestamp
+        if let timestampData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("lastFetchTimestamp.json")),
+           let decodedTimestamp = try? decoder.decode(Date.self, from: timestampData) {
+            self.lastFetchTimestamp = decodedTimestamp
+        }
+        
         // If we have any data, mark as fetched
         if userStats != nil || submissionStats != nil || solveStats != nil || achievementStats != nil || recentSolves != nil {
             hasFetchedInitialData = true
@@ -112,6 +125,9 @@ class DataManager: ObservableObject {
         }
         if let recentSolves = recentSolves {
             saveData(recentSolves, filename: "recentSolves.json")
+        }
+        if let timestamp = lastFetchTimestamp {
+            saveData(timestamp, filename: "lastFetchTimestamp.json")
         }
     }
     
@@ -149,6 +165,9 @@ class DataManager: ObservableObject {
         self.recentSolves = results.7.solves
         
         hasFetchedInitialData = true
+        
+        // Update timestamp
+        self.lastFetchTimestamp = Date()
         
         // Persist the data
         persistData()

@@ -35,8 +35,8 @@ final class IntelligenceManager: ObservableObject {
         recentSolves: [Solve],
         difficulty: ProblemsByDifficulty
     ) async {
-        print("🤖 [Intelligence] Starting generation...")
-        print("🤖 [Intelligence] System available: \(SystemLanguageModel.default.isAvailable)")
+        print("[Intelligence] Starting generation...")
+        print("[Intelligence] System available: \(SystemLanguageModel.default.isAvailable)")
         
         guard SystemLanguageModel.default.isAvailable else {
             state = .error("Apple Intelligence not available on this device")
@@ -54,28 +54,28 @@ final class IntelligenceManager: ObservableObject {
             difficulty: difficulty
         )
         
-        print("🤖 [Intelligence] Context built:")
-        print("📊 Input Data:")
+        print("[Intelligence] Context built:")
+        print("Input Data:")
         print("   - Streak: \(streak)")
         print("   - Solved Today: \(solvedToday)")
         print("   - Total Solves: \(totalSolves)")
         print("   - Difficulty: Easy=\(difficulty.easy), Medium=\(difficulty.medium), Hard=\(difficulty.hard)")
         print("   - Recent Solves Count: \(recentSolves.count)")
-        print("\n📝 Full Context String:")
+        print("\nFull Context String:")
         print("─────────────────────────────────────")
         print(context)
         print("─────────────────────────────────────\n")
         
         do {
             guard let session = session else {
-                print("❌ [Intelligence] Session not initialized")
+                print("[Intelligence] Session not initialized")
                 state = .error("Session not initialized")
                 return
             }
             
-            print("🔄 [Intelligence] Sending request to model...")
+            print("[Intelligence] Sending request to model...")
             let response = try await session.respond(to: context)
-            print("✅ [Intelligence] Response received:")
+            print("[Intelligence] Response received:")
             print("   Content: \(response.content)")
             
             let summary = IntelligenceSummary(
@@ -86,10 +86,10 @@ final class IntelligenceManager: ObservableObject {
             )
             
             state = .ready(summary)
-            print("✅ [Intelligence] Summary ready")
+            print("[Intelligence] Summary ready")
             
         } catch {
-            print("❌ [Intelligence] Error occurred:")
+            print("[Intelligence] Error occurred:")
             print("   Error: \(error)")
             print("   Localized: \(error.localizedDescription)")
             if let nsError = error as NSError? {

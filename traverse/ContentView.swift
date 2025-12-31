@@ -109,6 +109,17 @@ struct SignUpView: View {
                         authViewModel.password = answer
                         try await Task.sleep(nanoseconds: 100_000_000)
                     }
+                ),
+                FormStep(
+                    icon: "paintpalette.fill",
+                    title: "Pick Your Hue",
+                    description: "Choose a color palette that feels like you.",
+                    type: .huePicker,
+                    lightGradient: (.orange, .pink, .purple),
+                    darkGradient: (.purple, .blue, .cyan),
+                    onSubmit: { _ in
+                        try await Task.sleep(nanoseconds: 100_000_000)
+                    }
                 )
             ],
             completion: CompletionStep(

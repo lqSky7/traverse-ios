@@ -496,8 +496,8 @@ struct MLAttemptSheet: View {
                                 .foregroundStyle(.white)
                             
                             Picker("Outcome", selection: $outcome) {
-                                Text("❌ Failed").tag(0)
-                                Text("✅ Success").tag(1)
+                                Text("Failed").tag(0)
+                                Text("Success").tag(1)
                             }
                             .pickerStyle(.segmented)
                         }

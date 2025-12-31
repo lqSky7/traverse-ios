@@ -15,6 +15,7 @@ enum FieldState {
 enum StepType {
     case inputField(placeholder: String, keyboardType: UIKeyboardType)
     case button(title: String, icon: String)
+    case huePicker
 }
 
 public struct FormStep: Identifiable {
@@ -137,6 +138,17 @@ struct MultiStepForm: View {
                             action: submitCurrentStep,
                             keyboardShown: $keyboardShown
                         )
+                    case .huePicker:
+                        VStack(spacing: 24) {
+                            HuePicker()
+                            
+                            ContinueButton(
+                                title: "Continue",
+                                icon: "arrow.right",
+                                action: submitCurrentStep,
+                                state: steps[currentStep].state
+                            )
+                        }
                     }
                 }
             }

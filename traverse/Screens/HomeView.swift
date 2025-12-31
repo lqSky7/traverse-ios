@@ -7,23 +7,6 @@ struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
-    @State private var navigationTitle = "Welcome back,"
-    @State private var titleIndex = 0
-    @State private var titleOpacity: Double = 1.0
-    @State private var titleBlur: CGFloat = 0
-    
-private let titles = [
-    "Hi Hungry",
-    "I Tried",
-    "Nailed It",
-    "Close Enough",
-    "Math Exists",
-    "Free Bug",
-    "Ask Later",
-    "Coffee Counts",
-    "Read Docs",
-    "Turn Off"
-]
 
     
     var body: some View {
@@ -106,15 +89,8 @@ private let titles = [
                 .padding()
             }
             .background(Color.black)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text(navigationTitle)
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .opacity(titleOpacity)
-                        .blur(radius: titleBlur)
-                }
-            }
+            .navigationTitle("Home")
+            .navigationBarTitleDisplayMode(.large)
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
                     // Use Task to prevent early cancellation from pull-to-refresh gesture
@@ -127,13 +103,9 @@ private let titles = [
         .onAppear {
             if let username = authViewModel.currentUser?.username {
                 Task {
-                    // Always load to update widgets, even if data is cached
                     await viewModel.loadData(username: username)
                 }
             }
-            
-            // Start title animation cycle
-            startTitleAnimation()
         }
         .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
             if let username = newUsername, viewModel.solveStats == nil {
@@ -160,27 +132,7 @@ private let titles = [
         }
     }
     
-    private func startTitleAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 120.0, repeats: true) { _ in
-            // Fade out and blur
-            withAnimation(.easeIn(duration: 0.5)) {
-                titleOpacity = 0
-                titleBlur = 10
-            }
-            
-            // Change title in the middle
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                titleIndex = (titleIndex + 1) % titles.count
-                navigationTitle = titles[titleIndex]
-                
-                // Fade in and remove blur
-                withAnimation(.easeOut(duration: 0.5)) {
-                    titleOpacity = 1.0
-                    titleBlur = 0
-                }
-            }
-        }
-    }
+
 }
 
 // MARK: - Streak Card
@@ -355,10 +307,11 @@ struct DifficultyChartCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             Text("Difficulty")
                 .font(.headline)
                 .foregroundStyle(.white)
+                .padding()
             
             Divider()
                 .background(Color.gray.opacity(0.3))
@@ -397,10 +350,10 @@ struct DifficultyChartCard: View {
                     }
                 }
             }
+            .padding()
 
             Spacer()
         }
-        .padding()
         .background(.ultraThinMaterial)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
@@ -422,10 +375,11 @@ struct PlatformChartCard: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             Text("Platforms")
                 .font(.headline)
                 .foregroundStyle(.white)
+                .padding()
             
             Divider()
                 .background(Color.gray.opacity(0.3))
@@ -463,6 +417,7 @@ struct PlatformChartCard: View {
                     }
                 }
                 .frame(height: 140)
+                .padding()
                 
                 VStack(spacing: 6) {
                     ForEach(Array(chartData.prefix(3)), id: \.0) { item in
@@ -476,6 +431,8 @@ struct PlatformChartCard: View {
                         }
                     }
                 }
+                .padding(.horizontal)
+                .padding(.bottom)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "chart.pie")
@@ -486,9 +443,9 @@ struct PlatformChartCard: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(height: 140)
+                .padding()
             }
         }
-        .padding()
         .background(.ultraThinMaterial)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
@@ -507,7 +464,7 @@ struct AchievementStatsCard: View {
     @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("Achievements")
                     .font(.headline)
@@ -518,6 +475,7 @@ struct AchievementStatsCard: View {
                         .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
             }
+            .padding()
             
             Divider()
                 .background(Color.gray.opacity(0.3))
@@ -585,8 +543,8 @@ struct AchievementStatsCard: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            .padding()
         }
-        .padding()
         .background(.ultraThinMaterial)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
@@ -1877,9 +1835,19 @@ class HomeViewModel: ObservableObject {
     }
     
     func loadData(username: String, forceRefresh: Bool = false) async {
-        // Always fetch fresh data for widgets - don't use cache for initial load
-        // Cache is only used within the same app session after first load
+        // Use cache if fresh (< 2 hours), otherwise fetch from server
         
+        // Check if we can use cached data
+        if !forceRefresh && DataManager.shared.isCacheFresh {
+            await MainActor.run {
+                isLoading = false
+            }
+            // Update widgets with cached data
+            if let userStats = self.userStats?.stats {
+                updateWidgets(userStats: userStats, recentSolve: self.recentSolves?.first, revisions: self.todayRevisions)
+            }
+            return
+        }
         await MainActor.run {
             isLoading = true
             errorMessage = nil
@@ -1912,7 +1880,6 @@ class HomeViewModel: ObservableObject {
                 return revisionDate <= today
             }
             
-            print("🔥 WIDGET UPDATE: Passing \(todayAndOverdue.count) revisions to widget")
             
             await MainActor.run {
                 self.userStats = userStats
@@ -1929,6 +1896,9 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.solveStats = solveStats
             DataManager.shared.achievementStats = achievementStats
             DataManager.shared.recentSolves = solvesResponse.solves
+            
+            // Update timestamp
+            DataManager.shared.lastFetchTimestamp = Date()
             
             // Persist the data
             DataManager.shared.persistData()

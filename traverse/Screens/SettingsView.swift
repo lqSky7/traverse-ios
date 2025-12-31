@@ -15,11 +15,12 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // User Profile Section
-                if let user = authViewModel.currentUser {
-                    Section {
-                        VStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // User Profile Section - UNCHANGED
+                    if let user = authViewModel.currentUser {
+                        VStack(spacing: 16) {
+                            // Profile Image
                             if let imageUrl = user.profileImageURL {
                                 AsyncImage(url: URL(string: imageUrl)) { phase in
                                     switch phase {
@@ -54,6 +55,7 @@ struct SettingsView: View {
                                     .foregroundStyle(.blue)
                             }
 
+                            // User Info
                             VStack(spacing: 4) {
                                 Text(user.username)
                                     .font(.title2)
@@ -63,119 +65,57 @@ struct SettingsView: View {
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
+
+                            // Stats Row
+                            HStack(spacing: 32) {
+                                VStack(spacing: 4) {
+                                    Text("\(user.currentStreak)")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(paletteManager.color(at: 0))
+                                    Text("Day Streak")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Divider()
+                                    .frame(height: 30)
+                                
+                                VStack(spacing: 4) {
+                                    Text("\(user.totalXp)")
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(paletteManager.color(at: 1))
+                                    Text("Total XP")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                             .padding(.top, 8)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical)
-
-                        HStack {
-                            Text("Streak")
-                            Spacer()
-                            Text("\(user.currentStreak) days")
-                                .foregroundStyle(.secondary)
-                        }
-
-                        HStack {
-                            Text("Total XP")
-                            Spacer()
-                            Text("\(user.totalXp)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                // Appearance Section
-                Section("Appearance") {
-                    Picker("Color Palette", selection: $paletteManager.selectedPalette) {
-                        ForEach(paletteManager.allAvailablePalettes, id: \.self) { palette in
-                            HStack {
-                                HStack(spacing: 3) {
-                                    ForEach(palette.colors.prefix(4), id: \.self) { colorHex in
-                                        Circle()
-                                            .fill(Color(hex: colorHex))
-                                            .frame(width: 12, height: 12)
-                                    }
-                                }
-                                Text(palette.name)
-                            }
-                            .tag(palette)
-                        }
-                    }
-
-                    Button {
-                        showingImportPalette = true
-                        paletteInput = ""
-                        importError = nil
-                    } label: {
-                        HStack {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .foregroundStyle(.blue)
-                            Text("Import Custom Palette")
-                                .foregroundStyle(.primary)
-                        }
+                        .padding(.vertical, 24)
+                        .padding(.horizontal)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                        )
+                        .padding(.horizontal)
                     }
                     
-                    Button {
-                        showingDreamPicker = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "paintpalette.fill")
-                                .foregroundStyle(.purple)
-                            Text("Pick a Hue, Any Hue")
-                                .foregroundStyle(.primary)
-                        }
-                    }
+                    // Bento Settings Grid
+                    BentoSettingsGrid(
+                        paletteManager: paletteManager,
+                        showingEditProfile: $showingEditProfile,
+                        showingChangePassword: $showingChangePassword,
+                        showingDeleteAccount: $showingDeleteAccount,
+                        showingLogoutConfirmation: $showingLogoutConfirmation,
+                        showingImportPalette: $showingImportPalette,
+                        showingDreamPicker: $showingDreamPicker
+                    )
                 }
-
-                // Account Settings
-                Section("Account") {
-                    Button {
-                        showingEditProfile = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "person.circle.fill")
-                                .foregroundStyle(.blue)
-                            Text("Edit Profile")
-                                .foregroundStyle(.primary)
-                        }
-                    }
-
-                    Button {
-                        showingChangePassword = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "lock.fill")
-                                .foregroundStyle(.blue)
-                            Text("Change Password")
-                                .foregroundStyle(.primary)
-                        }
-                    }
-                }
-
-                // Danger Zone
-                Section("Danger Zone") {
-                    Button {
-                        showingDeleteAccount = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "trash.fill")
-                                .foregroundStyle(.red)
-                            Text("Delete Account")
-                        }
-                        .foregroundStyle(.red)
-                    }
-
-                    Button {
-                        showingLogoutConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "rectangle.portrait.and.arrow.right.fill")
-                                .foregroundStyle(.red)
-                            Text("Logout")
-                        }
-                        .foregroundStyle(.red)
-                    }
-                }
+                .padding(.vertical)
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $showingEditProfile) {
@@ -218,6 +158,7 @@ struct SettingsView: View {
             .disabled(isLoading)
         }
     }
+
 
     private func handleLogout() async {
         isLoading = true
@@ -305,4 +246,3 @@ struct ImportPaletteView: View {
         }
     }
 }
-

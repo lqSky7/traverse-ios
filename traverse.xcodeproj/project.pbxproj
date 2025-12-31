@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6A060AE02F04CC1900C536AE /* Glur in Frameworks */ = {isa = PBXBuildFile; productRef = 6A060ADF2F04CC1900C536AE /* Glur */; };
 		6A07DEA42F0165C2009A4EB8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A07DEA32F0165C2009A4EB8 /* WidgetKit.framework */; };
 		6A07DEA62F0165C2009A4EB8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A07DEA52F0165C2009A4EB8 /* SwiftUI.framework */; };
 		6A07DEB52F0165C3009A4EB8 /* TraverseWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6A07DEA12F0165C2009A4EB8 /* TraverseWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -93,6 +94,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6A060AE02F04CC1900C536AE /* Glur in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -172,6 +174,7 @@
 			);
 			name = traverse;
 			packageProductDependencies = (
+				6A060ADF2F04CC1900C536AE /* Glur */,
 			);
 			productName = traverse;
 			productReference = 6AAF62C82EF90FE6006944A1 /* traverse.app */;
@@ -204,6 +207,9 @@
 			);
 			mainGroup = 6AAF62BF2EF90FE6006944A1;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				6A060ADE2F04CC1900C536AE /* XCLocalSwiftPackageReference "../Glur" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6AAF62C92EF90FE6006944A1 /* Products */;
 			projectDirPath = "";
@@ -540,6 +546,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		6A060ADE2F04CC1900C536AE /* XCLocalSwiftPackageReference "../Glur" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Glur;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		6A060ADF2F04CC1900C536AE /* Glur */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Glur;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 6AAF62C02EF90FE6006944A1 /* Project object */;
 }

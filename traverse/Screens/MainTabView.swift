@@ -27,6 +27,7 @@ struct MainTabView: View {
                     .tag(2)
                 
                 SettingsView()
+                    .tint(.blue)
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
@@ -58,6 +59,7 @@ struct MainTabView: View {
                     .tag(2)
                 
                 SettingsView()
+                    .tint(.blue)
                     .tabItem {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
