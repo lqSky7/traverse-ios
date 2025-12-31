@@ -51,13 +51,13 @@ struct HuePicker: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Dad joke that cycles as you swipe
+            // Dad joke with numericText animation
             Text(colorJokes[currentJokeIndex])
                 .font(.system(.body, design: .rounded))
                 .fontWeight(.semibold)
                 .foregroundStyle(currentColor)
                 .contentTransition(.numericText())
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: currentJokeIndex)
+                .animation(.spring(duration: 3.5), value: currentJokeIndex)
                 .padding(.horizontal, 4)
             
             // Dot Grid
@@ -86,21 +86,13 @@ struct HuePicker: View {
                         }
                     }
                     
-                    // Cursor
+                    // Cursor - Liquid Glass Circle
                     if let location = dragLocation {
                         Circle()
-                            .fill(currentColor.opacity(0.3))
-                            .frame(width: 80, height: 80)
-                            .blur(radius: 20)
+                            .frame(width: 28, height: 28)
+                            .glassEffect(.clear.interactive(), in: .circle)
                             .position(location)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: location)
-                        
-                        Circle()
-                            .fill(currentColor.opacity(0.6))
-                            .frame(width: 40, height: 40)
-                            .blur(radius: 10)
-                            .position(location)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: location)
+                            .animation(.spring(response: 0.6, dampingFraction: 0.7), value: location)
                     }
                 }
                 .contentShape(Rectangle())
@@ -145,12 +137,35 @@ struct HuePicker: View {
                 .coordinateSpace(name: "grid")
             }
             .frame(height: 200)
+            .padding(20)
+            .background {
+                // LIQUID GLASS BACKGROUND
+                RoundedRectangle(cornerRadius: 32)
+                    .fill(.clear)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32))
+            }
+            .overlay {
+                // Subtle border
+                RoundedRectangle(cornerRadius: 32)
+                    .strokeBorder(currentColor.opacity(0.3), lineWidth: 1)
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.3), value: currentColor)
+            }
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.regularMaterial)
-        )
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 4)
+        .background {
+            // Outer card background with color glow
+            RoundedRectangle(cornerRadius: 36)
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 36)
+                        .fill(currentColor.opacity(0.15))
+                        .blur(radius: 40)
+                }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 36))
         .onAppear {
             selectionFeedback.prepare()
             lightFeedback.prepare()
@@ -163,22 +178,20 @@ struct HuePicker: View {
         let normalizedX = location.x / gridSize.width
         let normalizedY = location.y / gridSize.height
         
+        // Cycle joke on quadrant change - immediate update
+        let quadrant = (normalizedX < 0.5 ? 0 : 1) + (normalizedY < 0.5 ? 0 : 2)
+        if quadrant != lastQuadrant {
+            lastQuadrant = quadrant
+            currentJokeIndex = (currentJokeIndex + 1) % colorJokes.count
+            heavyFeedback.impactOccurred(intensity: 1.0)
+        }
+        
         // Bilinear color interpolation
         let interpolatedColor = interpolateColor(x: normalizedX, y: normalizedY)
         
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             currentColor = interpolatedColor
         }
-        
-        // Cycle joke on quadrant change
-        let quadrant = (normalizedX < 0.5 ? 0 : 1) + (normalizedY < 0.5 ? 0 : 2)
-        if quadrant != lastQuadrant && lastQuadrant != -1 {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                currentJokeIndex = (currentJokeIndex + 1) % colorJokes.count
-            }
-            heavyFeedback.impactOccurred(intensity: 1.0)
-        }
-        lastQuadrant = quadrant
     }
     
     private func interpolateColor(x: Double, y: Double) -> Color {
@@ -224,7 +237,7 @@ struct DotView: View {
     private var scale: CGFloat {
         guard dragLocation != nil else { return 0.3 }
         let normalized = distance / influenceRadius
-        return max(0.2, min(1.5, 1.5 - normalized))
+        return max(0.3, min(2.0, 2.0 - normalized))
     }
     
     private var opacity: CGFloat {
@@ -239,7 +252,6 @@ struct DotView: View {
         let normalizedX = center.x / gridSize.width
         let normalizedY = center.y / gridSize.height
         
-        // Interpolate color based on dot position
         let topColor = blendColors(HueCorners.topLeft, HueCorners.topRight, ratio: normalizedX)
         let bottomColor = blendColors(HueCorners.bottomLeft, HueCorners.bottomRight, ratio: normalizedX)
         return blendColors(topColor, bottomColor, ratio: normalizedY)
@@ -280,7 +292,6 @@ struct HuePickerSheet: View {
     @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var dragLocation: CGPoint? = nil
     @State private var currentColor: Color = HueCorners.bottomRight
-    @State private var hasSelection: Bool = false
     
     // Haptic tracking state
     @State private var lastQuadrant: Int = -1
@@ -321,146 +332,152 @@ struct HuePickerSheet: View {
     ]
     
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                // Header text - Dad joke that changes as you swipe
-                Text(colorJokes[currentJokeIndex])
-                    .font(.system(.title3, design: .rounded))
-                    .fontWeight(.semibold)
-                    .foregroundStyle(currentColor)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: currentJokeIndex)
-                    .padding(.top, 8)
+        VStack(spacing: 24) {
+            // Header text with numericText animation
+            Text(colorJokes[currentJokeIndex])
+                .font(.system(.title3, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundStyle(currentColor)
+                .contentTransition(.numericText())
+                .animation(.spring(duration: 3.5), value: currentJokeIndex)
+                .padding(.top, 24)
+            
+            // Dot Grid - fills remaining space
+            GeometryReader { geometry in
+                let gridWidth = geometry.size.width
+                let gridHeight = geometry.size.height
+                let spacingX = gridWidth / CGFloat(columns)
+                let spacingY = gridHeight / CGFloat(rows)
                 
-                // Dot Grid - fills remaining space
-                GeometryReader { geometry in
-                    let gridWidth = geometry.size.width
-                    let gridHeight = geometry.size.height
-                    let spacingX = gridWidth / CGFloat(columns)
-                    let spacingY = gridHeight / CGFloat(rows)
-                    
-                    ZStack {
-                        // Dots Grid
-                        ForEach(0..<rows, id: \.self) { row in
-                            ForEach(0..<columns, id: \.self) { col in
-                                let dotX = spacingX * (CGFloat(col) + 0.5)
-                                let dotY = spacingY * (CGFloat(row) + 0.5)
-                                let dotCenter = CGPoint(x: dotX, y: dotY)
-                                
-                                DotView(
-                                    center: dotCenter,
-                                    dragLocation: dragLocation,
-                                    influenceRadius: influenceRadius,
-                                    gridSize: geometry.size,
-                                    dotSize: dotSize
-                                )
-                                .position(dotCenter)
-                            }
-                        }
-                        
-                        // Cursor
-                        if let location = dragLocation {
-                            Circle()
-                                .fill(currentColor.opacity(0.3))
-                                .frame(width: 100, height: 100)
-                                .blur(radius: 25)
-                                .position(location)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: location)
+                ZStack {
+                    // Dots Grid
+                    ForEach(0..<rows, id: \.self) { row in
+                        ForEach(0..<columns, id: \.self) { col in
+                            let dotX = spacingX * (CGFloat(col) + 0.5)
+                            let dotY = spacingY * (CGFloat(row) + 0.5)
+                            let dotCenter = CGPoint(x: dotX, y: dotY)
                             
-                            Circle()
-                                .fill(currentColor.opacity(0.6))
-                                .frame(width: 50, height: 50)
-                                .blur(radius: 12)
-                                .position(location)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: location)
+                            DotView(
+                                center: dotCenter,
+                                dragLocation: dragLocation,
+                                influenceRadius: influenceRadius,
+                                gridSize: geometry.size,
+                                dotSize: dotSize
+                            )
+                            .position(dotCenter)
                         }
                     }
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                let clampedX = min(max(0, value.location.x), gridWidth)
-                                let clampedY = min(max(0, value.location.y), gridHeight)
-                                let newLocation = CGPoint(x: clampedX, y: clampedY)
-                                
-                                // Initial touch haptic
-                                if !hasStartedDragging {
-                                    hasStartedDragging = true
-                                    mediumFeedback.impactOccurred(intensity: 0.6)
-                                }
-                                
-                                // Grid line crossing haptic (when moving between dot positions)
-                                let gridX = Int(clampedX / spacingX)
-                                let gridY = Int(clampedY / spacingY)
-                                if (gridX != lastGridX || gridY != lastGridY) && lastGridX != -1 {
-                                    lightFeedback.impactOccurred(intensity: 0.5)
-                                }
-                                lastGridX = gridX
-                                lastGridY = gridY
-                                
-                                // Strong haptic and joke cycling for quadrant changes
-                                let quadrant = (clampedX < gridWidth / 2 ? 0 : 1) + (clampedY < gridHeight / 2 ? 0 : 2)
-                                if quadrant != lastQuadrant && lastQuadrant != -1 {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                        currentJokeIndex = (currentJokeIndex + 1) % colorJokes.count
-                                    }
-                                    heavyFeedback.impactOccurred(intensity: 1.0)
-                                }
+                    
+                    // Cursor - Liquid Glass Circle
+                    if let location = dragLocation {
+                        // Outer glow ring
+                        Circle()
+                            .fill(currentColor.opacity(0.15))
+                            .frame(width: 50, height: 50)
+                            .blur(radius: 10)
+                            .position(location)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: location)
+                        
+                        // Interactive liquid glass orb
+                        Circle()
+                            .fill(.clear)
+                            .frame(width: 28, height: 28)
+                            .glassEffect(.clear.interactive(), in: .circle)
+                            .position(location)
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: location)
+                    }
+                }
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let clampedX = min(max(0, value.location.x), gridWidth)
+                            let clampedY = min(max(0, value.location.y), gridHeight)
+                            let newLocation = CGPoint(x: clampedX, y: clampedY)
+                            
+                            // Initial touch haptic
+                            if !hasStartedDragging {
+                                hasStartedDragging = true
+                                mediumFeedback.impactOccurred(intensity: 0.6)
+                            }
+                            
+                            // Grid line crossing haptic
+                            let gridX = Int(clampedX / spacingX)
+                            let gridY = Int(clampedY / spacingY)
+                            if (gridX != lastGridX || gridY != lastGridY) && lastGridX != -1 {
+                                lightFeedback.impactOccurred(intensity: 0.5)
+                            }
+                            lastGridX = gridX
+                            lastGridY = gridY
+                            
+                            // Quadrant change logic - immediate update
+                            let quadrant = (clampedX < gridWidth / 2 ? 0 : 1) + (clampedY < gridHeight / 2 ? 0 : 2)
+                            
+                            if quadrant != lastQuadrant {
                                 lastQuadrant = quadrant
-                                
-                                // Edge zone haptic (near boundaries)
-                                let edgeThreshold: CGFloat = 25
-                                let nearEdge = clampedX < edgeThreshold || clampedX > gridWidth - edgeThreshold ||
-                                               clampedY < edgeThreshold || clampedY > gridHeight - edgeThreshold
-                                if nearEdge {
-                                    selectionFeedback.selectionChanged()
-                                }
-                                
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    dragLocation = newLocation
-                                }
-                                
-                                hasSelection = true
-                                
-                                updateColor(
-                                    at: newLocation,
-                                    gridSize: geometry.size
-                                )
+                                currentJokeIndex = (currentJokeIndex + 1) % colorJokes.count
+                                heavyFeedback.impactOccurred(intensity: 1.0)
                             }
-                            .onEnded { _ in
-                                // Confirmation haptic on release
-                                mediumFeedback.impactOccurred(intensity: 0.8)
-                                hasStartedDragging = false
-                                lastGridX = -1
-                                lastGridY = -1
+                            
+                            // Edge zone haptic
+                            let edgeThreshold: CGFloat = 25
+                            let nearEdge = clampedX < edgeThreshold || clampedX > gridWidth - edgeThreshold ||
+                                           clampedY < edgeThreshold || clampedY > gridHeight - edgeThreshold
+                            if nearEdge {
+                                selectionFeedback.selectionChanged()
                             }
-                    )
-                    .coordinateSpace(name: "sheetGrid")
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 20)
+                            
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                dragLocation = newLocation
+                            }
+                            
+                            updateColor(
+                                at: newLocation,
+                                gridSize: geometry.size
+                            )
+                        }
+                        .onEnded { _ in
+                            // Auto-save selection when user releases
+                            notificationFeedback.notificationOccurred(.success)
+                            mediumFeedback.impactOccurred(intensity: 0.8)
+                            saveSelection()
+                            dismiss()
+                        }
+                )
+                .coordinateSpace(name: "sheetGrid")
             }
-            .navigationTitle("huePicker")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        notificationFeedback.notificationOccurred(.success)
-                        saveSelection()
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelection)
-                }
+            .padding(20)
+            .background {
+                // LIQUID GLASS BACKGROUND
+                RoundedRectangle(cornerRadius: 32)
+                    .fill(.clear)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32))
             }
+            .overlay {
+                // Subtle border
+                RoundedRectangle(cornerRadius: 32)
+                    .strokeBorder(currentColor.opacity(0.3), lineWidth: 1)
+                    .allowsHitTesting(false)
+                    .animation(.easeInOut(duration: 0.3), value: currentColor)
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 4)
+        }
+        .background {
+            LinearGradient(
+                colors: [
+                    currentColor.opacity(0.55),
+                    currentColor.opacity(0.15),
+                    .clear
+                ],
+                startPoint: .bottom,
+                endPoint: .top
+            )
+            .blur(radius: 60)
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 0.4), value: currentColor)
         }
         .onAppear {
-            // Prepare haptic generators
             selectionFeedback.prepare()
             lightFeedback.prepare()
             mediumFeedback.prepare()
@@ -470,15 +487,34 @@ struct HuePickerSheet: View {
     }
     
     private func saveSelection() {
-        // Convert the selected color to hex and create a custom palette
-        let hexColor = currentColor.toHex()
+        let paletteColors = generatePalette(from: currentColor)
         let palette = ColorPalette(
             id: 1000,
             name: colorJokes[currentJokeIndex],
-            colors: [hexColor, hexColor, hexColor, hexColor, hexColor]
+            colors: paletteColors
         )
         paletteManager.customPalette = palette
         paletteManager.selectedPalette = palette
+    }
+    
+    private func generatePalette(from baseColor: Color) -> [String] {
+        let uiColor = UIColor(baseColor)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        
+        let colors: [UIColor] = [
+            uiColor,
+            UIColor(hue: fmod(hue + 0.083, 1.0), saturation: saturation * 0.85, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
+            UIColor(hue: fmod(hue + 0.917, 1.0), saturation: saturation * 0.85, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
+            UIColor(hue: fmod(hue + 0.5, 1.0), saturation: saturation * 0.7, brightness: brightness, alpha: alpha),
+            UIColor(hue: fmod(hue + 0.417, 1.0), saturation: saturation * 0.8, brightness: min(brightness * 1.1, 1.0), alpha: alpha)
+        ]
+        
+        return colors.map { Color($0).toHex() }
     }
     
     private func updateColor(at location: CGPoint, gridSize: CGSize) {
@@ -517,6 +553,14 @@ struct HuePickerSheet: View {
     }
 }
 
+// MARK: - Glass Effect Extensions
+extension View {
+    @ViewBuilder
+    func applyGlassEffect() -> some View {
+        self.glassEffect(.regular, in: .circle)
+    }
+}
+
 // MARK: - Preview
 #Preview("Inline Picker") {
     VStack {
@@ -532,4 +576,3 @@ struct HuePickerSheet: View {
         .presentationDetents([.medium])
         .presentationBackground(.ultraThinMaterial)
 }
-
