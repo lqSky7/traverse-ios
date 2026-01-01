@@ -8,39 +8,32 @@ import SwiftUI
 struct AccountTypeSelectionView: View {
     let onSelect: (AccountType) -> Void
     @State private var buttonTapped = 0
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     @Environment(\.colorScheme) var colorScheme
     
-    private var lightGradient: (Color, Color, Color) {
-        (Color.blue, Color.cyan, Color.purple)
-    }
-    
-    private var darkGradient: (Color, Color, Color) {
-        (Color(red: 0.3, green: 0, blue: 0.6), Color(red: 0.5, green: 0, blue: 0.8), Color(red: 0.2, green: 0, blue: 0.4))
-    }
-    
     var body: some View {
         ZStack {
-            // Gradient background
+            // Gradient background using palette colors
             ZStack {
                 RadialGradient(
-                    colors: [colorScheme == .dark ? darkGradient.0 : lightGradient.0, .clear],
-                    center: .bottom,
-                    startRadius: 300,
-                    endRadius: 500
+                    colors: [paletteManager.color(at: 0).opacity(0.6), .clear],
+                    center: .topLeading,
+                    startRadius: 100,
+                    endRadius: 400
                 )
                 
                 RadialGradient(
-                    colors: [colorScheme == .dark ? darkGradient.1 : lightGradient.1, .clear],
-                    center: .bottom,
-                    startRadius: 200,
+                    colors: [paletteManager.color(at: 1).opacity(0.5), .clear],
+                    center: .bottomTrailing,
+                    startRadius: 150,
                     endRadius: 450
                 )
                 
                 RadialGradient(
-                    colors: [colorScheme == .dark ? darkGradient.2 : lightGradient.2, .clear],
-                    center: .init(x: 0.5, y: 1.2),
-                    startRadius: 80,
+                    colors: [paletteManager.color(at: 2).opacity(0.4), .clear],
+                    center: .bottom,
+                    startRadius: 50,
                     endRadius: 350
                 )
             }
@@ -58,19 +51,17 @@ struct AccountTypeSelectionView: View {
                     
                     Text("Welcome to\nTraverse")
                         .font(.system(size: 48, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.8))
-                        .foregroundStyle(.ultraThinMaterial)
+                        .foregroundStyle(.white.opacity(0.9))
                         .multilineTextAlignment(.center)
                     
                     Text("The Complete Learning Ecosystem")
-                        .foregroundColor(.white.opacity(0.6))
-                        .foregroundStyle(.ultraThinMaterial)
+                        .foregroundColor(.white.opacity(0.7))
                         .multilineTextAlignment(.center)
                 }
                 
                 Spacer()
                 
-                // Account type buttons
+                // Account type buttons with liquid glass
                 VStack(spacing: 16) {
                     Button(action: {
                         buttonTapped += 1
@@ -79,13 +70,12 @@ struct AccountTypeSelectionView: View {
                         Text("Create New Account")
                             .font(.headline)
                             .bold()
-                            .foregroundStyle(.black.opacity(0.8))
+                            .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(16)
-                            .background(.white)
-                            .cornerRadius(.infinity)
                     }
                     .sensoryFeedback(.pathComplete, trigger: buttonTapped)
+                    .applyWelcomeGlassButton()
                     
                     Button(action: {
                         buttonTapped += 1
@@ -93,20 +83,33 @@ struct AccountTypeSelectionView: View {
                     }) {
                         Text("Already Have an Account?")
                             .font(.headline)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.white.opacity(0.9))
                             .frame(maxWidth: .infinity)
                             .padding(16)
-                            .background(.white.opacity(0.2))
-                            .cornerRadius(.infinity)
                     }
                     .sensoryFeedback(.pathComplete, trigger: buttonTapped)
+                    .applyWelcomeGlassButton()
                 }
                 .padding(.horizontal, 42)
                 .padding(.bottom, 60)
             }
         }
-        .background(Color(.systemBackground))
+        .background(Color.black)
         .ignoresSafeArea(.container)
+    }
+}
+
+// MARK: - View Extension for Welcome Glass Button
+extension View {
+    @ViewBuilder
+    func applyWelcomeGlassButton() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.clear.interactive(), in: .capsule)
+        } else {
+            self
+                .background(.white.opacity(0.15))
+                .cornerRadius(.infinity)
+        }
     }
 }
 

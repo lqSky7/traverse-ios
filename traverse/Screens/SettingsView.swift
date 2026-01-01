@@ -1,4 +1,5 @@
 import SwiftUI
+import Glur
 
 struct SettingsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -17,90 +18,110 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // User Profile Section - UNCHANGED
+                    // User Profile Section with Blurred Background
                     if let user = authViewModel.currentUser {
-                        VStack(spacing: 16) {
-                            // Profile Image
-                            if let imageUrl = user.profileImageURL {
-                                AsyncImage(url: URL(string: imageUrl)) { phase in
-                                    switch phase {
-                                    case .empty:
-                                        ProgressView()
-                                            .frame(width: 120, height: 120)
-                                    case .success(let image):
-                                        image
+                        ZStack {
+                            // Blurred profile photo background
+                            Group {
+                                if let imageUrl = user.profileImageURL, let url = URL(string: imageUrl) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                        default:
+                                            Image("def_user")
+                                                .resizable()
+                                                .scaledToFill()
+                                        }
+                                    }
+                                } else {
+                                    Image("def_user")
+                                        .resizable()
+                                        .scaledToFill()
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: 260)
+                            .clipped()
+                            .glur(radius: 12.0, offset: 0.2, interpolation: 0.5, direction: .down)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                            
+                            // Dark overlay for legibility
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.black.opacity(0.4))
+                            
+                            // Content
+                            VStack(spacing: 16) {
+                                // Profile Image
+                                Group {
+                                    if let imageUrl = user.profileImageURL, let url = URL(string: imageUrl) {
+                                        AsyncImage(url: url) { phase in
+                                            switch phase {
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .scaledToFill()
+                                            default:
+                                                Image("def_user")
+                                                    .resizable()
+                                                    .scaledToFill()
+                                            }
+                                        }
+                                    } else {
+                                        Image("def_user")
                                             .resizable()
                                             .scaledToFill()
-                                            .frame(width: 120, height: 120)
-                                            .clipShape(Circle())
-                                    case .failure:
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 120, height: 120)
-                                            .foregroundStyle(.blue)
-                                    @unknown default:
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 120, height: 120)
-                                            .foregroundStyle(.blue)
                                     }
                                 }
-                            } else {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 120, height: 120)
-                                    .foregroundStyle(.blue)
-                            }
-
-                            // User Info
-                            VStack(spacing: 4) {
-                                Text(user.username)
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-
-                                Text(user.email)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            // Stats Row
-                            HStack(spacing: 32) {
-                                VStack(spacing: 4) {
-                                    Text("\(user.currentStreak)")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(paletteManager.color(at: 0))
-                                    Text("Day Streak")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 2))
                                 
-                                Divider()
-                                    .frame(height: 30)
-                                
+                                // User Info
                                 VStack(spacing: 4) {
-                                    Text("\(user.totalXp)")
-                                        .font(.title3)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(paletteManager.color(at: 1))
-                                    Text("Total XP")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    Text(user.username)
+                                        .font(.title2)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+
+                                    Text(user.email)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.white.opacity(0.7))
                                 }
+
+                                // Stats Row
+                                HStack(spacing: 32) {
+                                    VStack(spacing: 4) {
+                                        Text("\(user.currentStreak)")
+                                            .font(.title3)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(paletteManager.color(at: 0))
+                                        Text("Day Streak")
+                                            .font(.caption)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                    }
+                                    
+                                    Divider()
+                                        .frame(height: 30)
+                                        .background(Color.white.opacity(0.3))
+                                    
+                                    VStack(spacing: 4) {
+                                        Text("\(user.totalXp)")
+                                            .font(.title3)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(paletteManager.color(at: 1))
+                                        Text("Total XP")
+                                            .font(.caption)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                    }
+                                }
+                                .padding(.top, 8)
                             }
-                            .padding(.top, 8)
+                            .padding(.vertical, 24)
+                            .padding(.horizontal)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                        .padding(.horizontal)
-                        .background(
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
-                        )
                         .padding(.horizontal)
                     }
                     
@@ -142,7 +163,7 @@ struct SettingsView: View {
                 })
             }
             .sheet(isPresented: $showingDreamPicker) {
-                HuePickerSheet()
+                HuePicker()
                     .presentationDetents([.medium])
             }
             .alert("Logout", isPresented: $showingLogoutConfirmation) {

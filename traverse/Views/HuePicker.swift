@@ -10,227 +10,6 @@ struct HueCorners {
     static let bottomRight = Color(hex: "98D8AA")  // Green
 }
 
-// MARK: - Hue Picker
-struct HuePicker: View {
-    @State private var dragLocation: CGPoint? = nil
-    @State private var currentColor: Color = HueCorners.bottomRight
-    @State private var lastQuadrant: Int = -1
-    @State private var currentJokeIndex: Int = 0
-    @State private var hasStartedDragging: Bool = false
-    @State private var lastGridX: Int = -1
-    @State private var lastGridY: Int = -1
-    
-    private let columns = 12
-    private let rows = 10
-    private let dotSize: CGFloat = 8
-    private let influenceRadius: CGFloat = 60
-    
-    // Haptic generators
-    private let selectionFeedback = UISelectionFeedbackGenerator()
-    private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
-    private let mediumFeedback = UIImpactFeedbackGenerator(style: .medium)
-    private let heavyFeedback = UIImpactFeedbackGenerator(style: .heavy)
-    
-    // Dad joke color picker names
-    private let colorJokes = [
-        "Hue Dunit?",
-        "Feeling Chroma-tic",
-        "Orange You Glad",
-        "Color Me Impressed",
-        "Fifty Shades of Yay",
-        "ROY G. BIV's Crib",
-        "Pigment of Imagination",
-        "Tint There, Done That",
-        "The Hue-man Touch",
-        "Shade-y Business",
-        "A Dye-lemma",
-        "Prism Break",
-        "In Living Color",
-        "Chromatic Chaos",
-        "The Palette Cleanser"
-    ]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            jokeTextView
-            dotGridView
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 4)
-        .background { cardBackground }
-        .clipShape(RoundedRectangle(cornerRadius: 36))
-        .onAppear {
-            selectionFeedback.prepare()
-            lightFeedback.prepare()
-            mediumFeedback.prepare()
-            heavyFeedback.prepare()
-        }
-    }
-    
-    // MARK: - Extracted Sub-views
-    
-    private var jokeTextView: some View {
-        Text("You pick!\(colorJokes[currentJokeIndex])")
-            .font(.system(.body, design: .rounded))
-            .fontWeight(.semibold)
-            .foregroundStyle(currentColor)
-            .contentTransition(.numericText())
-            .animation(.spring(response: 0.8, dampingFraction: 0.7), value: currentJokeIndex)
-            .padding(.horizontal, 4)
-    }
-    
-    private var dotGridView: some View {
-        GeometryReader { geometry in
-            let gridWidth = geometry.size.width
-            let gridHeight = geometry.size.height
-            let spacingX = gridWidth / CGFloat(columns)
-            let spacingY = gridHeight / CGFloat(rows)
-            
-            ZStack {
-                dotsGrid(geometry: geometry, spacingX: spacingX, spacingY: spacingY)
-                cursorView
-            }
-            .contentShape(Rectangle())
-            .gesture(dragGesture(gridWidth: gridWidth, gridHeight: gridHeight, spacingX: spacingX, spacingY: spacingY, gridSize: geometry.size))
-            .coordinateSpace(name: "grid")
-        }
-        .frame(height: 200)
-        .padding(20)
-        .background { gridBackground }
-        .overlay { gridBorder }
-    }
-    
-    private func dotsGrid(geometry: GeometryProxy, spacingX: CGFloat, spacingY: CGFloat) -> some View {
-        ForEach(0..<rows, id: \.self) { row in
-            ForEach(0..<columns, id: \.self) { col in
-                let dotX = spacingX * (CGFloat(col) + 0.5)
-                let dotY = spacingY * (CGFloat(row) + 0.5)
-                let dotCenter = CGPoint(x: dotX, y: dotY)
-                
-                DotView(
-                    center: dotCenter,
-                    dragLocation: dragLocation,
-                    influenceRadius: influenceRadius,
-                    gridSize: geometry.size,
-                    dotSize: dotSize
-                )
-                .position(dotCenter)
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var cursorView: some View {
-        if let location = dragLocation {
-            Circle()
-                .frame(width: 36, height: 36)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .position(location)
-                .animation(.interactiveSpring(response: 0.08, dampingFraction: 0.9), value: location)
-        }
-    }
-    
-    private func dragGesture(gridWidth: CGFloat, gridHeight: CGFloat, spacingX: CGFloat, spacingY: CGFloat, gridSize: CGSize) -> some Gesture {
-        DragGesture(minimumDistance: 0)
-            .onChanged { value in
-                let clampedX = min(max(0, value.location.x), gridWidth)
-                let clampedY = min(max(0, value.location.y), gridHeight)
-                
-                if !hasStartedDragging {
-                    hasStartedDragging = true
-                    mediumFeedback.impactOccurred(intensity: 0.6)
-                }
-                
-                let gridX = Int(clampedX / spacingX)
-                let gridY = Int(clampedY / spacingY)
-                if (gridX != lastGridX || gridY != lastGridY) && lastGridX != -1 {
-                    lightFeedback.impactOccurred(intensity: 0.5)
-                }
-                lastGridX = gridX
-                lastGridY = gridY
-                
-                // Update location immediately - no withAnimation wrapper
-                // The view's own animation handles the smooth trailing
-                dragLocation = CGPoint(x: clampedX, y: clampedY)
-                
-                updateColor(at: CGPoint(x: clampedX, y: clampedY), gridSize: gridSize)
-            }
-            .onEnded { _ in
-                mediumFeedback.impactOccurred(intensity: 0.8)
-                hasStartedDragging = false
-                lastGridX = -1
-                lastGridY = -1
-            }
-    }
-    
-    private var gridBackground: some View {
-        RoundedRectangle(cornerRadius: 32)
-            .fill(.clear)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32))
-    }
-    
-    private var gridBorder: some View {
-        RoundedRectangle(cornerRadius: 32)
-            .strokeBorder(currentColor.opacity(0.3), lineWidth: 1)
-            .allowsHitTesting(false)
-            .animation(.easeInOut(duration: 0.3), value: currentColor)
-    }
-    
-    private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 36)
-            .fill(.ultraThinMaterial)
-            .overlay {
-                RoundedRectangle(cornerRadius: 36)
-                    .fill(currentColor.opacity(0.15))
-                    .blur(radius: 40)
-            }
-    }
-    
-    private func updateColor(at location: CGPoint, gridSize: CGSize) {
-        let normalizedX = location.x / gridSize.width
-        let normalizedY = location.y / gridSize.height
-        
-        let quadrant = (normalizedX < 0.5 ? 0 : 1) + (normalizedY < 0.5 ? 0 : 2)
-        if quadrant != lastQuadrant {
-            lastQuadrant = quadrant
-            currentJokeIndex = (currentJokeIndex + 1) % colorJokes.count
-            heavyFeedback.impactOccurred(intensity: 1.0)
-        }
-        
-        // Bilinear color interpolation
-        let interpolatedColor = interpolateColor(x: normalizedX, y: normalizedY)
-        
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            currentColor = interpolatedColor
-        }
-    }
-    
-    private func interpolateColor(x: Double, y: Double) -> Color {
-        let topColor = blendColors(HueCorners.topLeft, HueCorners.topRight, ratio: x)
-        let bottomColor = blendColors(HueCorners.bottomLeft, HueCorners.bottomRight, ratio: x)
-        return blendColors(topColor, bottomColor, ratio: y)
-    }
-    
-    private func blendColors(_ color1: Color, _ color2: Color, ratio: Double) -> Color {
-        let uiColor1 = UIColor(color1)
-        let uiColor2 = UIColor(color2)
-        
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        
-        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        
-        let r = r1 + (r2 - r1) * ratio
-        let g = g1 + (g2 - g1) * ratio
-        let b = b1 + (b2 - b1) * ratio
-        let a = a1 + (a2 - a1) * ratio
-        
-        return Color(UIColor(red: r, green: g, blue: b, alpha: a))
-    }
-}
-
 // MARK: - Dot View
 struct DotView: View {
     let center: CGPoint
@@ -298,8 +77,8 @@ struct DotView: View {
     }
 }
 
-// MARK: - Hue Picker Sheet (Half-screen presentation)
-struct HuePickerSheet: View {
+// MARK: - Hue Picker (Used in both registration and settings)
+struct HuePicker: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var dragLocation: CGPoint? = nil
@@ -473,8 +252,7 @@ struct HuePickerSheet: View {
     
     private var sheetGridBackground: some View {
         RoundedRectangle(cornerRadius: 32)
-            .fill(.clear)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 32))
+            .fill(Color.white.opacity(0.08))
     }
     
     private var sheetGridBorder: some View {
@@ -585,7 +363,7 @@ extension View {
 }
 
 #Preview("Sheet Picker") {
-    HuePickerSheet()
+    HuePicker()
         .presentationDetents([.medium])
         .presentationBackground(.ultraThinMaterial)
 }

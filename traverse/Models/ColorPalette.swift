@@ -200,21 +200,26 @@ class ColorPaletteManager: ObservableObject {
         return colors[index % colors.count]
     }
     
-    // Get gradient colors for streak
+    // Get gradient colors for streak - always uses palette colors
     func streakGradientColors(for streak: Int) -> [Color] {
+        let colors = selectedPalette.swiftUIColors
+        
+        // Always return palette colors, never gray
         if streak == 0 {
-            return [Color.gray.opacity(0.6), Color.gray.opacity(0.4)]
+            // Use muted versions of first two palette colors
+            return [colors[0].opacity(0.7), colors[safe: 1]?.opacity(0.5) ?? colors[0].opacity(0.5)]
         }
         
-        let colors = selectedPalette.swiftUIColors
         if streak >= 100 {
-            return Array(colors.prefix(3))
+            // All colors for epic streaks
+            return Array(colors.prefix(4))
         } else if streak >= 60 {
             return Array(colors.suffix(3))
         } else if streak >= 25 {
-            return Array(colors.dropFirst(2).prefix(3))
+            return Array(colors.dropFirst(1).prefix(3))
         } else {
-            return [colors.first ?? .gray, colors[safe: 1] ?? .gray]
+            // Default: first 3 palette colors
+            return Array(colors.prefix(3))
         }
     }
 }

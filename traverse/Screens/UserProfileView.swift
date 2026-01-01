@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import Glur
 
 enum FriendshipStatus {
     case currentUser
@@ -335,79 +336,103 @@ struct ProfileHeaderView: View {
     @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
-        VStack(spacing: 16) {
-            Circle()
-                .fill(paletteManager.selectedPalette.primary.gradient)
-                .frame(width: 100, height: 100)
-                .overlay {
-                    Text(profile.username.prefix(1).uppercased())
-                        .font(.system(size: 42, weight: .bold))
-                        .foregroundStyle(.white)
-                }
+        ZStack {
+            // Blurred profile photo background
+            Image("def_user")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: 280)
+                .clipped()
+                .glur(radius: 12.0, offset: 0.2, interpolation: 0.5, direction: .down)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             
-            Divider()
+            // Dark overlay for legibility
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.4))
             
-            Text(profile.username)
-                .font(.title2)
-                .bold()
-            
-            Divider()
-            
-            HStack(spacing: 0) {
-                VStack(spacing: 4) {
-                    Text("\(profile.currentStreak)")
-                        .font(.title2)
-                        .bold()
-                    Label("Streak", systemImage: "flame.fill")
-                        .font(.caption)
-                        .foregroundStyle(paletteManager.selectedPalette.primary)
-                }
-                .frame(maxWidth: .infinity)
+            // Content
+            VStack(spacing: 16) {
+                Circle()
+                    .fill(paletteManager.selectedPalette.primary.gradient)
+                    .frame(width: 100, height: 100)
+                    .overlay {
+                        Text(profile.username.prefix(1).uppercased())
+                            .font(.system(size: 42, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 2))
+                
+                Text(profile.username)
+                    .font(.title2)
+                    .bold()
+                    .foregroundStyle(.white)
                 
                 Divider()
+                    .background(Color.white.opacity(0.3))
                 
-                VStack(spacing: 4) {
-                    Text("\(profile.totalXp)")
-                        .font(.title2)
-                        .bold()
-                    Label("XP", systemImage: "star.fill")
-                        .font(.caption)
-                        .foregroundStyle(paletteManager.selectedPalette.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                
-                if let stats = statistics {
-                    Divider()
-                    
+                HStack(spacing: 0) {
                     VStack(spacing: 4) {
-                        Text("\(stats.totalSolves)")
+                        Text("\(profile.currentStreak)")
                             .font(.title2)
                             .bold()
-                        Text("Solves")
+                            .foregroundStyle(.white)
+                        Label("Streak", systemImage: "flame.fill")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(paletteManager.selectedPalette.primary)
                     }
                     .frame(maxWidth: .infinity)
+                    
+                    Divider()
+                        .frame(height: 40)
+                        .background(Color.white.opacity(0.3))
+                    
+                    VStack(spacing: 4) {
+                        Text("\(profile.totalXp)")
+                            .font(.title2)
+                            .bold()
+                            .foregroundStyle(.white)
+                        Label("XP", systemImage: "star.fill")
+                            .font(.caption)
+                            .foregroundStyle(paletteManager.selectedPalette.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    if let stats = statistics {
+                        Divider()
+                            .frame(height: 40)
+                            .background(Color.white.opacity(0.3))
+                        
+                        VStack(spacing: 4) {
+                            Text("\(stats.totalSolves)")
+                                .font(.title2)
+                                .bold()
+                                .foregroundStyle(.white)
+                            Text("Solves")
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                
+                Divider()
+                    .background(Color.white.opacity(0.3))
+                
+                HStack(spacing: 12) {
+                    Label(profile.visibility.capitalized, systemImage: profile.visibility == "public" ? "globe" : profile.visibility == "private" ? "lock" : "person.2")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
+                    
+                    Text("•")
+                        .foregroundStyle(.white.opacity(0.7))
+                    
+                    Text("Joined \(formatDate(profile.createdAt))")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.7))
                 }
             }
-            
-            Divider()
-            
-            HStack(spacing: 12) {
-                Label(profile.visibility.capitalized, systemImage: profile.visibility == "public" ? "globe" : profile.visibility == "private" ? "lock" : "person.2")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                Text("•")
-                    .foregroundStyle(.secondary)
-                
-                Text("Joined \(formatDate(profile.createdAt))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            .padding()
         }
-        .padding()
-        .background(.ultraThinMaterial)
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .padding(.horizontal)
@@ -449,7 +474,7 @@ struct StatisticsView: View {
                 }
             }
             .padding()
-            .background(.secondary.opacity(0.1))
+            .applyProfileCardBackground()
             .cornerRadius(12)
             .padding(.horizontal)
         }
@@ -583,7 +608,7 @@ struct SolveCard: View {
                 .foregroundStyle(.secondary)
         }
         .padding()
-        .background(.secondary.opacity(0.1))
+        .applyProfileCardBackground()
         .cornerRadius(12)
     }
     
@@ -695,7 +720,7 @@ struct AchievementCard: View {
             Spacer()
         }
         .padding()
-        .background(.secondary.opacity(0.1))
+        .applyProfileCardBackground()
         .cornerRadius(12)
     }
     
@@ -722,6 +747,15 @@ extension View {
             }
         } else {
             self.buttonStyle(.bordered)
+        }
+    }
+    
+    @ViewBuilder
+    func applyProfileCardBackground() -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
+        } else {
+            self.background(Color(UIColor.systemGray6))
         }
     }
 }

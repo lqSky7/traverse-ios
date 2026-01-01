@@ -7,6 +7,12 @@ struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
+    
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: Date())
+    }
 
     
     var body: some View {
@@ -39,20 +45,16 @@ struct HomeView: View {
                                 AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
                             }
                             
-                            if let solveStats = viewModel.solveStats {
-                                HStack(spacing: 16) {
+                            if let solveStats = viewModel.solveStats,
+                               let solves = viewModel.recentSolves {
+                                // Difficulty and Activity side by side
+                                HStack(alignment: .top, spacing: 16) {
                                     DifficultyChartCard(stats: solveStats.stats, paletteManager: paletteManager)
-                                    PlatformChartCard(stats: solveStats.stats, paletteManager: paletteManager)
+                                    SolveHeatmapCard(solves: solves, paletteManager: paletteManager)
                                 }
-                            }
-                            
-                            if let submissionStats = viewModel.submissionStats {
-                                SubmissionStatsCard(stats: submissionStats.stats)
-                            }
-                            
-                            // New Charts
-                            if let solveStats = viewModel.solveStats {
-                                DifficultyPieChartCard(stats: solveStats.stats, paletteManager: paletteManager)
+                                
+                                // Platforms full width
+                                PlatformChartCard(stats: solveStats.stats, paletteManager: paletteManager)
                             }
                             
                             if let submissionStats = viewModel.submissionStats {
@@ -89,7 +91,7 @@ struct HomeView: View {
                 .padding()
             }
             .background(Color.black)
-            .navigationTitle("Home")
+            .navigationTitle(formattedDate)
             .navigationBarTitleDisplayMode(.large)
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
@@ -140,7 +142,6 @@ struct StreakCard: View {
     let streak: Int
     let solvedToday: Bool
     @ObservedObject var paletteManager: ColorPaletteManager
-    @State private var gradientOffset: CGFloat = -1
     
     private var gradientColors: [Color] {
         paletteManager.streakGradientColors(for: streak)
@@ -160,20 +161,25 @@ struct StreakCard: View {
         }
     }
     
-    
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 20) {
             Image(systemName: streak == 0 ? "flame" : "flame.fill")
-                .font(.system(size: 40))
+                .font(.system(size: 48))
                 .foregroundStyle(.white)
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(displayNumber)
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundStyle(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(displayNumber)
+                        .font(.system(size: 56, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("DAYS")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
                 Text(streakMessage)
-                    .font(.title3)
-                    .foregroundStyle(.white.opacity(0.9))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.8))
             }
             
             Spacer()
@@ -185,34 +191,99 @@ struct StreakCard: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.vertical, 24)
         .background(
-            AnimatedGradient(colors: gradientColors, offset: gradientOffset)
-                .overlay(.ultraThinMaterial.opacity(0.2))
+            ColorMorphBackground(colors: gradientColors)
         )
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.2), radius: 12, x: 0, y: 6)
-        .onAppear {
-            withAnimation(.linear(duration: 3).repeatForever(autoreverses: true)) {
-                gradientOffset = 1
-            }
-        }
+        .shadow(color: gradientColors.first?.opacity(0.4) ?? .black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 }
 
-// MARK: - Animated Gradient View
-struct AnimatedGradient: View {
+// MARK: - Color Morph Background (Professional Metal-style)
+struct ColorMorphBackground: View {
     let colors: [Color]
-    let offset: CGFloat
     
     var body: some View {
-        GeometryReader { geometry in
-            LinearGradient(
-                colors: colors,
-                startPoint: UnitPoint(x: 0.5 + offset * 0.5, y: 0),
-                endPoint: UnitPoint(x: 0.5 - offset * 0.5, y: 1)
-            )
+        TimelineView(.animation(minimumInterval: 1/60)) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            
+            GeometryReader { geometry in
+                Canvas { context, size in
+                    // Create smooth flowing color field
+                    let cycleSpeed = 0.15 // How fast colors change
+                    let t = time * cycleSpeed
+                    
+                    // Calculate color blend factor (0-1, smoothly oscillating)
+                    let blendFactor = (sin(t) + 1) / 2
+                    let secondaryFactor = (sin(t * 0.7 + 1.5) + 1) / 2
+                    
+                    // Get colors - use palette colors only, fallback to first color
+                    let color1 = colors.indices.contains(0) ? colors[0] : .clear
+                    let color2 = colors.indices.contains(1) ? colors[1] : color1
+                    let color3 = colors.indices.contains(2) ? colors[2] : color2
+                    
+                    // Create multiple gradient layers for depth
+                    let mainGradient = Gradient(colors: [
+                        interpolateColor(color1, color2, factor: blendFactor),
+                        interpolateColor(color2, color3, factor: secondaryFactor),
+                        interpolateColor(color3, color1, factor: (blendFactor + secondaryFactor) / 2)
+                    ])
+                    
+                    // Animated gradient positions
+                    let startX = 0.3 + sin(t * 0.5) * 0.2
+                    let startY = 0.2 + cos(t * 0.4) * 0.15
+                    let endX = 0.7 + cos(t * 0.6) * 0.2
+                    let endY = 0.8 + sin(t * 0.3) * 0.15
+                    
+                    // Draw the flowing gradient
+                    context.fill(
+                        Path(CGRect(origin: .zero, size: size)),
+                        with: .linearGradient(
+                            mainGradient,
+                            startPoint: CGPoint(x: size.width * startX, y: size.height * startY),
+                            endPoint: CGPoint(x: size.width * endX, y: size.height * endY)
+                        )
+                    )
+                    
+                    // Add subtle overlay for metallic depth
+                    let overlayGradient = Gradient(colors: [
+                        .white.opacity(0.1),
+                        .clear,
+                        .black.opacity(0.15)
+                    ])
+                    context.fill(
+                        Path(CGRect(origin: .zero, size: size)),
+                        with: .linearGradient(
+                            overlayGradient,
+                            startPoint: CGPoint(x: 0, y: 0),
+                            endPoint: CGPoint(x: 0, y: size.height)
+                        )
+                    )
+                }
+            }
         }
+    }
+    
+    // Smooth color interpolation
+    private func interpolateColor(_ c1: Color, _ c2: Color, factor: Double) -> Color {
+        let f = max(0, min(1, factor))
+        
+        // Get UIColor for component access
+        let uiColor1 = UIColor(c1)
+        let uiColor2 = UIColor(c2)
+        
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        
+        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        
+        return Color(
+            red: r1 + (r2 - r1) * f,
+            green: g1 + (g2 - g1) * f,
+            blue: b1 + (b2 - b1) * f
+        )
     }
 }
 
@@ -225,8 +296,12 @@ struct MainStatsCard: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("Your Progress")
-                    .font(.headline)
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.bar.fill")
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("Your Progress")
+                        .font(.headline)
+                }
                 Spacer()
             }
             .padding()
@@ -263,7 +338,7 @@ struct MainStatsCard: View {
             }
             .padding()
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
@@ -276,18 +351,18 @@ struct StatItem: View {
     let color: Color
     
     var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
+        VStack(spacing: 6) {
+            Text(value)
+                .font(.system(size: 28, weight: .bold))
                 .foregroundStyle(color)
             
-            Text(value)
-                .font(.title)
-                .bold()
-            
             Text(title)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(.secondary)
+            
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(color.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
     }
@@ -298,65 +373,119 @@ struct DifficultyChartCard: View {
     let stats: SolveStatsData
     @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var chartData: [(String, Int, Color)] {
-        [
-            ("Easy", stats.byDifficulty.easy, paletteManager.color(at: 0)),
-            ("Medium", stats.byDifficulty.medium, paletteManager.color(at: 1)),
-            ("Hard", stats.byDifficulty.hard, paletteManager.color(at: 2))
-        ]
+    private var totalProblems: Int {
+        stats.byDifficulty.easy + stats.byDifficulty.medium + stats.byDifficulty.hard
+    }
+    
+    private var maxCount: Int {
+        max(stats.byDifficulty.easy, stats.byDifficulty.medium, stats.byDifficulty.hard, 1)
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            Text("Difficulty")
-                .font(.headline)
-                .foregroundStyle(.white)
-                .padding()
+            HStack {
+                Text("Difficulty")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 8)
             
             Divider()
                 .background(Color.gray.opacity(0.3))
             
-            Chart(chartData, id: \.0) { item in
-                BarMark(
-                    x: .value("Difficulty", item.0),
-                    y: .value("Count", item.1)
+            // Hero total
+            VStack(spacing: 4) {
+                Text("\(totalProblems)")
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("Total Solved")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+            
+            // Horizontal progress bars
+            VStack(spacing: 10) {
+                DifficultyProgressRow(
+                    label: "Easy",
+                    count: stats.byDifficulty.easy,
+                    maxCount: maxCount,
+                    color: paletteManager.color(at: 0)
                 )
-                .foregroundStyle(item.2.gradient)
-                .cornerRadius(6)
-                .annotation(position: .top) {
-                    Text("\(item.1)")
-                        .font(.caption)
-                        .bold()
-                        .foregroundStyle(item.2)
-                }
+                
+                DifficultyProgressRow(
+                    label: "Medium",
+                    count: stats.byDifficulty.medium,
+                    maxCount: maxCount,
+                    color: paletteManager.color(at: 1)
+                )
+                
+                DifficultyProgressRow(
+                    label: "Hard",
+                    count: stats.byDifficulty.hard,
+                    maxCount: maxCount,
+                    color: paletteManager.color(at: 2)
+                )
             }
-            .frame(height: 140)
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                        .foregroundStyle(Color.gray.opacity(0.3))
-                    AxisValueLabel()
-                        .foregroundStyle(.gray)
-                }
-            }
-            .chartXAxis {
-                AxisMarks(values: .automatic) { value in
-                    AxisValueLabel {
-                        if let label = value.as(String.self) {
-                            Text(label)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-            .padding()
-
-            Spacer()
+            .padding(.horizontal)
+            .padding(.bottom)
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Difficulty Progress Row
+struct DifficultyProgressRow: View {
+    let label: String
+    let count: Int
+    let maxCount: Int
+    let color: Color
+    
+    private var progress: CGFloat {
+        guard maxCount > 0 else { return 0 }
+        return CGFloat(count) / CGFloat(maxCount)
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 50, alignment: .leading)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background track
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 12)
+                    
+                    // Progress bar
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                }
+            }
+            .frame(height: 12)
+            
+            Text("\(count)")
+                .font(.subheadline)
+                .bold()
+                .foregroundStyle(color)
+                .frame(width: 40, alignment: .trailing)
+        }
     }
 }
 
@@ -370,91 +499,126 @@ struct PlatformChartCard: View {
             .sorted { $0.1 > $1.1 }
     }
     
-    private var totalPlatforms: Int {
+    private var totalSolves: Int {
         chartData.reduce(0) { $0 + $1.1 }
+    }
+    
+    private var maxCount: Int {
+        chartData.map { $0.1 }.max() ?? 1
     }
     
     var body: some View {
         VStack(spacing: 0) {
-            Text("Platforms")
-                .font(.headline)
-                .foregroundStyle(.white)
-                .padding()
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "laptopcomputer")
+                        .foregroundStyle(paletteManager.color(at: 4))
+                    Text("Platforms")
+                        .font(.headline)
+                }
+                Spacer()
+                Text("\(chartData.count)")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(paletteManager.color(at: 4))
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 8)
             
             Divider()
                 .background(Color.gray.opacity(0.3))
             
             if !chartData.isEmpty {
-                ZStack {
-                    ForEach(Array(chartData.enumerated()), id: \.element.0) { index, _ in
-                        let ringSize = 120 - (CGFloat(index) * 20)
-                        Circle()
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 8)
-                            .frame(width: ringSize, height: ringSize)
-                    }
-                    
-                    ForEach(Array(chartData.enumerated()), id: \.element.0) { index, item in
-                        let percentage = Double(item.1) / Double(totalPlatforms)
-                        let ringSize = 120 - (CGFloat(index) * 20)
-                        
-                        Circle()
-                            .trim(from: 0, to: percentage)
-                            .stroke(
-                                platformColor(for: item.0),
-                                style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                            )
-                            .frame(width: ringSize, height: ringSize)
-                            .rotationEffect(.degrees(-90))
-                    }
-                    
-                    VStack(spacing: 2) {
-                        Text("\(chartData.count)")
-                            .font(.title3)
-                            .bold()
-                        Text("Platforms")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                // Hero total
+                VStack(spacing: 4) {
+                    Text("\(totalSolves)")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("Total Solves")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .frame(height: 140)
-                .padding()
+                .padding(.top, 12)
+                .padding(.bottom, 16)
                 
-                VStack(spacing: 6) {
-                    ForEach(Array(chartData.prefix(3)), id: \.0) { item in
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(platformColor(for: item.0))
-                                .frame(width: 8, height: 8)
-                            Text("\(item.0): \(item.1)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                // Horizontal bars for each platform
+                VStack(spacing: 12) {
+                    ForEach(Array(chartData.prefix(4).enumerated()), id: \.element.0) { index, item in
+                        PlatformProgressRow(
+                            label: item.0,
+                            count: item.1,
+                            maxCount: maxCount,
+                            color: paletteManager.color(at: index)
+                        )
                     }
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
             } else {
                 VStack(spacing: 8) {
-                    Image(systemName: "chart.pie")
+                    Image(systemName: "laptopcomputer")
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
                     Text("No platform data")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .frame(height: 140)
+                .frame(height: 100)
                 .padding()
             }
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
+}
+
+// MARK: - Platform Progress Row
+struct PlatformProgressRow: View {
+    let label: String
+    let count: Int
+    let maxCount: Int
+    let color: Color
     
-    private func platformColor(for platform: String) -> Color {
-        let colors = paletteManager.selectedPalette.chartColors
-        let hash = platform.hashValue
-        return colors[abs(hash) % colors.count]
+    private var progress: CGFloat {
+        guard maxCount > 0 else { return 0 }
+        return CGFloat(count) / CGFloat(maxCount)
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 80, alignment: .leading)
+                .lineLimit(1)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 12)
+                    
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                }
+            }
+            .frame(height: 12)
+            
+            Text("\(count)")
+                .font(.subheadline)
+                .bold()
+                .foregroundStyle(color)
+                .frame(width: 30, alignment: .trailing)
+        }
     }
 }
 
@@ -462,101 +626,155 @@ struct PlatformChartCard: View {
 struct AchievementStatsCard: View {
     let stats: AchievementStatsData
     @ObservedObject var paletteManager: ColorPaletteManager
+    @State private var glowPhase: CGFloat = 0
+    
+    // Progress determines glow intensity (0 to 1)
+    private var progress: CGFloat {
+        CGFloat(stats.unlocked) / CGFloat(max(stats.total, 1))
+    }
+    
+    // Break up complex expressions for compiler
+    private var glowFillOpacity: Double {
+        let baseOpacity: Double = 0.1
+        let progressMultiplier: Double = Double(progress) * 0.3
+        let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
+        return baseOpacity + progressMultiplier * animationFactor
+    }
+    
+    private var glowStrokeOpacity: Double {
+        let baseOpacity: Double = 0.3
+        let progressMultiplier: Double = Double(progress) * 0.5
+        let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
+        return baseOpacity + progressMultiplier * animationFactor
+    }
+    
+    private var accentColor: Color {
+        paletteManager.color(at: 3)
+    }
+    
+    private var secondaryAccentColor: Color {
+        paletteManager.color(at: 4)
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Achievements")
-                    .font(.headline)
-                Spacer()
-                NavigationLink(destination: AllAchievementsView()) {
-                    Text("View All")
-                        .font(.subheadline)
-                        .foregroundStyle(paletteManager.selectedPalette.primary)
-                }
-            }
-            .padding()
+        VStack(spacing: 0) {
+            headerView
             
             Divider()
                 .background(Color.gray.opacity(0.3))
             
-            HStack(spacing: 20) {
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 12)
-                        .frame(width: 100, height: 100)
-                    
-                    Circle()
-                        .trim(from: 0, to: CGFloat(stats.unlocked) / CGFloat(max(stats.total, 1)))
-                        .stroke(
-                            LinearGradient(
-                                colors: [paletteManager.color(at: 3), paletteManager.color(at: 4)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                        )
-                        .frame(width: 100, height: 100)
-                        .rotationEffect(.degrees(-90))
-                    
-                    VStack(spacing: 2) {
-                        Text("\(stats.unlocked)")
-                            .font(.title)
-                            .bold()
-                        Text("of \(stats.total)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                // Vertical divider
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 1)
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(stats.percentage)
-                            .font(.title2)
-                            .bold()
-                            .foregroundStyle(paletteManager.color(at: 3))
-                        Text("Complete")
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(stats.byCategory.sorted(by: { $0.value > $1.value }), id: \.key) { category, count in
-                            HStack {
-                                Image(systemName: getCategoryIcon(category))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .frame(width: 20)
-                                Text(category.capitalized)
-                                    .font(.subheadline)
-                                Spacer()
-                                Text("\(count)")
-                                    .font(.subheadline)
-                                    .bold()
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .padding()
+            heroSection
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .overlay(glowFillOverlay)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                glowPhase = .pi * 2
+            }
+        }
     }
     
-    private func getCategoryIcon(_ category: String) -> String {
-        switch category.lowercased() {
-        case "solve": return "checkmark.seal.fill"
-        case "streak": return "flame.fill"
-        case "submission": return "arrow.up.doc.fill"
-        default: return "sparkles"
+    private var headerView: some View {
+        HStack {
+            HStack(spacing: 8) {
+                Image(systemName: "trophy.fill")
+                    .foregroundStyle(accentColor)
+                Text("Achievements")
+                    .font(.headline)
+            }
+            Spacer()
+            NavigationLink(destination: AllAchievementsView()) {
+                HStack(spacing: 4) {
+                    Text("View All")
+                        .font(.subheadline)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                }
+                .foregroundStyle(paletteManager.selectedPalette.primary)
+            }
         }
+        .padding()
+    }
+    
+    private var heroSection: some View {
+        HStack(spacing: 24) {
+            ringView
+            
+            Divider()
+                .frame(height: 80)
+            
+            percentageView
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal)
+        .padding(.vertical, 16)
+    }
+    
+    private var ringView: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.gray.opacity(0.2), lineWidth: 14)
+                .frame(width: 100, height: 100)
+            
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    LinearGradient(
+                        colors: [accentColor, secondaryAccentColor],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
+                )
+                .frame(width: 100, height: 100)
+                .rotationEffect(.degrees(-90))
+            
+            VStack(spacing: 0) {
+                Text("\(stats.unlocked)")
+                    .font(.system(size: 28, weight: .bold))
+                Text("of \(stats.total)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+    
+    private var percentageView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(stats.percentage)
+                .font(.system(size: 48, weight: .bold))
+                .foregroundStyle(accentColor)
+            Text("Complete")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private var glowFillOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(
+                LinearGradient(
+                    colors: [.clear, .clear, accentColor.opacity(glowFillOpacity)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .allowsHitTesting(false)
+    }
+    
+    private var glowStrokeOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(
+                LinearGradient(
+                    colors: [.clear, .clear, accentColor.opacity(glowStrokeOpacity)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                lineWidth: 2
+            )
+            .allowsHitTesting(false)
     }
 }
 
@@ -792,10 +1010,12 @@ struct CategoriesSection: View {
                     isExpanded: expandedCategories.contains(category),
                     paletteManager: paletteManager,
                     onToggle: {
-                        if expandedCategories.contains(category) {
-                            expandedCategories.remove(category)
-                        } else {
-                            expandedCategories.insert(category)
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
+                            if expandedCategories.contains(category) {
+                                expandedCategories.remove(category)
+                            } else {
+                                expandedCategories.insert(category)
+                            }
                         }
                     }
                 )
@@ -883,8 +1103,7 @@ struct AchievementCategoryCard: View {
                 }
             }
         }
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -1064,92 +1283,142 @@ struct SubmissionStatsCard: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
 }
 
 // MARK: - Difficulty Pie Chart Card (NEW)
-struct DifficultyPieChartCard: View {
-    let stats: SolveStatsData
+// MARK: - Solve Heatmap Card
+struct SolveHeatmapCard: View {
+    let solves: [Solve]
     @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var chartData: [(String, Int, Color)] {
-        [
-            ("Easy", stats.byDifficulty.easy, paletteManager.color(at: 0)),
-            ("Medium", stats.byDifficulty.medium, paletteManager.color(at: 1)),
-            ("Hard", stats.byDifficulty.hard, paletteManager.color(at: 2))
-        ].filter { $0.1 > 0 }
+    // Process solves into date -> difficulty data
+    private var heatmapData: [Date: String] {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var data: [Date: String] = [:]
+        
+        for solve in solves {
+            guard let date = formatter.date(from: solve.solvedAt) else { continue }
+            let day = Calendar.current.startOfDay(for: date)
+            // Keep the hardest difficulty for each day
+            if let existing = data[day] {
+                data[day] = harderDifficulty(existing, solve.problem.difficulty)
+            } else {
+                data[day] = solve.problem.difficulty
+            }
+        }
+        return data
     }
     
-    private var total: Int {
-        stats.byDifficulty.easy + stats.byDifficulty.medium + stats.byDifficulty.hard
+    private func harderDifficulty(_ a: String, _ b: String) -> String {
+        let order = ["easy": 0, "medium": 1, "hard": 2]
+        let aVal = order[a.lowercased()] ?? 0
+        let bVal = order[b.lowercased()] ?? 0
+        return aVal >= bVal ? a : b
+    }
+    
+    // Generate last 7 weeks of dates
+    private var weekDates: [[Date]] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        var weeks: [[Date]] = []
+        
+        // Start from 8 weeks ago (9 weeks total)
+        for weekOffset in (0..<9).reversed() {
+            var week: [Date] = []
+            let weekStart = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: today)!
+            let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekStart))!
+            
+            for dayOffset in 0..<7 {
+                if let day = calendar.date(byAdding: .day, value: dayOffset, to: startOfWeek) {
+                    week.append(day)
+                }
+            }
+            weeks.append(week)
+        }
+        return weeks
+    }
+    
+    private func colorForDate(_ date: Date) -> Color {
+        guard let difficulty = heatmapData[date] else {
+            return Color.gray.opacity(0.15)
+        }
+        switch difficulty.lowercased() {
+        case "easy": return paletteManager.color(at: 0)
+        case "medium": return paletteManager.color(at: 1)
+        case "hard": return paletteManager.color(at: 2)
+        default: return Color.gray.opacity(0.3)
+        }
+    }
+    
+    private var totalSolvedDays: Int {
+        heatmapData.count
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Problem Distribution")
-                .font(.headline)
+        VStack(spacing: 0) {
+            // Header with count
+            HStack {
+                HStack(spacing: 6) {
+                    Image(systemName: "square.grid.3x3.fill")
+                        .font(.caption)
+                        .foregroundStyle(paletteManager.color(at: 3))
+                    Text("Activity")
+                        .font(.headline)
+                }
+                Spacer()
+                Text("\(totalSolvedDays)")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(paletteManager.color(at: 3))
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 8)
             
             Divider()
                 .background(Color.gray.opacity(0.3))
+                .padding(.horizontal, -16)
             
-            if !chartData.isEmpty {
-                HStack(spacing: 30) {
-                    Chart(chartData, id: \.0) { item in
-                        SectorMark(
-                            angle: .value("Count", item.1),
-                            innerRadius: .ratio(0.6),
-                            angularInset: 2
-                        )
-                        .foregroundStyle(item.2.gradient)
-                        .cornerRadius(4)
-                    }
-                    .frame(width: 140, height: 140)
-                    .overlay {
-                        VStack(spacing: 2) {
-                            Text("\(total)")
-                                .font(.title2)
-                                .bold()
-                            Text("Problems")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(chartData, id: \.0) { item in
-                            HStack(spacing: 10) {
-                                Circle()
-                                    .fill(item.2)
-                                    .frame(width: 12, height: 12)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.0)
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                    Text("\(item.1) (\(Int((Double(item.1) / Double(total)) * 100))%)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Spacer()
+            // Heatmap grid - larger cells to fill space
+            HStack(spacing: 3) {
+                // Weeks
+                HStack(spacing: 3) {
+                    ForEach(Array(weekDates.enumerated()), id: \.offset) { weekIndex, week in
+                        VStack(spacing: 3) {
+                            ForEach(week, id: \.self) { date in
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(colorForDate(date))
+                                    .frame(width: 16, height: 16)
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity)
                 }
-                .padding(.vertical, 8)
-            } else {
-                Text("No difficulty data available")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 40)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            
+            // Compact legend - dots only, centered
+            HStack {
+                Spacer()
+                HStack(spacing: 12) {
+                    Circle().fill(paletteManager.color(at: 0)).frame(width: 8, height: 8)
+                    Circle().fill(paletteManager.color(at: 1)).frame(width: 8, height: 8)
+                    Circle().fill(paletteManager.color(at: 2)).frame(width: 8, height: 8)
+                }
+                Spacer()
+            }
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+            
+            Spacer(minLength: 0)
         }
-        .padding()
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
@@ -1233,7 +1502,7 @@ struct SubmissionBreakdownCard: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
@@ -1245,29 +1514,55 @@ struct RecentSolvesCard: View {
     @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
             HStack {
-                Text("Recent Solves")
-                    .font(.headline)
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("Recent Solves")
+                        .font(.headline)
+                }
                 Spacer()
                 NavigationLink(destination: AllSolvesView(solves: solves)) {
-                    Text("View All")
-                        .font(.subheadline)
-                        .foregroundStyle(paletteManager.selectedPalette.primary)
+                    HStack(spacing: 4) {
+                        Text("View All")
+                            .font(.subheadline)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
             }
+            .padding()
             
             Divider()
                 .background(Color.gray.opacity(0.3))
             
-            VStack(spacing: 12) {
+            // Hero count
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("\(solves.count)")
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundStyle(paletteManager.color(at: 0))
+                Text("PROBLEMS")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+            
+            // Solve list
+            VStack(spacing: 8) {
                 ForEach(solves.prefix(5)) { solve in
                     SolveRow(solve: solve, paletteManager: paletteManager)
                 }
             }
+            .padding(.horizontal)
+            .padding(.bottom)
         }
-        .padding()
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
@@ -1358,7 +1653,7 @@ struct SolveRow: View {
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .padding(12)
+                .padding(16)
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -1369,7 +1664,7 @@ struct SolveRow: View {
                     // Language
                     HStack(spacing: 8) {
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
-                            .foregroundStyle(.green)
+                            .foregroundStyle(paletteManager.color(at: 0))
                             .font(.caption)
                         Text("Language: \(solve.submission.language.capitalized)")
                             .font(.subheadline)
@@ -1379,7 +1674,7 @@ struct SolveRow: View {
                     if let tries = solve.submission.numberOfTries {
                         HStack(spacing: 8) {
                             Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(.purple)
+                                .foregroundStyle(paletteManager.color(at: 1))
                                 .font(.caption)
                             Text("Attempts: \(tries)")
                                 .font(.subheadline)
@@ -1390,7 +1685,7 @@ struct SolveRow: View {
                     if let timeTaken = solve.submission.timeTaken {
                         HStack(spacing: 8) {
                             Image(systemName: "clock.fill")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(paletteManager.color(at: 2))
                                 .font(.caption)
                             Text("Time: \(formatTime(timeTaken))")
                                 .font(.subheadline)
@@ -1402,7 +1697,7 @@ struct SolveRow: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "sparkles")
-                                    .foregroundStyle(.yellow)
+                                    .foregroundStyle(paletteManager.color(at: 3))
                                     .font(.caption)
                                 Text("AI Analysis")
                                     .font(.subheadline)
@@ -1422,7 +1717,7 @@ struct SolveRow: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "note.text")
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(paletteManager.color(at: 4))
                                     .font(.caption)
                                 Text("Your Note")
                                     .font(.subheadline)
@@ -1455,7 +1750,7 @@ struct SolveRow: View {
                 .padding(.bottom, 12)
             }
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(12)
     }
     
@@ -1519,28 +1814,27 @@ struct PerformanceMetricsCard: View {
                 .background(Color.gray.opacity(0.3))
             
             if !timeData.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(formatTime(averageTime()))
+                                .font(.system(size: 40, weight: .bold))
+                                .foregroundStyle(paletteManager.color(at: 5))
                             Text("Average Time")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(formatTime(averageTime()))
-                                .font(.title3)
-                                .bold()
-                                .foregroundStyle(paletteManager.color(at: 5))
                         }
                         
                         Spacer()
                         
-                        VStack(alignment: .trailing, spacing: 2) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text(formatTime(fastestTime()))
+                                .font(.title2)
+                                .bold()
+                                .foregroundStyle(paletteManager.color(at: 6))
                             Text("Fastest")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(formatTime(fastestTime()))
-                                .font(.title3)
-                                .bold()
-                                .foregroundStyle(paletteManager.color(at: 6))
                         }
                     }
                     
@@ -1577,21 +1871,9 @@ struct PerformanceMetricsCard: View {
                         .foregroundStyle(paletteManager.color(at: 5))
                         .symbol(Circle())
                     }
-                    .frame(height: 160)
+                    .frame(height: 120)
                     .chartXAxis(.hidden)
-                    .chartYAxis {
-                        AxisMarks(position: .leading) { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                                .foregroundStyle(Color.gray.opacity(0.3))
-                            AxisValueLabel {
-                                if let seconds = value.as(Int.self) {
-                                    Text(formatTimeShort(seconds))
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
+                    .chartYAxis(.hidden)
                 }
             } else {
                 Text("No time data available")
@@ -1601,7 +1883,7 @@ struct PerformanceMetricsCard: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
@@ -1665,28 +1947,27 @@ struct TriesDistributionCard: View {
                 .background(Color.gray.opacity(0.3))
             
             if !triesData.isEmpty {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 20) {
-                        VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack(alignment: .top, spacing: 20) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(String(format: "%.1f", averageTries()))
+                                .font(.system(size: 40, weight: .bold))
+                                .foregroundStyle(paletteManager.color(at: 7))
                             Text("Average Tries")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(String(format: "%.1f", averageTries()))
-                                .font(.title3)
-                                .bold()
-                                .foregroundStyle(paletteManager.color(at: 7))
                         }
                         
                         Spacer()
                         
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Best (1st try)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                        VStack(alignment: .trailing, spacing: 4) {
                             Text("\(firstTryCount())")
-                                .font(.title3)
+                                .font(.title2)
                                 .bold()
                                 .foregroundStyle(paletteManager.color(at: 0))
+                            Text("First Try")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                     }
                     
@@ -1701,24 +1982,10 @@ struct TriesDistributionCard: View {
                                 .fill(difficultyColor(item.2))
                                 .frame(width: item.1 == 1 ? 12 : 8, height: item.1 == 1 ? 12 : 8)
                         }
-                        
-                        if item.1 > 3 {
-                            RuleMark(y: .value("Tries", item.1))
-                                .lineStyle(StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                                .foregroundStyle(difficultyColor(item.2).opacity(0.3))
-                        }
                     }
-                    .frame(height: 140)
+                    .frame(height: 100)
                     .chartXAxis(.hidden)
-                    .chartYAxis {
-                        AxisMarks(position: .leading, values: [1, 2, 3, 4, 5]) { value in
-                            AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
-                                .foregroundStyle(Color.gray.opacity(0.3))
-                            AxisValueLabel()
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    .chartYAxis(.hidden)
                     
                     // Legend
                     HStack(spacing: 16) {
@@ -1750,7 +2017,7 @@ struct TriesDistributionCard: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }

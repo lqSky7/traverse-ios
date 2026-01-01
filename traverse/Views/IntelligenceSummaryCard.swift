@@ -52,7 +52,7 @@ struct IntelligenceSummaryCard: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .overlay(

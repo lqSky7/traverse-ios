@@ -116,8 +116,21 @@ class FriendsViewModel: ObservableObject {
 
 struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     @State private var showingSearch = false
     @State private var showingRequests = false
+    
+    // Leaderboard: Top 3 by weighted score (streak has more weight)
+    private var leaderboard: [Friend] {
+        viewModel.friends
+            .sorted { friend1, friend2 in
+                let score1 = friend1.currentStreak * 10 + friend1.totalXp / 100
+                let score2 = friend2.currentStreak * 10 + friend2.totalXp / 100
+                return score1 > score2
+            }
+            .prefix(3)
+            .map { $0 }
+    }
     
     var body: some View {
         NavigationStack {
@@ -204,28 +217,224 @@ struct FriendsView: View {
     
     private var friendsList: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
-                ForEach(viewModel.friends) { friend in
-                    NavigationLink(value: friend.username) {
-                        FriendCard(friend: friend)
-                    }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            Task {
-                                await viewModel.removeFriend(friend)
+            VStack(spacing: 20) {
+                // Leaderboard Section
+                if !leaderboard.isEmpty {
+                    LeaderboardSection(leaderboard: leaderboard, paletteManager: paletteManager)
+                }
+                
+                // All Friends Section Header
+                HStack {
+                    Text("ALL FRIENDS")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(viewModel.friends.count)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(paletteManager.color(at: 3))
+                }
+                .padding(.horizontal, 4)
+                
+                // Friends List
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(viewModel.friends.enumerated()), id: \.element.id) { index, friend in
+                        NavigationLink(value: friend.username) {
+                            FriendRow(friend: friend, paletteManager: paletteManager)
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                Task {
+                                    await viewModel.removeFriend(friend)
+                                }
+                            } label: {
+                                Label("Remove Friend", systemImage: "person.fill.xmark")
                             }
-                        } label: {
-                            Label("Remove Friend", systemImage: "person.fill.xmark")
+                        }
+                        
+                        if index < viewModel.friends.count - 1 {
+                            Divider()
+                                .background(Color.gray.opacity(0.3))
+                                .padding(.leading, 66)
                         }
                     }
                 }
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(12)
             }
             .padding()
         }
         .navigationDestination(for: String.self) { username in
             UserProfileView(username: username)
         }
+    }
+}
+
+// MARK: - Leaderboard Section (Clean List Style)
+struct LeaderboardSection: View {
+    let leaderboard: [Friend]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section Header
+            HStack(spacing: 8) {
+                Image(systemName: "trophy.fill")
+                    .foregroundStyle(paletteManager.color(at: 1))
+                    .font(.caption)
+                Text("LEADERBOARD")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 4)
+            
+            // Clean list
+            VStack(spacing: 0) {
+                ForEach(Array(leaderboard.enumerated()), id: \.element.id) { index, friend in
+                    LeaderboardRow(
+                        rank: index + 1,
+                        friend: friend,
+                        paletteManager: paletteManager
+                    )
+                    
+                    if index < leaderboard.count - 1 {
+                        Divider()
+                            .padding(.leading, 56)
+                    }
+                }
+            }
+            .background(Color(UIColor.systemGray6))
+            .cornerRadius(12)
+        }
+    }
+}
+
+// MARK: - Leaderboard Row (Simple)
+struct LeaderboardRow: View {
+    let rank: Int
+    let friend: Friend
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private var rankColor: Color {
+        switch rank {
+        case 1: return paletteManager.color(at: 1)
+        case 2: return paletteManager.color(at: 2)
+        case 3: return paletteManager.color(at: 3)
+        default: return .secondary
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Rank number
+            Text("\(rank)")
+                .font(.headline)
+                .fontWeight(.bold)
+                .foregroundStyle(rankColor)
+                .frame(width: 24)
+            
+            // Avatar
+            Circle()
+                .fill(paletteManager.color(at: rank - 1).gradient)
+                .frame(width: 40, height: 40)
+                .overlay {
+                    Text(friend.username.prefix(1).uppercased())
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                }
+            
+            // Name and stats
+            VStack(alignment: .leading, spacing: 2) {
+                Text(friend.username)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.caption2)
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("\(friend.currentStreak)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundStyle(paletteManager.color(at: 1))
+                        Text("\(friend.totalXp)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}
+
+// MARK: - Friend Row (Compact)
+struct FriendRow: View {
+    let friend: Friend
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Avatar
+            Circle()
+                .fill(paletteManager.color(at: 0).gradient)
+                .frame(width: 44, height: 44)
+                .overlay {
+                    Text(friend.username.prefix(1).uppercased())
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+            
+            // Info
+            VStack(alignment: .leading, spacing: 2) {
+                Text(friend.username)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.white)
+                
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "flame.fill")
+                            .font(.caption2)
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("\(friend.currentStreak)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundStyle(paletteManager.color(at: 1))
+                        Text("\(friend.totalXp)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
@@ -286,7 +495,7 @@ struct FriendCard: View {
             }
             .padding()
         }
-        .background(.ultraThinMaterial)
+        .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }

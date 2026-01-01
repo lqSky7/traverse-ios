@@ -76,13 +76,11 @@ struct WelcomeScreen: View {
                     Text("Continue")
                         .font(.headline)
                         .bold()
-                        .foregroundStyle(.black.opacity(0.8))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(16)
-                        .background(.white)
-                        .cornerRadius(.infinity)
-                        
                 }
+                .applyWelcomeGlassButton()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             .padding(42)

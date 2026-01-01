@@ -285,29 +285,42 @@ struct RevisionGroupCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Date Header
-            HStack {
+            // Date Header - OUTSIDE the card as section header
+            HStack(spacing: 8) {
                 Image(systemName: dateIcon)
                     .foregroundStyle(dateColor)
-                Text(formattedDate)
-                    .font(.headline)
-                    .foregroundStyle(.white)
+                    .font(.caption)
+                Text(formattedDate.uppercased())
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.secondary)
                 
                 Spacer()
                 
-                Text("\(group.count) revision\(group.count == 1 ? "" : "s")")
+                Text("\(group.count)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .fontWeight(.bold)
+                    .foregroundStyle(dateColor)
             }
+            .padding(.horizontal, 4)
             
-            // Revisions List
-            ForEach(group.revisions) { revision in
-                RevisionCard(revision: revision, useMLMode: useMLMode, onComplete: onComplete, onMLAttempt: onMLAttempt)
+            // Card with revisions
+            VStack(spacing: 0) {
+                ForEach(Array(group.revisions.enumerated()), id: \.element.id) { index, revision in
+                    RevisionCard(revision: revision, useMLMode: useMLMode, onComplete: onComplete, onMLAttempt: onMLAttempt)
+                    
+                    // Add inset divider between items (not after last)
+                    if index < group.revisions.count - 1 {
+                        Divider()
+                            .background(Color.gray.opacity(0.3))
+                            .padding(.leading, 16)
+                    }
+                }
             }
+            .padding(.vertical, 8)
+            .background(Color(UIColor.systemGray6))
+            .cornerRadius(12)
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .cornerRadius(16)
     }
     
     private var formattedDate: String {
@@ -410,6 +423,7 @@ struct RevisionCard: View {
             }
         }
         .padding(.vertical, 8)
+        .padding(.horizontal, 16)
         .opacity(revision.isCompleted ? 0.6 : 1.0)
     }
     
