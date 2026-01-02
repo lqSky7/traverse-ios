@@ -22,38 +22,7 @@ struct SettingsView: View {
                     if let user = authViewModel.currentUser {
                         ZStack {
                             // Blurred profile photo background
-                            Group {
-                                if let imageUrl = user.profileImageURL, let url = URL(string: imageUrl) {
-                                    AsyncImage(url: url) { phase in
-                                        switch phase {
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .scaledToFill()
-                                        default:
-                                            Image("def_user")
-                                                .resizable()
-                                                .scaledToFill()
-                                        }
-                                    }
-                                } else {
-                                    Image("def_user")
-                                        .resizable()
-                                        .scaledToFill()
-                                }
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: 260)
-                            .clipped()
-                            .glur(radius: 12.0, offset: 0.2, interpolation: 0.5, direction: .down)
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                            
-                            // Dark overlay for legibility
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(Color.black.opacity(0.4))
-                            
-                            // Content
-                            VStack(spacing: 16) {
-                                // Profile Image
+                            GeometryReader { geometry in
                                 Group {
                                     if let imageUrl = user.profileImageURL, let url = URL(string: imageUrl) {
                                         AsyncImage(url: url) { phase in
@@ -74,21 +43,39 @@ struct SettingsView: View {
                                             .scaledToFill()
                                     }
                                 }
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 2))
-                                
-                                // User Info
-                                VStack(spacing: 4) {
-                                    Text(user.username)
-                                        .font(.title2)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.white)
+                                .frame(width: geometry.size.width, height: 180)
+                                .clipped()
+                            }
+                            .frame(height: 180)
+                            .glur(radius: 12.0, offset: 0.2, interpolation: 0.5, direction: .down)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                            
+                            // Dark overlay for legibility
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.black.opacity(0.4))
+                            
+                            // Content
+                            VStack(spacing: 0) {
+                                // User Info - Left + Top aligned
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(user.username)
+                                            .font(.title)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(.white)
+                                            .opacity(0.9)
 
-                                    Text(user.email)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.white.opacity(0.7))
+                                        Text(user.email)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.white)
+                                            .opacity(0.75)
+                                    }
+                                    
+                                    Spacer()
                                 }
+                                .padding(.bottom, 12)
+
+                                Spacer()
 
                                 // Stats Row
                                 HStack(spacing: 32) {
@@ -116,10 +103,8 @@ struct SettingsView: View {
                                             .foregroundStyle(.white.opacity(0.7))
                                     }
                                 }
-                                .padding(.top, 8)
                             }
-                            .padding(.vertical, 24)
-                            .padding(.horizontal)
+                            .padding(16)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.horizontal)

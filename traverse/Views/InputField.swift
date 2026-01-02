@@ -13,8 +13,11 @@ struct InputField: View {
     let action: () -> Void
     
     @FocusState.Binding var keyboardShown: Bool
-    @State private var isSecure: Bool = false
     @State private var submitTapped = 0
+    
+    private var isSecure: Bool {
+        label.lowercased().contains("password")
+    }
     
     private var isValid: Bool {
         return !value.isEmpty
@@ -69,10 +72,6 @@ struct InputField: View {
         .overlay {
             RoundedRectangle(cornerRadius: .infinity)
                 .stroke(Color.primary.opacity(0.1), lineWidth: 1)
-        }
-        .onAppear {
-            // Automatically detect if this is a password field
-            isSecure = label.lowercased().contains("password")
         }
     }
 }

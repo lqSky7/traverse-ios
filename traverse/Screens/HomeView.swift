@@ -123,14 +123,24 @@ struct HomeView: View {
         guard let solves = recentSolves else { return false }
         
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let now = Date()
+        
+        // Create ISO8601 formatter that handles optional fractional seconds
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
         return solves.contains { solve in
-            // Parse the solvedAt date string
-            let formatter = ISO8601DateFormatter()
-            guard let solveDate = formatter.date(from: solve.solvedAt) else { return false }
-            let solveDay = calendar.startOfDay(for: solveDate)
-            return solveDay == today
+            // Try with fractional seconds first, then without
+            var date = formatter.date(from: solve.solvedAt)
+            if date == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                date = formatter.date(from: solve.solvedAt)
+            }
+            
+            if let solveDate = date {
+                return calendar.isDate(solveDate, inSameDayAs: now)
+            }
+            return false
         }
     }
     

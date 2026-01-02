@@ -179,12 +179,23 @@ class DataManager: ObservableObject {
     private func checkSolvedTodayAndEndActivity() {
         // Check if user solved today based on recent solves
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
+        let now = Date()
+        
+        // Create ISO8601 formatter that handles optional fractional seconds
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
         if let recentSolves = recentSolves {
             let solvedToday = recentSolves.contains { solve in
-                if let date = ISO8601DateFormatter().date(from: solve.solvedAt) {
-                    return calendar.isDate(date, inSameDayAs: today)
+                // Try with fractional seconds first, then without
+                var date = formatter.date(from: solve.solvedAt)
+                if date == nil {
+                    formatter.formatOptions = [.withInternetDateTime]
+                    date = formatter.date(from: solve.solvedAt)
+                }
+                
+                if let solveDate = date {
+                    return calendar.isDate(solveDate, inSameDayAs: now)
                 }
                 return false
             }
@@ -219,16 +230,25 @@ class DataManager: ObservableObject {
         // Check if user has solved today based on recent solves
         let calendar = Calendar.current
         let now = Date()
-        let today = calendar.startOfDay(for: now)
         let hour = calendar.component(.hour, from: now)
+        
+        // Create ISO8601 formatter that handles optional fractional seconds
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         
         // Check if solved today from cached data
         let solvedToday: Bool
         if let recentSolves = self.recentSolves {
             solvedToday = recentSolves.contains { solve in
-                if let date = ISO8601DateFormatter().date(from: solve.solvedAt) {
-                    let solveDay = calendar.startOfDay(for: date)
-                    return solveDay == today
+                // Try with fractional seconds first, then without
+                var date = formatter.date(from: solve.solvedAt)
+                if date == nil {
+                    formatter.formatOptions = [.withInternetDateTime]
+                    date = formatter.date(from: solve.solvedAt)
+                }
+                
+                if let solveDate = date {
+                    return calendar.isDate(solveDate, inSameDayAs: now)
                 }
                 return false
             }

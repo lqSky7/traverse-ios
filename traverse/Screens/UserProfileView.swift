@@ -338,73 +338,82 @@ struct ProfileHeaderView: View {
     var body: some View {
         ZStack {
             // Blurred profile photo background
-            Image("def_user")
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: 280)
-                .clipped()
-                .glur(radius: 12.0, offset: 0.2, interpolation: 0.5, direction: .down)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+            GeometryReader { geometry in
+                Image("def_user")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: 180)
+                    .clipped()
+            }
+            .frame(height: 180)
+            .glur(radius: 12.0, offset: 0.2, interpolation: 0.5, direction: .down)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             
             // Dark overlay for legibility
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.black.opacity(0.4))
             
             // Content
-            VStack(spacing: 16) {
-                Circle()
-                    .fill(paletteManager.selectedPalette.primary.gradient)
-                    .frame(width: 100, height: 100)
-                    .overlay {
-                        Text(profile.username.prefix(1).uppercased())
-                            .font(.system(size: 42, weight: .bold))
+            VStack(spacing: 0) {
+                // User Info - Left + Top aligned
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(profile.username)
+                            .font(.title)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
+                            .opacity(0.8)
+
+                        HStack(spacing: 8) {
+                            Label(profile.visibility.capitalized, systemImage: profile.visibility == "public" ? "globe" : profile.visibility == "private" ? "lock" : "person.2")
+                                .font(.caption)
+                                .foregroundStyle(.white)
+                                .opacity(0.75)
+                        }
                     }
-                    .overlay(Circle().stroke(Color.white.opacity(0.3), lineWidth: 2))
-                
-                Text(profile.username)
-                    .font(.title2)
-                    .bold()
-                    .foregroundStyle(.white)
-                
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
+                    
+                    Spacer()
+                }
+                .padding(.bottom, 12)
+
+                Spacer()
+
+                // Stats Row
                 HStack(spacing: 0) {
                     VStack(spacing: 4) {
                         Text("\(profile.currentStreak)")
-                            .font(.title2)
+                            .font(.title3)
                             .bold()
-                            .foregroundStyle(.white)
+                            .foregroundStyle(paletteManager.color(at: 0))
                         Label("Streak", systemImage: "flame.fill")
                             .font(.caption)
-                            .foregroundStyle(paletteManager.selectedPalette.primary)
+                            .foregroundStyle(.white.opacity(0.7))
                     }
                     .frame(maxWidth: .infinity)
                     
                     Divider()
-                        .frame(height: 40)
+                        .frame(height: 30)
                         .background(Color.white.opacity(0.3))
                     
                     VStack(spacing: 4) {
                         Text("\(profile.totalXp)")
-                            .font(.title2)
+                            .font(.title3)
                             .bold()
-                            .foregroundStyle(.white)
+                            .foregroundStyle(paletteManager.color(at: 1))
                         Label("XP", systemImage: "star.fill")
                             .font(.caption)
-                            .foregroundStyle(paletteManager.selectedPalette.secondary)
+                            .foregroundStyle(.white.opacity(0.7))
                     }
                     .frame(maxWidth: .infinity)
                     
                     if let stats = statistics {
                         Divider()
-                            .frame(height: 40)
+                            .frame(height: 30)
                             .background(Color.white.opacity(0.3))
                         
                         VStack(spacing: 4) {
                             Text("\(stats.totalSolves)")
-                                .font(.title2)
+                                .font(.title3)
                                 .bold()
                                 .foregroundStyle(.white)
                             Text("Solves")
@@ -414,26 +423,10 @@ struct ProfileHeaderView: View {
                         .frame(maxWidth: .infinity)
                     }
                 }
-                
-                Divider()
-                    .background(Color.white.opacity(0.3))
-                
-                HStack(spacing: 12) {
-                    Label(profile.visibility.capitalized, systemImage: profile.visibility == "public" ? "globe" : profile.visibility == "private" ? "lock" : "person.2")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
-                    
-                    Text("•")
-                        .foregroundStyle(.white.opacity(0.7))
-                    
-                    Text("Joined \(formatDate(profile.createdAt))")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
             }
-            .padding()
+            .padding(16)
         }
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
         .padding(.horizontal)
     }
