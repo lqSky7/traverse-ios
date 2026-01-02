@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UserNotifications
+import WidgetKit
 
 @main
 struct traverseApp: App {
@@ -23,6 +24,9 @@ struct traverseApp: App {
                 Task {
                     await DataManager.shared.checkAndScheduleStreakReminder()
                 }
+                
+                // Refresh all widgets when app opens
+                WidgetCenter.shared.reloadAllTimelines()
             }
         }
     }

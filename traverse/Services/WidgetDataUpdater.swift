@@ -14,21 +14,21 @@ class WidgetDataUpdater {
     func updateWidgetData(
         userStats: UserStatsData?,
         recentSolve: Solve?,
-        revisions: [Revision]?
+        revisions: [Revision]?,
+        achievementStats: AchievementStatsData? = nil,
+        solvedToday: Bool = false
     ) {
         var widgetData = WidgetData(
             streak: nil,
             recentSolve: nil,
             revisions: nil,
             revisionsDueCount: 0,
+            achievements: nil,
             lastUpdated: Date()
         )
         
         // Update streak data
         if let stats = userStats {
-            // Check if solved today by looking at recent solves
-            let solvedToday = false // This will be updated from HomeView
-            
             widgetData = WidgetData(
                 streak: StreakData(
                     currentStreak: stats.currentStreak,
@@ -39,6 +39,7 @@ class WidgetDataUpdater {
                 recentSolve: widgetData.recentSolve,
                 revisions: widgetData.revisions,
                 revisionsDueCount: widgetData.revisionsDueCount,
+                achievements: widgetData.achievements,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -57,6 +58,7 @@ class WidgetDataUpdater {
                 ),
                 revisions: widgetData.revisions,
                 revisionsDueCount: widgetData.revisionsDueCount,
+                achievements: widgetData.achievements,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -80,6 +82,22 @@ class WidgetDataUpdater {
                 recentSolve: widgetData.recentSolve,
                 revisions: revisionDataArray,
                 revisionsDueCount: revs.count,  // Simple count - no datetime parsing
+                achievements: widgetData.achievements,
+                lastUpdated: widgetData.lastUpdated
+            )
+        }
+        
+        // Update achievements
+        if let achievements = achievementStats {
+            widgetData = WidgetData(
+                streak: widgetData.streak,
+                recentSolve: widgetData.recentSolve,
+                revisions: widgetData.revisions,
+                revisionsDueCount: widgetData.revisionsDueCount,
+                achievements: AchievementsData(
+                    unlocked: achievements.unlocked,
+                    total: achievements.total
+                ),
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -98,6 +116,7 @@ class WidgetDataUpdater {
             recentSolve: nil,
             revisions: nil,
             revisionsDueCount: 0,
+            achievements: nil,
             lastUpdated: Date()
         )
         
@@ -112,10 +131,13 @@ class WidgetDataUpdater {
             recentSolve: widgetData.recentSolve,
             revisions: widgetData.revisions,
             revisionsDueCount: widgetData.revisionsDueCount,
+            achievements: widgetData.achievements,
             lastUpdated: Date()
         )
         
         WidgetDataManager.shared.saveWidgetData(widgetData)
         WidgetCenter.shared.reloadTimelines(ofKind: "StreakWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "StreakLockScreenWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "MotivationalLockScreenWidget")
     }
 }

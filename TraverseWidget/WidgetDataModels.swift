@@ -11,7 +11,13 @@ struct WidgetData: Codable {
     let recentSolve: RecentSolveData?
     let revisions: [RevisionData]?
     let revisionsDueCount: Int  // Simple count - no datetime BS
+    let achievements: AchievementsData?
     let lastUpdated: Date
+}
+
+struct AchievementsData: Codable {
+    let unlocked: Int
+    let total: Int
 }
 
 struct StreakData: Codable {
@@ -59,6 +65,7 @@ class WidgetDataManager {
     func saveWidgetData(_ data: WidgetData) {
         guard let encoded = try? JSONEncoder().encode(data) else { return }
         userDefaults?.set(encoded, forKey: WidgetDataManager.dataKey)
+        userDefaults?.synchronize() // Force immediate write for widget access
     }
     
     func loadWidgetData() -> WidgetData? {
