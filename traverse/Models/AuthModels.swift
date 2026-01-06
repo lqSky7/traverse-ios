@@ -78,5 +78,5 @@ struct RecoveryResponse: Codable {
 
 // MARK: - Error Response
 struct ErrorResponse: Codable {
-    let message: String
+    let error: String
 }

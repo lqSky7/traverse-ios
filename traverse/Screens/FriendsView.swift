@@ -11,11 +11,18 @@ class FriendsViewModel: ObservableObject {
     @Published var friends: [Friend] = []
     @Published var receivedRequests: [FriendRequest] = []
     @Published var sentRequests: [FriendRequest] = []
+    @Published var friendStreaks: [FriendStreak] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
     private var hasLoadedFriends = false
     private var hasLoadedRequests = false
+    private var hasLoadedStreaks = false
+    
+    /// Get the friend streak for a specific friend by username
+    func getStreakForFriend(_ username: String) -> FriendStreak? {
+        friendStreaks.first { $0.friend.username == username }
+    }
     
     func loadFriends(force: Bool = false) async {
         // Use cached data from DataManager if available and not forcing refresh
@@ -68,6 +75,35 @@ class FriendsViewModel: ObservableObject {
         }
     }
     
+    func loadFriendStreaks(force: Bool = false) async {
+        // Use cached data from DataManager if available and not forcing refresh
+        if !force && !DataManager.shared.friendStreaks.isEmpty {
+            friendStreaks = DataManager.shared.friendStreaks
+            hasLoadedStreaks = true
+            print("[FriendsViewModel] Loaded \(friendStreaks.count) friend streaks from cache")
+            return
+        }
+        
+        guard !hasLoadedStreaks || force else { 
+            print("[FriendsViewModel] Skipping streak load - already loaded")
+            return 
+        }
+        
+        do {
+            friendStreaks = try await NetworkService.shared.getFriendStreaks()
+            DataManager.shared.friendStreaks = friendStreaks
+            DataManager.shared.persistData()
+            hasLoadedStreaks = true
+            print("[FriendsViewModel] Loaded \(friendStreaks.count) friend streaks from network")
+            for streak in friendStreaks {
+                print("[FriendsViewModel] Streak with \(streak.friend.username): current=\(streak.currentStreak)")
+            }
+        } catch {
+            // Silently fail for friend streaks - not critical
+            print("[FriendsViewModel] Failed to load friend streaks: \(error)")
+        }
+    }
+    
     func acceptRequest(_ request: FriendRequest) async {
         do {
             _ = try await NetworkService.shared.acceptFriendRequest(requestId: request.id)
@@ -116,9 +152,11 @@ class FriendsViewModel: ObservableObject {
 
 struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
+    @StateObject private var streakRequestsViewModel = FriendStreakRequestsViewModel()
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @State private var showingSearch = false
     @State private var showingRequests = false
+    @State private var showingStreakRequests = false
     
     // Leaderboard: Top 3 by weighted score (streak has more weight)
     private var leaderboard: [Friend] {
@@ -163,12 +201,28 @@ struct FriendsView: View {
             .navigationTitle("Friends")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 20) {
+                    HStack(spacing: 16) {
+                        Button {
+                            showingStreakRequests = true
+                        } label: {
+                            ZStack {
+                                Image(systemName: "flame.circle")
+                                    .frame(width: 24, height: 24)
+                                    .foregroundStyle(paletteManager.color(at: 0))
+                                if !streakRequestsViewModel.receivedRequests.isEmpty {
+                                    Circle()
+                                        .fill(.red)
+                                        .frame(width: 8, height: 8)
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
+                        }
+                        
                         Button {
                             showingRequests = true
                         } label: {
                             ZStack {
-                                Image(systemName: "person.badge.clock")
+                                Image(systemName: "person.crop.circle.badge.clock")
                                     .frame(width: 24, height: 24)
                                 if !viewModel.receivedRequests.isEmpty {
                                     Circle()
@@ -192,6 +246,7 @@ struct FriendsView: View {
             .refreshable {
                 await viewModel.loadFriends(force: true)
                 await viewModel.loadRequests(force: true)
+                await viewModel.loadFriendStreaks(force: true)
             }
             .sheet(isPresented: $showingSearch) {
                 UserSearchView()
@@ -199,9 +254,16 @@ struct FriendsView: View {
             .sheet(isPresented: $showingRequests) {
                 FriendRequestsView(viewModel: viewModel)
             }
+            .sheet(isPresented: $showingStreakRequests) {
+                FriendStreakRequestsView(viewModel: streakRequestsViewModel)
+            }
             .task {
-                await viewModel.loadFriends()
-                await viewModel.loadRequests()
+                // Load friends and streaks in parallel for faster display
+                async let friendsTask: () = viewModel.loadFriends()
+                async let streaksTask: () = viewModel.loadFriendStreaks()
+                async let requestsTask: () = viewModel.loadRequests()
+                async let streakRequestsTask: () = streakRequestsViewModel.loadRequests()
+                _ = await (friendsTask, streaksTask, requestsTask, streakRequestsTask)
             }
             .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
                 Button("OK") {
@@ -238,10 +300,14 @@ struct FriendsView: View {
                 .padding(.horizontal, 4)
                 
                 // Friends List
-                LazyVStack(spacing: 0) {
+                LazyVStack(spacing: 8) {
                     ForEach(Array(viewModel.friends.enumerated()), id: \.element.id) { index, friend in
                         NavigationLink(value: friend.username) {
-                            FriendRow(friend: friend, paletteManager: paletteManager)
+                            FriendRow(
+                                friend: friend,
+                                paletteManager: paletteManager,
+                                friendStreak: viewModel.getStreakForFriend(friend.username)
+                            )
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
@@ -252,12 +318,6 @@ struct FriendsView: View {
                             } label: {
                                 Label("Remove Friend", systemImage: "person.fill.xmark")
                             }
-                        }
-                        
-                        if index < viewModel.friends.count - 1 {
-                            Divider()
-                                .background(Color.gray.opacity(0.3))
-                                .padding(.leading, 66)
                         }
                     }
                 }
@@ -272,113 +332,140 @@ struct FriendsView: View {
     }
 }
 
-// MARK: - Leaderboard Section (Clean List Style)
+// MARK: - Leaderboard (Elegant Gradient Design)
 struct LeaderboardSection: View {
     let leaderboard: [Friend]
     @ObservedObject var paletteManager: ColorPaletteManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Section Header
-            HStack(spacing: 8) {
-                Image(systemName: "trophy.fill")
-                    .foregroundStyle(paletteManager.color(at: 1))
-                    .font(.caption)
-                Text("LEADERBOARD")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 4)
-            
-            // Clean list
-            VStack(spacing: 0) {
-                ForEach(Array(leaderboard.enumerated()), id: \.element.id) { index, friend in
-                    LeaderboardRow(
-                        rank: index + 1,
-                        friend: friend,
-                        paletteManager: paletteManager
-                    )
+        VStack(spacing: 0) {
+            if leaderboard.isEmpty {
+                // Empty state
+                VStack(spacing: 12) {
+                    Image(systemName: "person.2.slash")
+                        .font(.system(size: 32))
+                        .foregroundStyle(.secondary)
+                    Text("Add friends to see the leaderboard")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(20)
+            } else {
+                // Elegant gradient leaderboard card
+                ZStack {
+                    // Gradient background
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    paletteManager.color(at: 0).opacity(0.4),
+                                    paletteManager.color(at: 1).opacity(0.3),
+                                    paletteManager.color(at: 2).opacity(0.2)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                     
-                    if index < leaderboard.count - 1 {
-                        Divider()
-                            .padding(.leading, 56)
+                    // Content
+                    VStack(spacing: 12) {
+                        // Header
+                        HStack {
+                            Image(systemName: "trophy.fill")
+                                .foregroundStyle(.yellow)
+                            Text("LEADERBOARD")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white.opacity(0.8))
+                            Spacer()
+                        }
+                        
+                        // Divider after header
+                        Rectangle()
+                            .fill(.white.opacity(0.1))
+                            .frame(height: 1)
+                        
+                        // Top 3 Names
+                        VStack(spacing: 0) {
+                            ForEach(Array(leaderboard.prefix(3).enumerated()), id: \.element.id) { index, friend in
+                                LeaderboardNameRow(
+                                    rank: index + 1,
+                                    friend: friend,
+                                    paletteManager: paletteManager
+                                )
+                                
+                                // Separator between rows (not after last)
+                                if index < min(leaderboard.count, 3) - 1 {
+                                    Rectangle()
+                                        .fill(.white.opacity(0.08))
+                                        .frame(height: 1)
+                                        .padding(.leading, 52)
+                                }
+                            }
+                        }
                     }
+                    .padding(16)
                 }
             }
-            .background(Color(UIColor.systemGray6))
-            .cornerRadius(12)
         }
     }
 }
 
-// MARK: - Leaderboard Row (Simple)
-struct LeaderboardRow: View {
+// MARK: - Leaderboard Name Row
+struct LeaderboardNameRow: View {
     let rank: Int
     let friend: Friend
     @ObservedObject var paletteManager: ColorPaletteManager
     
+    private var rankIcon: String {
+        switch rank {
+        case 1: return "crown.fill"
+        case 2: return "medal.fill"
+        case 3: return "medal.fill"
+        default: return "circle.fill"
+        }
+    }
+    
     private var rankColor: Color {
         switch rank {
-        case 1: return paletteManager.color(at: 1)
-        case 2: return paletteManager.color(at: 2)
-        case 3: return paletteManager.color(at: 3)
+        case 1: return Color(red: 1.0, green: 0.84, blue: 0) // Gold
+        case 2: return Color(red: 0.75, green: 0.75, blue: 0.8) // Silver
+        case 3: return Color(red: 0.8, green: 0.5, blue: 0.2) // Bronze
         default: return .secondary
         }
     }
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Rank number
-            Text("\(rank)")
-                .font(.headline)
-                .fontWeight(.bold)
+        HStack(alignment: .center, spacing: 12) {
+            // Rank Icon
+            Image(systemName: rankIcon)
+                .font(.system(size: rank == 1 ? 20 : 18))
                 .foregroundStyle(rankColor)
-                .frame(width: 24)
+                .frame(width: 32, height: 32)
             
-            // Avatar
-            Circle()
-                .fill(paletteManager.color(at: rank - 1).gradient)
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Text(friend.username.prefix(1).uppercased())
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                }
-            
-            // Name and stats
-            VStack(alignment: .leading, spacing: 2) {
-                Text(friend.username)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "flame.fill")
-                            .font(.caption2)
-                            .foregroundStyle(paletteManager.color(at: 0))
-                        Text("\(friend.currentStreak)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.caption2)
-                            .foregroundStyle(paletteManager.color(at: 1))
-                        Text("\(friend.totalXp)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            // Name (normal font, not serif)
+            Text(friend.username)
+                .font(.system(size: rank == 1 ? 22 : 18, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
             
             Spacer()
+            
+            // XP (aligned to baseline with name)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(friend.totalXp)")
+                    .font(.system(size: rank == 1 ? 20 : 16, weight: .bold))
+                    .foregroundStyle(rankColor)
+                Text("XP")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.6))
+            }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
+        .opacity(rank == 1 ? 1.0 : (rank == 2 ? 0.9 : 0.8))
     }
 }
 
@@ -386,25 +473,46 @@ struct LeaderboardRow: View {
 struct FriendRow: View {
     let friend: Friend
     @ObservedObject var paletteManager: ColorPaletteManager
+    var friendStreak: FriendStreak?
+    @State private var glowPhase: CGFloat = 0
+    
+    private var hasActiveStreak: Bool {
+        // Show glow when friend streak exists (even if 0 days)
+        return friendStreak != nil
+    }
+    
+    private var streakColor: Color {
+        paletteManager.color(at: 0)
+    }
+    
+    private var glowFillOpacity: Double {
+        guard hasActiveStreak else { return 0 }
+        return 0.15 + 0.1 * (0.5 + 0.5 * sin(glowPhase))
+    }
+    
+    private var glowStrokeOpacity: Double {
+        guard hasActiveStreak else { return 0 }
+        return 0.4 + 0.2 * (0.5 + 0.5 * sin(glowPhase))
+    }
     
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
             Circle()
-                .fill(paletteManager.color(at: 0).gradient)
-                .frame(width: 44, height: 44)
+                .fill(paletteManager.color(at: 2).gradient)
+                .frame(width: 50, height: 50)
                 .overlay {
                     Text(friend.username.prefix(1).uppercased())
-                        .font(.headline)
+                        .font(.title3)
+                        .bold()
                         .foregroundStyle(.white)
                 }
             
             // Info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(friend.username)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
+                    .font(.headline)
+                    .fontWeight(.semibold)
                 
                 HStack(spacing: 12) {
                     HStack(spacing: 4) {
@@ -428,13 +536,47 @@ struct FriendRow: View {
             }
             
             Spacer()
-            
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(16)
+        .padding(.trailing, 40) // Always have space for text on right
+        .background(Color(UIColor.systemGray6))
+        .overlay(alignment: .trailing) {
+            // Oversized streak number or "Start Streak!" text
+            if let streak = friendStreak {
+                Text("\(streak.currentStreak)")
+                    .font(.system(size: 80, weight: .heavy, design: .rounded))
+                    .foregroundStyle(streakColor.opacity(0.25))
+                    .offset(x: 10, y: 0)
+            } else {
+                Text("Start!")
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
+                    .foregroundStyle(paletteManager.color(at: 0).opacity(0.3))
+                    .offset(x: -8, y: 0)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            Group {
+                if hasActiveStreak {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [.clear, .clear, streakColor.opacity(glowFillOpacity)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
+        )
+        .onAppear {
+            if hasActiveStreak {
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    glowPhase = .pi * 2
+                }
+            }
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "light.png",
+      "filename" : "traverse-iOS-Default-1024x1024@1x.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "traverse-iOS-ClearDark-1024x1024@1x.png",
+      "filename" : "traverse-iOS-ClearLight-1024x1024@1x.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

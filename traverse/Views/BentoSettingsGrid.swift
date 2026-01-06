@@ -25,10 +25,21 @@ struct BentoSettingsGrid: View {
         VStack(spacing: 0) {
             // Row 1: Palette | Hue Picker
             HStack(spacing: 0) {
-                // Palette Tile
-                Button {
-                    lightFeedback.impactOccurred()
-                    // Future: palette selection
+                // Palette Tile with Selection Menu
+                Menu {
+                    ForEach(paletteManager.allAvailablePalettes) { palette in
+                        Button {
+                            lightFeedback.impactOccurred()
+                            paletteManager.selectPalette(palette)
+                        } label: {
+                            HStack {
+                                Text(palette.name)
+                                if palette.id == paletteManager.selectedPalette.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
                 } label: {
                     BentoCell(alignment: .bottomLeading) {
                         // Color circles preview

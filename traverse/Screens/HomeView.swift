@@ -53,8 +53,8 @@ struct HomeView: View {
                                     SolveHeatmapCard(solves: solves, paletteManager: paletteManager)
                                 }
                                 
-                                // Platforms full width
-                                PlatformChartCard(stats: solveStats.stats, paletteManager: paletteManager)
+                                // Mistake Tags Analysis full width
+                                MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
                             }
                             
                             if let submissionStats = viewModel.submissionStats {
@@ -602,6 +602,149 @@ struct PlatformProgressRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 80, alignment: .leading)
+                .lineLimit(1)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 12)
+                    
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                }
+            }
+            .frame(height: 12)
+            
+            Text("\(count)")
+                .font(.subheadline)
+                .bold()
+                .foregroundStyle(color)
+                .frame(width: 30, alignment: .trailing)
+        }
+    }
+}
+
+// MARK: - Mistake Tags Analysis Card
+struct MistakeTagsAnalysisCard: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private var tagCounts: [(String, Int)] {
+        var counts: [String: Int] = [:]
+        for solve in solves {
+            if let tags = solve.mistakeTags ?? solve.submission.mistakeTags {
+                for tag in tags {
+                    counts[tag, default: 0] += 1
+                }
+            }
+        }
+        return counts.sorted { $0.value > $1.value }
+    }
+    
+    private var totalTags: Int {
+        tagCounts.reduce(0) { $0 + $1.1 }
+    }
+    
+    private var maxCount: Int {
+        tagCounts.map { $0.1 }.max() ?? 1
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "tag.fill")
+                        .foregroundStyle(paletteManager.color(at: 5))
+                    Text("Mistake Analysis")
+                        .font(.headline)
+                }
+                Spacer()
+                Text("\(tagCounts.count)")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(paletteManager.color(at: 5))
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 8)
+            
+            Divider()
+                .background(Color.gray.opacity(0.3))
+            
+            if !tagCounts.isEmpty {
+                // Hero total
+                VStack(spacing: 4) {
+                    Text("\(totalTags)")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("Total Mistakes")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+                
+                // Horizontal bars for each tag
+                VStack(spacing: 12) {
+                    ForEach(Array(tagCounts.prefix(6).enumerated()), id: \.element.0) { index, item in
+                        MistakeTagProgressRow(
+                            label: item.0,
+                            count: item.1,
+                            maxCount: maxCount,
+                            color: paletteManager.color(at: index % 10)
+                        )
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("No mistakes detected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Keep solving problems!")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(height: 120)
+                .padding()
+            }
+        }
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Mistake Tag Progress Row
+struct MistakeTagProgressRow: View {
+    let label: String
+    let count: Int
+    let maxCount: Int
+    let color: Color
+    
+    private var progress: CGFloat {
+        guard maxCount > 0 else { return 0 }
+        return CGFloat(count) / CGFloat(maxCount)
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 100, alignment: .leading)
                 .lineLimit(1)
             
             GeometryReader { geometry in
@@ -1718,6 +1861,35 @@ struct SolveRow: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(5)
+                        }
+                        .padding(.top, 4)
+                    }
+                    
+                    // Mistake Tags
+                    if let tags = solve.mistakeTags ?? solve.submission.mistakeTags, !tags.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag.fill")
+                                    .foregroundStyle(paletteManager.color(at: 5))
+                                    .font(.caption)
+                                Text("Mistake Tags")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(tags, id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(paletteManager.color(at: 5).opacity(0.2))
+                                            .foregroundStyle(paletteManager.color(at: 5))
+                                            .cornerRadius(6)
+                                    }
+                                }
+                            }
                         }
                         .padding(.top, 4)
                     }

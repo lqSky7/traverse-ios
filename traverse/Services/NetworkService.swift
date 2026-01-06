@@ -76,7 +76,7 @@ class NetworkService {
             }
             
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Registration failed (Status: \(httpResponse.statusCode))")
         }
@@ -122,7 +122,7 @@ class NetworkService {
             }
             
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Authentication failed (Status: \(httpResponse.statusCode))")
         }
@@ -191,7 +191,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get user (Status: \(httpResponse.statusCode))")
         }
@@ -231,7 +231,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to update profile (Status: \(httpResponse.statusCode))")
         }
@@ -263,7 +263,7 @@ class NetworkService {
         
         if httpResponse.statusCode != 200 {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to change password (Status: \(httpResponse.statusCode))")
         }
@@ -304,7 +304,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to delete account (Status: \(httpResponse.statusCode))")
         }
@@ -345,7 +345,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to recover account (Status: \(httpResponse.statusCode))")
         }
@@ -376,7 +376,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get user stats (Status: \(httpResponse.statusCode))")
         }
@@ -412,7 +412,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get submission stats (Status: \(httpResponse.statusCode))")
         }
@@ -448,7 +448,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get solve stats (Status: \(httpResponse.statusCode))")
         }
@@ -498,7 +498,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get solves (Status: \(httpResponse.statusCode))")
         }
@@ -534,7 +534,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get achievement stats (Status: \(httpResponse.statusCode))")
         }
@@ -570,7 +570,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get achievements (Status: \(httpResponse.statusCode))")
         }
@@ -607,7 +607,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to search users (Status: \(httpResponse.statusCode))")
         }
@@ -638,7 +638,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get user profile (Status: \(httpResponse.statusCode))")
         }
@@ -669,7 +669,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get user statistics (Status: \(httpResponse.statusCode))")
         }
@@ -706,7 +706,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get user solves (Status: \(httpResponse.statusCode))")
         }
@@ -737,7 +737,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get user achievements (Status: \(httpResponse.statusCode))")
         }
@@ -777,8 +777,8 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                print("Friend request error (\(httpResponse.statusCode)): \(errorResponse.message)")
-                throw NetworkError.serverError(errorResponse.message)
+                print("Friend request error (\(httpResponse.statusCode)): \(errorResponse.error)")
+                throw NetworkError.serverError(errorResponse.error)
             }
             let responseString = String(data: data, encoding: .utf8) ?? "unknown"
             print("Failed to send friend request. Status: \(httpResponse.statusCode), Response: \(responseString)")
@@ -816,7 +816,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get received requests (Status: \(httpResponse.statusCode))")
         }
@@ -852,7 +852,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get sent requests (Status: \(httpResponse.statusCode))")
         }
@@ -888,7 +888,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to accept friend request (Status: \(httpResponse.statusCode))")
         }
@@ -916,7 +916,7 @@ class NetworkService {
         
         if httpResponse.statusCode != 200 {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to reject friend request (Status: \(httpResponse.statusCode))")
         }
@@ -944,7 +944,7 @@ class NetworkService {
         
         if httpResponse.statusCode != 200 {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to cancel friend request (Status: \(httpResponse.statusCode))")
         }
@@ -980,7 +980,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get friends (Status: \(httpResponse.statusCode))")
         }
@@ -1008,7 +1008,7 @@ class NetworkService {
         
         if httpResponse.statusCode != 200 {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to remove friend (Status: \(httpResponse.statusCode))")
         }
@@ -1050,7 +1050,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get friend's solves (Status: \(httpResponse.statusCode))")
         }
@@ -1086,7 +1086,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get friend's statistics (Status: \(httpResponse.statusCode))")
         }
@@ -1122,7 +1122,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get friend's achievements (Status: \(httpResponse.statusCode))")
         }
@@ -1173,7 +1173,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get revisions (Status: \(httpResponse.statusCode))")
         }
@@ -1215,7 +1215,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get grouped revisions (Status: \(httpResponse.statusCode))")
         }
@@ -1256,7 +1256,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get revision stats (Status: \(httpResponse.statusCode))")
         }
@@ -1292,7 +1292,7 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to complete revision (Status: \(httpResponse.statusCode))")
         }
@@ -1336,9 +1336,299 @@ class NetworkService {
             }
         } else {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.message)
+                throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to record revision attempt (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Delete Revision
+    func deleteRevision(id: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/revisions/\(id)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to delete revision (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Friend Streaks
+    
+    /// Send a friend streak request to a friend
+    func sendFriendStreakRequest(username: String) async throws -> SendFriendStreakRequestResponse {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/request") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        let requestBody = SendFriendStreakRequestBody(username: username)
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 201 {
+            do {
+                let streakResponse = try JSONDecoder().decode(SendFriendStreakRequestResponse.self, from: data)
+                return streakResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to send friend streak request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Get received friend streak requests
+    func getReceivedFriendStreakRequests() async throws -> [FriendStreakRequest] {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/requests/received") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let requestsResponse = try JSONDecoder().decode(FriendStreakRequestsResponse.self, from: data)
+                return requestsResponse.requests
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to get received streak requests (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Get sent friend streak requests
+    func getSentFriendStreakRequests() async throws -> [FriendStreakRequest] {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/requests/sent") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let requestsResponse = try JSONDecoder().decode(FriendStreakRequestsResponse.self, from: data)
+                return requestsResponse.requests
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to get sent streak requests (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Accept a friend streak request
+    func acceptFriendStreakRequest(requestId: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/requests/\(requestId)/accept") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to accept streak request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Reject a friend streak request
+    func rejectFriendStreakRequest(requestId: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/requests/\(requestId)/reject") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to reject streak request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Cancel a sent friend streak request
+    func cancelFriendStreakRequest(requestId: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/requests/\(requestId)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to cancel streak request (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Get all active friend streaks
+    func getFriendStreaks() async throws -> [FriendStreak] {
+        guard let url = URL(string: "\(baseURL)/friend-streaks") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let streaksResponse = try JSONDecoder().decode(FriendStreaksResponse.self, from: data)
+                return streaksResponse.streaks
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to get friend streaks (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    /// Delete a friend streak
+    func deleteFriendStreak(username: String) async throws {
+        guard let url = URL(string: "\(baseURL)/friend-streaks/\(username)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to delete friend streak (Status: \(httpResponse.statusCode))")
         }
     }
 }

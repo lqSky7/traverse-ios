@@ -76,6 +76,7 @@ struct Solve: Codable, Identifiable {
     let xpAwarded: Int
     let solvedAt: String
     let aiAnalysis: String?
+    let mistakeTags: [String]?
     let problem: Problem
     let submission: Submission
     let highlight: Highlight?
@@ -92,6 +93,7 @@ struct Submission: Codable {
     let language: String
     let happenedAt: String
     let aiAnalysis: String?
+    let mistakeTags: [String]?
     let numberOfTries: Int?
     let timeTaken: Int?
 }

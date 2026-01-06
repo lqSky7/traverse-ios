@@ -15,13 +15,38 @@ enum FriendshipStatus {
     case requestReceived
 }
 
+enum FriendStreakStatus {
+    case none           // Not friends or no streak
+    case active         // Active streak
+    case requestSent    // Streak request pending
+    case requestReceived // Received streak request
+    case canStart       // Friends but no streak yet
+}
+
 @MainActor
 class UserProfileViewModel: ObservableObject {
+    // Static cache for user profiles
+    private static var profileCache: [String: CachedProfile] = [:]
+    
+    struct CachedProfile {
+        let profile: UserProfile
+        let statistics: UserStatistics?
+        let friendshipStatus: FriendshipStatus
+        let timestamp: Date
+        
+        var isValid: Bool {
+            // Cache valid for 5 minutes
+            Date().timeIntervalSince(timestamp) < 300
+        }
+    }
+    
     @Published var profile: UserProfile?
     @Published var statistics: UserStatistics?
     @Published var solves: [UserSolve] = []
     @Published var achievements: [Achievement] = []
     @Published var friendshipStatus: FriendshipStatus = .notFriends
+    @Published var friendStreakStatus: FriendStreakStatus = .none
+    @Published var friendStreak: FriendStreak?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var selectedTab = 0
@@ -30,6 +55,8 @@ class UserProfileViewModel: ObservableObject {
     private var allSolves: [UserSolve] = []
     private var hasLoadedSolves = false
     private var hasLoadedAchievements = false
+    private var hasLoadedStreakStatus = false
+    private var hasLoadedProfile = false
     
     let username: String
     var currentUsername: String?
@@ -38,16 +65,27 @@ class UserProfileViewModel: ObservableObject {
         self.username = username
     }
     
-    func loadProfile() async {
-        isLoading = true
-        errorMessage = nil
-        
+    func loadProfile(force: Bool = false) async {
         // Check if viewing own profile
         if username == currentUsername {
             friendshipStatus = .currentUser
-            isLoading = false
             return
         }
+        
+        // Use cache if valid and not forcing refresh
+        if !force, let cached = Self.profileCache[username], cached.isValid {
+            self.profile = cached.profile
+            self.statistics = cached.statistics
+            self.friendshipStatus = cached.friendshipStatus
+            hasLoadedProfile = true
+            return
+        }
+        
+        // Only show loading on first load, not refresh
+        if !hasLoadedProfile {
+            isLoading = true
+        }
+        errorMessage = nil
         
         do {
             async let profileData = NetworkService.shared.getUserProfile(username: username)
@@ -61,7 +99,7 @@ class UserProfileViewModel: ObservableObject {
             
             let statsResponse = try await statsData
             // Combine profile data (currentStreak, totalXp) with stats data
-            statistics = UserStatistics(
+            let userStats = UserStatistics(
                 currentStreak: userProfile.currentStreak,
                 totalXp: userProfile.totalXp,
                 totalSolves: statsResponse.stats.totalSolves,
@@ -73,21 +111,33 @@ class UserProfileViewModel: ObservableObject {
                     hard: statsResponse.stats.problemsByDifficulty.hard
                 )
             )
+            statistics = userStats
             
             let friends = try await friendsData
             let received = try await receivedRequests
             let sent = try await sentRequests
             
             // Determine friendship status
+            let status: FriendshipStatus
             if friends.contains(where: { $0.username == username }) {
-                friendshipStatus = .friends
+                status = .friends
             } else if received.contains(where: { $0.requester?.username == username }) {
-                friendshipStatus = .requestReceived
+                status = .requestReceived
             } else if sent.contains(where: { $0.addressee?.username == username }) {
-                friendshipStatus = .requestSent
+                status = .requestSent
             } else {
-                friendshipStatus = .notFriends
+                status = .notFriends
             }
+            friendshipStatus = status
+            
+            // Cache the result
+            Self.profileCache[username] = CachedProfile(
+                profile: userProfile,
+                statistics: userStats,
+                friendshipStatus: status,
+                timestamp: Date()
+            )
+            hasLoadedProfile = true
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -163,6 +213,71 @@ class UserProfileViewModel: ObservableObject {
         do {
             try await NetworkService.shared.removeFriend(username: username)
             friendshipStatus = .notFriends
+            friendStreakStatus = .none
+            friendStreak = nil
+            HapticManager.shared.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.shared.error()
+        }
+    }
+    
+    func loadFriendStreakStatus(force: Bool = false) async {
+        guard !hasLoadedStreakStatus || force else { return }
+        guard friendshipStatus == .friends else {
+            friendStreakStatus = .none
+            return
+        }
+        
+        do {
+            // Check for active streaks
+            let streaks = try await NetworkService.shared.getFriendStreaks()
+            if let existingStreak = streaks.first(where: { $0.friend.username == username }) {
+                friendStreak = existingStreak
+                friendStreakStatus = .active
+                hasLoadedStreakStatus = true
+                return
+            }
+            
+            // Check for pending streak requests
+            async let sentRequests = NetworkService.shared.getSentFriendStreakRequests()
+            async let receivedRequests = NetworkService.shared.getReceivedFriendStreakRequests()
+            
+            let sent = try await sentRequests
+            let received = try await receivedRequests
+            
+            if sent.contains(where: { $0.requested?.username == username }) {
+                friendStreakStatus = .requestSent
+            } else if received.contains(where: { $0.requester?.username == username }) {
+                friendStreakStatus = .requestReceived
+            } else {
+                friendStreakStatus = .canStart
+            }
+            
+            hasLoadedStreakStatus = true
+        } catch {
+            // Silently fail - not critical
+            print("Failed to load friend streak status: \(error)")
+            friendStreakStatus = .canStart
+        }
+    }
+    
+    func sendStreakRequest() async {
+        do {
+            _ = try await NetworkService.shared.sendFriendStreakRequest(username: username)
+            friendStreakStatus = .requestSent
+            HapticManager.shared.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.shared.error()
+        }
+    }
+    
+    func deleteStreak() async {
+        do {
+            try await NetworkService.shared.deleteFriendStreak(username: username)
+            friendStreak = nil
+            friendStreakStatus = .canStart
             HapticManager.shared.success()
         } catch {
             errorMessage = error.localizedDescription
@@ -207,6 +322,11 @@ struct UserProfileView: View {
                 } else if let profile = viewModel.profile {
                     ProfileHeaderView(profile: profile, statistics: viewModel.statistics)
                     
+                    // Friend streak section (only for friends) - shown above remove button
+                    if viewModel.friendshipStatus == .friends {
+                        streakActionSection
+                    }
+                    
                     friendActionButton
                     
                     if let statistics = viewModel.statistics {
@@ -235,9 +355,20 @@ struct UserProfileView: View {
         .navigationTitle(username)
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            // Load profile first, then load streak status in parallel with other data
             await viewModel.loadProfile()
-            await viewModel.loadSolves()
-            await viewModel.loadAchievements()
+            async let solvesTask: () = viewModel.loadSolves()
+            async let achievementsTask: () = viewModel.loadAchievements()
+            async let streakTask: () = viewModel.loadFriendStreakStatus()
+            _ = await (solvesTask, achievementsTask, streakTask)
+        }
+        .refreshable {
+            // Force refresh all data on pull-to-refresh
+            await viewModel.loadProfile(force: true)
+            async let solvesTask: () = viewModel.loadSolves(force: true)
+            async let achievementsTask: () = viewModel.loadAchievements(force: true)
+            async let streakTask: () = viewModel.loadFriendStreakStatus(force: true)
+            _ = await (solvesTask, achievementsTask, streakTask)
         }
         .onChange(of: viewModel.selectedTab) { _, newValue in
             if newValue == 0 && viewModel.solves.isEmpty {
@@ -328,6 +459,77 @@ struct UserProfileView: View {
             .padding(.horizontal)
         }
     }
+    
+    @ViewBuilder
+    private var streakActionSection: some View {
+        VStack(spacing: 8) {
+            switch viewModel.friendStreakStatus {
+            case .none:
+                EmptyView()
+                
+            case .active:
+                // Show active streak info with liquid glass and glow
+                if let streak = viewModel.friendStreak {
+                    ActiveStreakCard(streak: streak, paletteManager: paletteManager, onDelete: {
+                        Task {
+                            await viewModel.deleteStreak()
+                        }
+                    })
+                    .padding(.horizontal)
+                }
+                
+            case .canStart:
+                // Show "Start Streak" button
+                Group {
+                    Button {
+                        Task {
+                            await viewModel.sendStreakRequest()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "flame")
+                            Text("Start Streak")
+                        }
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .tint(paletteManager.color(at: 0))
+                }
+                .applyGlassButtonStyle(.glassProminent)
+                .padding(.horizontal)
+                
+            case .requestSent:
+                HStack {
+                    Image(systemName: "flame.badge.checkmark")
+                    Text("Streak Request Sent")
+                }
+                .font(.subheadline)
+                .foregroundStyle(paletteManager.color(at: 0))
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(paletteManager.color(at: 0).opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal)
+                
+            case .requestReceived:
+                HStack {
+                    Image(systemName: "flame.badge.checkmark")
+                    Text("Streak Request Received")
+                    Spacer()
+                    Text("Check requests")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.subheadline)
+                .foregroundStyle(paletteManager.color(at: 0))
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(paletteManager.color(at: 0).opacity(0.1))
+                .cornerRadius(12)
+                .padding(.horizontal)
+            }
+        }
+    }
 }
 
 struct ProfileHeaderView: View {
@@ -385,7 +587,7 @@ struct ProfileHeaderView: View {
                             .font(.title3)
                             .bold()
                             .foregroundStyle(paletteManager.color(at: 0))
-                        Label("Streak", systemImage: "flame.fill")
+                        Label("My Streak", systemImage: "flame.fill")
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.7))
                     }
@@ -528,7 +730,7 @@ struct SolvesListView: View {
     @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 0) {
             if solves.isEmpty {
                 VStack(spacing: 16) {
                     Image(systemName: "checkmark.circle")
@@ -540,28 +742,35 @@ struct SolvesListView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
             } else {
-                ForEach(solves) { solve in
-                    SolveCard(solve: solve)
+                VStack(spacing: 0) {
+                    ForEach(Array(solves.enumerated()), id: \.element.id) { index, solve in
+                        ProfileSolveRow(solve: solve)
+                        if index < solves.count - 1 {
+                            Divider()
+                                .padding(.leading, 16)
+                        }
+                    }
                 }
+                .background(Color(UIColor.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal)
                 
                 if canLoadMore {
-                    Group {
-                        Button {
-                            onLoadMore()
-                        } label: {
-                            Text("Load More")
-                                .foregroundStyle(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                        }
-                        .tint(paletteManager.selectedPalette.primary)
+                    Button {
+                        onLoadMore()
+                    } label: {
+                        Text("Load More")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
                     }
-                    .applyGlassButtonStyle(.glassProminent)
-                    .padding(.top, 8)
+                    .background(Color(UIColor.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal)
+                    .padding(.top, 16)
                 }
             }
         }
-        .padding()
+        .padding(.vertical)
     }
 }
 
@@ -641,28 +850,280 @@ struct DifficultyTag: View {
     }
 }
 
-struct AchievementsListView: View {
-    let achievements: [Achievement]
+// MARK: - Row Components for List Style
+struct ProfileSolveRow: View {
+    let solve: UserSolve
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(solve.problem.title)
+                    .font(.body)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                DifficultyTag(difficulty: solve.problem.difficulty)
+            }
+            
+            HStack(spacing: 12) {
+                Label(solve.problem.platform.capitalized, systemImage: "globe")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                Label("\(solve.xpAwarded) XP", systemImage: "star.fill")
+                    .font(.caption)
+                    .foregroundStyle(paletteManager.selectedPalette.secondary)
+                
+                Spacer()
+                
+                Text(formatSolveDate(solve.solvedAt))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+    
+    private func formatSolveDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: dateString) else { return "" }
+        
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateStyle = .short
+        return displayFormatter.string(from: date)
+    }
+}
+
+struct ProfileAchievementRow: View {
+    let achievement: Achievement
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    
+    var categoryIcon: String {
+        switch achievement.category.lowercased() {
+        case "solve": return "checkmark.circle.fill"
+        case "streak": return "flame.fill"
+        case "social": return "person.2.fill"
+        default: return "trophy.fill"
+        }
+    }
+    
+    var categoryColor: Color {
+        switch achievement.category.lowercased() {
+        case "solve": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
+        case "social": return paletteManager.color(at: 2)
+        default: return paletteManager.color(at: 3)
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: categoryIcon)
+                .font(.system(size: 24))
+                .foregroundStyle(categoryColor)
+                .frame(width: 40, height: 40)
+                .background(categoryColor.opacity(0.1))
+                .cornerRadius(8)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(achievement.name)
+                    .font(.body)
+                
+                Text(achievement.description)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+}
+
+struct AchievementsListView: View {
+    let achievements: [Achievement]
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
             if achievements.isEmpty {
                 VStack(spacing: 16) {
-                    Image(systemName: "trophy")
-                        .font(.system(size: 48))
+                    ZStack {
+                        Circle()
+                            .fill(paletteManager.color(at: 1).opacity(0.15))
+                            .frame(width: 80, height: 80)
+                        Image(systemName: "trophy")
+                            .font(.system(size: 36))
+                            .foregroundStyle(paletteManager.color(at: 1))
+                    }
+                    Text("No achievements unlocked yet")
+                        .font(.headline)
                         .foregroundStyle(.secondary)
-                    Text("No achievements unlocked")
+                    Text("Complete challenges to earn achievements")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
             } else {
-                ForEach(achievements) { achievement in
-                    AchievementCard(achievement: achievement)
+                // 2-column grid of achievement cards
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(achievements) { achievement in
+                        AchievementBadgeCard(achievement: achievement)
+                    }
                 }
+                .padding(.horizontal)
+                
+                // Summary text
+                Text("\(achievements.count) achievement\(achievements.count == 1 ? "" : "s") unlocked")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
             }
         }
-        .padding()
+        .padding(.vertical)
+    }
+}
+
+// MARK: - Achievement Badge Card (Card Style for Vertical Grid)
+struct AchievementBadgeCard: View {
+    let achievement: Achievement
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var glowPhase: CGFloat = 0
+    
+    var categoryIcon: String {
+        switch achievement.category.lowercased() {
+        case "solve": return "checkmark.seal.fill"
+        case "streak": return "flame.fill"
+        case "social": return "person.2.fill"
+        default: return "trophy.fill"
+        }
+    }
+    
+    var categoryColor: Color {
+        switch achievement.category.lowercased() {
+        case "solve": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
+        case "social": return paletteManager.color(at: 2)
+        default: return paletteManager.color(at: 3)
+        }
+    }
+    
+    var glowOpacity: Double {
+        0.3 + 0.2 * (0.5 + 0.5 * sin(glowPhase))
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Circular Badge with Glow
+            ZStack {
+                // Outer glow ring
+                Circle()
+                    .stroke(categoryColor.opacity(glowOpacity), lineWidth: 3)
+                    .frame(width: 76, height: 76)
+                    .blur(radius: 4)
+                
+                // Background ring
+                Circle()
+                    .stroke(
+                        LinearGradient(
+                            colors: [categoryColor, categoryColor.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 4
+                    )
+                    .frame(width: 72, height: 72)
+                
+                // Inner circle with icon
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 35
+                        )
+                    )
+                    .frame(width: 64, height: 64)
+                
+                Image(systemName: categoryIcon)
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(categoryColor)
+                    .shadow(color: categoryColor.opacity(0.5), radius: 4)
+            }
+            
+            // Achievement Name
+            Text(achievement.name)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            
+            // Description
+            Text(achievement.description)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            
+            // Unlocked date
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.green)
+                Text(formatDate(achievement.unlockedAt))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(UIColor.systemGray6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [categoryColor.opacity(0.1), .clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(categoryColor.opacity(0.2), lineWidth: 1)
+        )
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                glowPhase = .pi * 2
+            }
+        }
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: dateString) else { return "" }
+        
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateStyle = .medium
+        return displayFormatter.string(from: date)
     }
 }
 
@@ -749,6 +1210,96 @@ extension View {
             self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16))
         } else {
             self.background(Color(UIColor.systemGray6))
+        }
+    }
+}
+
+// MARK: - Active Streak Card
+struct ActiveStreakCard: View {
+    let streak: FriendStreak
+    @ObservedObject var paletteManager: ColorPaletteManager
+    let onDelete: () -> Void
+    @State private var glowPhase: CGFloat = 0
+    @State private var showDeleteConfirmation = false
+    
+    private var streakColor: Color {
+        paletteManager.color(at: 2) // Use different color from personal streak
+    }
+    
+    private var glowFillOpacity: Double {
+        0.15 + 0.1 * (0.5 + 0.5 * sin(glowPhase))
+    }
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Friend Streak column
+            VStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption)
+                        .foregroundStyle(streakColor)
+                    Text("\(streak.currentStreak)")
+                        .font(.title2)
+                        .bold()
+                }
+                Text("With \(streak.friend.username)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            
+            Divider()
+                .frame(height: 40)
+            
+            // Best streak column
+            VStack(spacing: 4) {
+                Text("\(streak.longestStreak)")
+                    .font(.title2)
+                    .bold()
+                Text("Best")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(16)
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [.clear, .clear, streakColor.opacity(glowFillOpacity)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .allowsHitTesting(false)
+        )
+        .contextMenu {
+            Button(role: .destructive) {
+                showDeleteConfirmation = true
+            } label: {
+                Label("End Streak", systemImage: "flame.slash")
+            }
+        }
+        .confirmationDialog(
+            "End Streak with \(streak.friend.username)?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("End Streak", role: .destructive) {
+                onDelete()
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will permanently delete your streak of \(streak.currentStreak) days. This cannot be undone.")
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                glowPhase = .pi * 2
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileEditView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.dismiss) var dismiss
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     @State private var email: String = ""
     @State private var visibility: String = "public"
@@ -47,19 +48,23 @@ struct ProfileEditView: View {
                     } label: {
                         if isLoading {
                             ProgressView()
-                                .tint(Color(.systemBackground))
+                                .tint(.white)
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         } else {
                             Text("Save Changes")
                                 .font(.headline)
-                                .foregroundStyle(Color(.systemBackground))
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         }
                     }
-                    .listRowBackground(Color.primary)
-                    .cornerRadius(.infinity)
+                    .tint(paletteManager.selectedPalette.primary)
+                    .buttonStyle(.borderedProminent)
+                    .modifier(LiquidGlassCapsuleButton())
                     .disabled(isLoading)
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
             }
             .navigationTitle("Edit Profile")
             .navigationBarTitleDisplayMode(.inline)

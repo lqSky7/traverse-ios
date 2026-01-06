@@ -14,6 +14,9 @@ class DataManager: ObservableObject {
     @Published var friends: [Friend] = []
     @Published var receivedRequests: [FriendRequest] = []
     @Published var sentRequests: [FriendRequest] = []
+    @Published var receivedStreakRequests: [FriendStreakRequest] = []
+    @Published var sentStreakRequests: [FriendStreakRequest] = []
+    @Published var friendStreaks: [FriendStreak] = []
     
     // Home data
     @Published var userStats: UserStats?
@@ -56,6 +59,21 @@ class DataManager: ObservableObject {
         if let sentRequestsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("sentRequests.json")),
            let decodedRequests = try? decoder.decode([FriendRequest].self, from: sentRequestsData) {
             self.sentRequests = decodedRequests
+        }
+        
+        if let receivedStreakRequestsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("receivedStreakRequests.json")),
+           let decodedRequests = try? decoder.decode([FriendStreakRequest].self, from: receivedStreakRequestsData) {
+            self.receivedStreakRequests = decodedRequests
+        }
+        
+        if let sentStreakRequestsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("sentStreakRequests.json")),
+           let decodedRequests = try? decoder.decode([FriendStreakRequest].self, from: sentStreakRequestsData) {
+            self.sentStreakRequests = decodedRequests
+        }
+        
+        if let friendStreaksData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("friendStreaks.json")),
+           let decodedStreaks = try? decoder.decode([FriendStreak].self, from: friendStreaksData) {
+            self.friendStreaks = decodedStreaks
         }
         
         // Load home data
@@ -110,6 +128,9 @@ class DataManager: ObservableObject {
         saveData(friends, filename: "friends.json")
         saveData(receivedRequests, filename: "receivedRequests.json")
         saveData(sentRequests, filename: "sentRequests.json")
+        saveData(receivedStreakRequests, filename: "receivedStreakRequests.json")
+        saveData(sentStreakRequests, filename: "sentStreakRequests.json")
+        saveData(friendStreaks, filename: "friendStreaks.json")
         
         if let userStats = userStats {
             saveData(userStats, filename: "userStats.json")
@@ -213,6 +234,9 @@ class DataManager: ObservableObject {
         friends = []
         receivedRequests = []
         sentRequests = []
+        receivedStreakRequests = []
+        sentStreakRequests = []
+        friendStreaks = []
         userStats = nil
         submissionStats = nil
         solveStats = nil

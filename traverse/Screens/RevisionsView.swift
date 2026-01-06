@@ -63,6 +63,9 @@ struct RevisionsView: View {
                                     onMLAttempt: { revision in
                                         selectedRevision = revision
                                         showMLAttemptSheet = true
+                                    },
+                                    onDelete: { revision in
+                                        await deleteRevision(revision)
                                     }
                                 )
                             }
@@ -144,10 +147,7 @@ struct RevisionsView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showMLAttemptSheet) {
             if let revision = selectedRevision {
-                MLAttemptSheet(revision: revision) { outcome, numTries, timeSpent in
-                    await recordMLAttempt(revision: revision, outcome: outcome, numTries: numTries, timeSpent: timeSpent)
-                    showMLAttemptSheet = false
-                }
+                MLAttemptSheet(revision: revision)
             }
         }
         .onAppear {
@@ -228,26 +228,7 @@ struct RevisionsView: View {
         }
     }
     
-    private func recordMLAttempt(revision: Revision, outcome: Int, numTries: Int, timeSpent: Double) async {
-        do {
-            let response = try await NetworkService.shared.recordRevisionAttempt(
-                id: revision.id,
-                outcome: outcome,
-                numTries: numTries,
-                timeSpentMinutes: timeSpent
-            )
-            HapticManager.shared.success()
-            
-            // You could surface response.prediction to the user as a toast/banner if desired
-            print("Next review in \(response.prediction.nextReviewIntervalDays) days (Confidence: \(response.prediction.confidence))")
-            
-            await loadData()
-        } catch {
-            print("Failed to record ML attempt: \(error.localizedDescription)")
-            HapticManager.shared.error()
-        }
-    }
-    
+
     private func scheduleAllNotifications() async {
         guard notificationsEnabled else { return }
         
@@ -274,6 +255,17 @@ struct RevisionsView: View {
             print("Failed to complete revision: \(error.localizedDescription)")
         }
     }
+    
+    private func deleteRevision(_ revision: Revision) async {
+        do {
+            try await NetworkService.shared.deleteRevision(id: revision.id)
+            HapticManager.shared.success()
+            await loadData()
+        } catch {
+            print("Failed to delete revision: \(error.localizedDescription)")
+            HapticManager.shared.error()
+        }
+    }
 }
 
 struct RevisionGroupCard: View {
@@ -281,6 +273,7 @@ struct RevisionGroupCard: View {
     let useMLMode: Bool
     let onComplete: (Revision) async -> Void
     let onMLAttempt: (Revision) -> Void
+    let onDelete: (Revision) async -> Void
     @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
@@ -307,7 +300,7 @@ struct RevisionGroupCard: View {
             // Card with revisions
             VStack(spacing: 0) {
                 ForEach(Array(group.revisions.enumerated()), id: \.element.id) { index, revision in
-                    RevisionCard(revision: revision, useMLMode: useMLMode, onComplete: onComplete, onMLAttempt: onMLAttempt)
+                    RevisionCard(revision: revision, useMLMode: useMLMode, onComplete: onComplete, onMLAttempt: onMLAttempt, onDelete: onDelete)
                     
                     // Add inset divider between items (not after last)
                     if index < group.revisions.count - 1 {
@@ -359,7 +352,9 @@ struct RevisionCard: View {
     let useMLMode: Bool
     let onComplete: (Revision) async -> Void
     let onMLAttempt: (Revision) -> Void
+    let onDelete: (Revision) async -> Void
     @State private var isCompleting = false
+    @State private var isDeleting = false
     @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
@@ -425,6 +420,19 @@ struct RevisionCard: View {
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
         .opacity(revision.isCompleted ? 0.6 : 1.0)
+        .contextMenu {
+            if useMLMode && !revision.isCompleted {
+                Button(role: .destructive) {
+                    Task {
+                        isDeleting = true
+                        await onDelete(revision)
+                        isDeleting = false
+                    }
+                } label: {
+                    Label("Delete Revision", systemImage: "trash")
+                }
+            }
+        }
     }
     
     private var difficultyColor: Color {
@@ -464,174 +472,217 @@ struct StatBadge: View {
 // MARK: - ML Attempt Sheet
 struct MLAttemptSheet: View {
     let revision: Revision
-    let onSubmit: (Int, Int, Double) async -> Void
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @Environment(\.dismiss) private var dismiss
-    
-    @State private var outcome: Int = 1 // 0 = failed, 1 = success
-    @State private var numTries: Int = 1
-    @State private var timeSpent: Double = 10
-    @State private var isSubmitting = false
+    @Environment(\.openURL) private var openURL
+    @State private var showTechnicalDetails = false
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Problem Info
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(revision.problem.title)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundStyle(.white)
-                            
-                            HStack {
-                                Text(revision.problem.platform.capitalized)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("•")
-                                    .foregroundStyle(.secondary)
-                                Text(revision.problem.difficulty.capitalized)
-                                    .font(.caption)
-                                    .foregroundStyle(difficultyColor)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
+            Form {
+                // Hero Section
+                Section {
+                    VStack(spacing: 12) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 44))
+                            .foregroundStyle(paletteManager.selectedPalette.primary)
                         
-                        // Outcome Toggle
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Did you solve it today?")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            
-                            Picker("Outcome", selection: $outcome) {
-                                Text("Failed").tag(0)
-                                Text("Success").tag(1)
-                            }
-                            .pickerStyle(.segmented)
-                        }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
+                        Text("LSTM Spaced Repetition")
+                            .font(.title2)
+                            .fontWeight(.bold)
                         
-                        // Number of Tries
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("How many attempts?")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            
-                            HStack {
-                                Button {
-                                    if numTries > 1 { numTries -= 1; HapticManager.shared.success() }
-                                } label: {
-                                    Image(systemName: "minus.circle.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(paletteManager.color(at: 0))
-                                }
-                                .disabled(numTries <= 1)
-                                
-                                Spacer()
-                                
-                                Text("\(numTries)")
-                                    .font(.title)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 60)
-                                
-                                Spacer()
-                                
-                                Button {
-                                    if numTries < 20 { numTries += 1; HapticManager.shared.success() }
-                                } label: {
-                                    Image(systemName: "plus.circle.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(paletteManager.color(at: 1))
-                                }
-                                .disabled(numTries >= 20)
-                            }
-                        }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        
-                        // Time Spent
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Time spent (minutes)")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                            
-                            HStack {
-                                Slider(value: $timeSpent, in: 1...120, step: 1)
-                                    .tint(paletteManager.selectedPalette.primary)
-                                
-                                Text("\(Int(timeSpent)) min")
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 70, alignment: .trailing)
-                            }
-                        }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(12)
-                        
-                        // Submit Button
-                        Button(action: {
-                            Task {
-                                isSubmitting = true
-                                await onSubmit(outcome, numTries, timeSpent)
-                                HapticManager.shared.success()
-                                isSubmitting = false
-                                dismiss()
-                            }
-                        }) {
-                            if isSubmitting {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            } else {
-                                Text("Submit Attempt")
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            }
-                        }
-                        .background(paletteManager.selectedPalette.primary)
-                        .cornerRadius(12)
-                        .disabled(isSubmitting)
+                        Text("Predicting your optimal review intervals")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
                 }
+                .listRowBackground(Color.clear)
+                
+                // What is this section
+                Section {
+                    Text("This is an ML-powered spaced repetition system. Instead of fixed review schedules (1 day, 3 days, 7 days...), our LSTM neural network learns YOUR learning patterns and predicts the perfect time for your next review.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .foregroundStyle(.green)
+                        Text("MAE: 1.78 days")
+                            .font(.footnote)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.green)
+                        Text("— within ~2 days of optimal")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Label("What is this?", systemImage: "questionmark.circle.fill")
+                }
+                
+                // Features Section
+                Section {
+                    FeatureListRow(icon: "gauge.medium", text: "Problem difficulty", detail: "Easy / Medium / Hard", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "folder", text: "Category", detail: "Arrays, Trees, DP, Graphs...", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "number", text: "Attempt number", detail: "1st, 2nd, 3rd review...", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "calendar", text: "Days since last", detail: "Time gap between reviews", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "checkmark.circle", text: "Outcome", detail: "Success or failure — critical!", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "arrow.counterclockwise", text: "Number of tries", detail: "Submit attempts this session", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "clock", text: "Time spent", detail: "Minutes solving the problem", iconColor: paletteManager.selectedPalette.primary)
+                } header: {
+                    Label("7 Features We Track", systemImage: "chart.line.uptrend.xyaxis")
+                } footer: {
+                    Text("Every submission feeds into the model to improve predictions.")
+                }
+                
+                // Technical Details Section
+                Section {
+                    DisclosureGroup(isExpanded: $showTechnicalDetails) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            TechRow(label: "Architecture", value: "2-layer LSTM + BatchNorm")
+                            TechRow(label: "Hidden size", value: "128 units")
+                            TechRow(label: "Loss function", value: "Huber Loss")
+                            TechRow(label: "Training data", value: "15,321 records")
+                            TechRow(label: "Clusters", value: "5 learner patterns")
+                            
+                            Divider()
+                            
+                            Text("Exponential Decay Model")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            
+                            Text("interval = -log(0.9) / exp(LSTM_output)")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                                .padding(8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            
+                            Text("Recall probability decays exponentially. The LSTM learns your personal forgetting curve.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    } label: {
+                        Label("Under the hood", systemImage: "cpu")
+                    }
+                }
+                
+                // Buttons Section (not sticky, scrolls with content)
+                Section {
+                    VStack(spacing: 10) {
+                        // Open Problem Button
+                        Button(action: openProblem) {
+                            Text("Solve: \(revision.problem.title)")
+                                .font(.headline)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .tint(paletteManager.selectedPalette.primary)
+                        .buttonStyle(.borderedProminent)
+                        .modifier(LiquidGlassCapsuleButton())
+                        
+                        // Got it Button
+                        Button(action: { dismiss() }) {
+                            Text("Got it")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                        }
+                        .tint(paletteManager.color(at: 2))
+                        .buttonStyle(.borderedProminent)
+                        .modifier(LiquidGlassCapsuleButton())
+                    }
+                    .padding(.vertical, 8)
+                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
             }
-            .navigationTitle("Record Attempt")
+            .navigationTitle("Smart Revisions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(paletteManager.selectedPalette.primary)
+                    Button("Close") { dismiss() }
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
     
-    private var difficultyColor: Color {
-        switch revision.problem.difficulty.lowercased() {
-        case "easy":
-            return paletteManager.color(at: 1)
-        case "medium":
-            return paletteManager.color(at: 2)
-        case "hard":
-            return paletteManager.color(at: 0)
-        default:
-            return .gray
+    private func openProblem() {
+        let baseURLs: [String: String] = [
+            "leetcode": "https://leetcode.com/problems/",
+            "codeforces": "https://codeforces.com/problemset/problem/",
+            "hackerrank": "https://www.hackerrank.com/challenges/",
+            "takeuforward": "https://takeuforward.org/practice/"
+        ]
+        
+        if let baseURL = baseURLs[revision.problem.platform.lowercased()],
+           let url = URL(string: "\(baseURL)\(revision.problem.slug)") {
+            openURL(url)
+        }
+    }
+}
+
+// MARK: - Feature List Row
+struct FeatureListRow: View {
+    let icon: String
+    let text: String
+    let detail: String
+    let iconColor: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.body)
+                .foregroundStyle(iconColor)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text)
+                    .font(.subheadline)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Tech Row
+struct TechRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+    }
+}
+
+// Helper view for info rows
+struct InfoRow: View {
+    let icon: String
+    let text: String
+    let color: Color
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .font(.body)
+            Text(text)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.9))
         }
     }
 }
