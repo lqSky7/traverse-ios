@@ -41,8 +41,21 @@ struct HomeView: View {
                         
                         // Charts Section
                         VStack(spacing: 16) {
-                            if let achievementStats = viewModel.achievementStats {
-                                AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
+                            // Achievements and Insights side by side
+                            if let achievementStats = viewModel.achievementStats,
+                               let solves = viewModel.recentSolves, !solves.isEmpty {
+                                HStack(alignment: .top, spacing: 16) {
+                                    NavigationLink(destination: AllAchievementsView()) {
+                                        AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    ProductivityInsightsCard(solves: solves, paletteManager: paletteManager)
+                                }
+                            } else if let achievementStats = viewModel.achievementStats {
+                                NavigationLink(destination: AllAchievementsView()) {
+                                    AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
                             
                             if let solveStats = viewModel.solveStats,
@@ -50,15 +63,17 @@ struct HomeView: View {
                                 // Difficulty and Activity side by side
                                 HStack(alignment: .top, spacing: 16) {
                                     DifficultyChartCard(stats: solveStats.stats, paletteManager: paletteManager)
-                                    SolveHeatmapCard(solves: solves, paletteManager: paletteManager)
+                                    NavigationLink(destination: ActivityDetailView(solves: solves, paletteManager: paletteManager)) {
+                                        SolveHeatmapCard(solves: solves, paletteManager: paletteManager)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                                 
                                 // Mistake Tags Analysis full width
                                 MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
-                            }
-                            
-                            if let submissionStats = viewModel.submissionStats {
-                                SubmissionBreakdownCard(stats: submissionStats.stats, paletteManager: paletteManager)
+                                
+                                // Best Solving Hours (replaces Submission Breakdown)
+                                BestSolvingHoursCard(solves: solves, paletteManager: paletteManager)
                             }
                             
                             if let solves = viewModel.recentSolves, !solves.isEmpty {
@@ -444,6 +459,7 @@ struct DifficultyChartCard: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
+        .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
@@ -775,7 +791,7 @@ struct MistakeTagProgressRow: View {
     }
 }
 
-// MARK: - Achievement Stats Card
+// MARK: - Achievement Stats Card (Compact Half-Width)
 struct AchievementStatsCard: View {
     let stats: AchievementStatsData
     @ObservedObject var paletteManager: ColorPaletteManager
@@ -788,15 +804,8 @@ struct AchievementStatsCard: View {
     
     // Break up complex expressions for compiler
     private var glowFillOpacity: Double {
-        let baseOpacity: Double = 0.1
-        let progressMultiplier: Double = Double(progress) * 0.3
-        let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
-        return baseOpacity + progressMultiplier * animationFactor
-    }
-    
-    private var glowStrokeOpacity: Double {
-        let baseOpacity: Double = 0.3
-        let progressMultiplier: Double = Double(progress) * 0.5
+        let baseOpacity: Double = 0.15
+        let progressMultiplier: Double = Double(progress) * 0.4
         let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
         return baseOpacity + progressMultiplier * animationFactor
     }
@@ -805,129 +814,267 @@ struct AchievementStatsCard: View {
         paletteManager.color(at: 3)
     }
     
-    private var secondaryAccentColor: Color {
-        paletteManager.color(at: 4)
-    }
-    
     var body: some View {
         VStack(spacing: 0) {
-            headerView
+            Spacer()
             
-            Divider()
-                .background(Color.gray.opacity(0.3))
+            // Hero number only
+            VStack(spacing: 8) {
+                Text("\(stats.unlocked)")
+                    .font(.system(size: 72, weight: .bold))
+                    .foregroundStyle(accentColor)
+                Text("of \(stats.total)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("unlocked")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
             
-            heroSection
+            Spacer()
         }
+        .frame(maxWidth: .infinity, minHeight: 180)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-        .overlay(glowFillOverlay)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    RadialGradient(
+                        colors: [accentColor.opacity(glowFillOpacity), .clear],
+                        center: .bottom,
+                        startRadius: 0,
+                        endRadius: 150
+                    )
+                )
+                .allowsHitTesting(false)
+        )
         .onAppear {
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 glowPhase = .pi * 2
             }
         }
     }
+}
+
+// MARK: - Productivity Insights Card (Minimal Design)
+struct ProductivityInsightsCard: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var headerView: some View {
-        HStack {
-            HStack(spacing: 8) {
-                Image(systemName: "trophy.fill")
-                    .foregroundStyle(accentColor)
-                Text("Achievements")
-                    .font(.headline)
+    // Peak day calculation
+    private var peakWeekday: Int {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        var dayCounts: [Int: Int] = [:]
+        for solve in solves {
+            if let date = formatter.date(from: solve.solvedAt) {
+                let weekday = Calendar.current.component(.weekday, from: date)
+                dayCounts[weekday, default: 0] += 1
             }
+        }
+        return dayCounts.max(by: { $0.value < $1.value })?.key ?? 1
+    }
+    
+    private var peakDayName: String {
+        let names = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return names[peakWeekday]
+    }
+    
+    private var firstTryRate: Double {
+        let firstTryCount = solves.filter { ($0.submission.numberOfTries ?? 1) == 1 }.count
+        guard !solves.isEmpty else { return 0 }
+        return Double(firstTryCount) / Double(solves.count)
+    }
+    
+    var body: some View {
+        VStack(spacing: 16) {
             Spacer()
-            NavigationLink(destination: AllAchievementsView()) {
-                HStack(spacing: 4) {
-                    Text("View All")
-                        .font(.subheadline)
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
+            
+            // Hero percentage with subtle ring
+            ZStack {
+                // Background ring
+                Circle()
+                    .stroke(Color.gray.opacity(0.15), lineWidth: 8)
+                    .frame(width: 100, height: 100)
+                
+                // Progress ring
+                Circle()
+                    .trim(from: 0, to: firstTryRate)
+                    .stroke(
+                        paletteManager.color(at: 0),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(width: 100, height: 100)
+                    .rotationEffect(.degrees(-90))
+                
+                // Percentage
+                VStack(spacing: 0) {
+                    Text("\(Int(firstTryRate * 100))")
+                        .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("1st try")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                .foregroundStyle(paletteManager.selectedPalette.primary)
             }
-        }
-        .padding()
-    }
-    
-    private var heroSection: some View {
-        HStack(spacing: 24) {
-            ringView
             
-            Divider()
-                .frame(height: 80)
+            Spacer()
             
-            percentageView
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal)
-        .padding(.vertical, 16)
-    }
-    
-    private var ringView: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.gray.opacity(0.2), lineWidth: 14)
-                .frame(width: 100, height: 100)
-            
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    LinearGradient(
-                        colors: [accentColor, secondaryAccentColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                )
-                .frame(width: 100, height: 100)
-                .rotationEffect(.degrees(-90))
-            
-            VStack(spacing: 0) {
-                Text("\(stats.unlocked)")
-                    .font(.system(size: 28, weight: .bold))
-                Text("of \(stats.total)")
+            // Week strip - 7 dots, peak day highlighted
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    ForEach(1...7, id: \.self) { day in
+                        Circle()
+                            .fill(day == peakWeekday ? paletteManager.color(at: 5) : Color.gray.opacity(0.3))
+                            .frame(width: day == peakWeekday ? 10 : 6, height: day == peakWeekday ? 10 : 6)
+                    }
+                }
+                
+                Text("Peak: \(peakDayName)")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
+        .padding()
+        .frame(maxWidth: .infinity, minHeight: 180)
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
+}
+
+// MARK: - Best Solving Hours Card
+struct BestSolvingHoursCard: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var percentageView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(stats.percentage)
-                .font(.system(size: 48, weight: .bold))
-                .foregroundStyle(accentColor)
-            Text("Complete")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    private var hourlyData: [(hour: Int, count: Int, avgTime: Double)] {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        var hourCounts: [Int: Int] = [:]
+        var hourTimes: [Int: [Int]] = [:]
+        
+        for solve in solves {
+            if let date = formatter.date(from: solve.solvedAt) {
+                let hour = Calendar.current.component(.hour, from: date)
+                hourCounts[hour, default: 0] += 1
+                if let time = solve.submission.timeTaken {
+                    hourTimes[hour, default: []].append(time)
+                }
+            }
+        }
+        
+        return (0..<24).map { hour in
+            let count = hourCounts[hour] ?? 0
+            let times = hourTimes[hour] ?? []
+            let avgTime = times.isEmpty ? 0 : Double(times.reduce(0, +)) / Double(times.count)
+            return (hour, count, avgTime)
         }
     }
     
-    private var glowFillOverlay: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(
-                LinearGradient(
-                    colors: [.clear, .clear, accentColor.opacity(glowFillOpacity)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .allowsHitTesting(false)
+    private var peakHour: (hour: Int, count: Int) {
+        if let max = hourlyData.max(by: { $0.count < $1.count }) {
+            return (max.hour, max.count)
+        }
+        return (0, 0)
     }
     
-    private var glowStrokeOverlay: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(
-                LinearGradient(
-                    colors: [.clear, .clear, accentColor.opacity(glowStrokeOpacity)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                lineWidth: 2
-            )
-            .allowsHitTesting(false)
+    private var fastestHour: (hour: Int, avgTime: Double)? {
+        let validHours = hourlyData.filter { $0.avgTime > 0 }
+        return validHours.min(by: { $0.avgTime < $1.avgTime }).map { ($0.hour, $0.avgTime) }
+    }
+    
+    private func formatHour(_ hour: Int) -> String {
+        if hour == 0 { return "12am" }
+        if hour < 12 { return "\(hour)am" }
+        if hour == 12 { return "12pm" }
+        return "\(hour - 12)pm"
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        let mins = Int(seconds) / 60
+        if mins > 0 { return "\(mins)m" }
+        return "\(Int(seconds))s"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(paletteManager.color(at: 6))
+                    Text("Solving Hours")
+                        .font(.headline)
+                }
+                Spacer()
+            }
+            
+            Divider()
+                .background(Color.gray.opacity(0.3))
+            
+            // Stats summary
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(formatHour(peakHour.hour))
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 6))
+                    Text("Peak Hour")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                if let fastest = fastestHour {
+                    Divider()
+                        .frame(height: 50)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(formatHour(fastest.hour))
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("Fastest (\(formatTime(fastest.avgTime)))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Bar chart showing activity by hour
+            Chart(hourlyData, id: \.hour) { data in
+                BarMark(
+                    x: .value("Hour", data.hour),
+                    y: .value("Count", data.count)
+                )
+                .foregroundStyle(
+                    data.hour == peakHour.hour
+                        ? paletteManager.color(at: 6).gradient
+                        : paletteManager.color(at: 6).opacity(0.4).gradient
+                )
+                .cornerRadius(2)
+            }
+            .frame(height: 80)
+            .chartXAxis {
+                AxisMarks(values: [0, 6, 12, 18]) { value in
+                    AxisValueLabel {
+                        if let hour = value.as(Int.self) {
+                            Text(formatHour(hour))
+                                .font(.caption2)
+                        }
+                    }
+                }
+            }
+            .chartYAxis(.hidden)
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -1482,7 +1629,7 @@ struct SolveHeatmapCard: View {
         var weeks: [[Date]] = []
         
         // Start from 8 weeks ago (9 weeks total)
-        for weekOffset in (0..<9).reversed() {
+        for weekOffset in (0..<7).reversed() {
             var week: [Date] = []
             let weekStart = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: today)!
             let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekStart))!
@@ -1571,9 +1718,195 @@ struct SolveHeatmapCard: View {
             
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Activity Detail View (Full Screen Heatmap)
+struct ActivityDetailView: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    // Process solves into date -> difficulty data
+    private var heatmapData: [Date: (difficulty: String, count: Int)] {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var data: [Date: (String, Int)] = [:]
+        
+        for solve in solves {
+            guard let date = formatter.date(from: solve.solvedAt) else { continue }
+            let day = Calendar.current.startOfDay(for: date)
+            if let existing = data[day] {
+                let newDifficulty = harderDifficulty(existing.0, solve.problem.difficulty)
+                data[day] = (newDifficulty, existing.1 + 1)
+            } else {
+                data[day] = (solve.problem.difficulty, 1)
+            }
+        }
+        return data
+    }
+    
+    private func harderDifficulty(_ a: String, _ b: String) -> String {
+        let order = ["easy": 0, "medium": 1, "hard": 2]
+        let aVal = order[a.lowercased()] ?? 0
+        let bVal = order[b.lowercased()] ?? 0
+        return aVal >= bVal ? a : b
+    }
+    
+    // Generate last 20 weeks of dates (fits on screen)
+    private var weekDates: [[Date]] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        var weeks: [[Date]] = []
+        
+        for weekOffset in (0..<20).reversed() {
+            var week: [Date] = []
+            let weekStart = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: today)!
+            let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekStart))!
+            
+            for dayOffset in 0..<7 {
+                if let day = calendar.date(byAdding: .day, value: dayOffset, to: startOfWeek) {
+                    week.append(day)
+                }
+            }
+            weeks.append(week)
+        }
+        return weeks
+    }
+    
+    private func colorForDate(_ date: Date) -> Color {
+        guard let data = heatmapData[date] else {
+            return Color.gray.opacity(0.15)
+        }
+        switch data.difficulty.lowercased() {
+        case "easy": return paletteManager.color(at: 0)
+        case "medium": return paletteManager.color(at: 1)
+        case "hard": return paletteManager.color(at: 2)
+        default: return Color.gray.opacity(0.3)
+        }
+    }
+    
+    private var totalActiveDays: Int {
+        heatmapData.count
+    }
+    
+    private var totalSolves: Int {
+        heatmapData.values.reduce(0) { $0 + $1.1 }
+    }
+    
+    private let dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""]
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Summary stats
+                HStack(spacing: 32) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(totalActiveDays)")
+                            .font(.system(size: 48, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 3))
+                        Text("Active Days")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(totalSolves)")
+                            .font(.system(size: 48, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("Total Solves")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                
+                // Heatmap card
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Last 20 Weeks")
+                        .font(.headline)
+                    
+                    // Heatmap grid with day labels
+                    GeometryReader { geometry in
+                        let availableWidth = geometry.size.width - 40 // Account for day labels
+                        let cellSize = (availableWidth - CGFloat(19 * 3)) / 20 // 20 weeks, 3pt spacing
+                        
+                        HStack(alignment: .top, spacing: 4) {
+                            // Day labels
+                            VStack(spacing: max(cellSize * 0.2, 2)) {
+                                ForEach(Array(dayLabels.enumerated()), id: \.offset) { _, day in
+                                    Text(day)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 32, height: cellSize, alignment: .trailing)
+                                }
+                            }
+                            
+                            // Heatmap grid
+                            HStack(spacing: 3) {
+                                ForEach(Array(weekDates.enumerated()), id: \.offset) { _, week in
+                                    VStack(spacing: 3) {
+                                        ForEach(week, id: \.self) { date in
+                                            RoundedRectangle(cornerRadius: 3)
+                                                .fill(colorForDate(date))
+                                                .frame(width: cellSize, height: cellSize)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 140)
+                    
+                    // Legend
+                    HStack {
+                        HStack(spacing: 8) {
+                            Text("Less")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 4) {
+                                ForEach([Color.gray.opacity(0.15), paletteManager.color(at: 0), paletteManager.color(at: 1), paletteManager.color(at: 2)], id: \.self) { color in
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(color)
+                                        .frame(width: 12, height: 12)
+                                }
+                            }
+                            
+                            Text("More")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    // Difficulty legend
+                    HStack(spacing: 16) {
+                        ForEach([(paletteManager.color(at: 0), "Easy"), (paletteManager.color(at: 1), "Medium"), (paletteManager.color(at: 2), "Hard")], id: \.1) { color, label in
+                            HStack(spacing: 6) {
+                                Circle().fill(color).frame(width: 10, height: 10)
+                                Text(label)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(16)
+            }
+            .padding()
+        }
+        .background(Color.black)
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 
@@ -1707,9 +2040,13 @@ struct RecentSolvesCard: View {
             .padding(.bottom, 12)
             
             // Solve list
-            VStack(spacing: 8) {
-                ForEach(solves.prefix(5)) { solve in
+            VStack(spacing: 0) {
+                ForEach(Array(solves.prefix(5).enumerated()), id: \.element.id) { index, solve in
                     SolveRow(solve: solve, paletteManager: paletteManager)
+                    if index < min(4, solves.count - 1) {
+                        Divider()
+                            .background(Color.gray.opacity(0.3))
+                    }
                 }
             }
             .padding(.horizontal)
@@ -1767,7 +2104,8 @@ struct SolveRow: View {
                         Text(solve.problem.title)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                         
                         HStack(spacing: 8) {
                             Text(solve.problem.difficulty.capitalized)
@@ -1857,10 +2195,15 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            Text(analysis)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(5)
+                            if let attributedAnalysis = try? AttributedString(markdown: analysis, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                                Text(attributedAnalysis)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(analysis)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .padding(.top, 4)
                     }
