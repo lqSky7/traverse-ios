@@ -138,6 +138,10 @@ class UserProfileViewModel: ObservableObject {
                 timestamp: Date()
             )
             hasLoadedProfile = true
+        } catch is CancellationError {
+            // Ignore - user released pull-to-refresh
+        } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
+            // Ignore - request was cancelled
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -300,10 +304,7 @@ struct UserProfileView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                if viewModel.isLoading {
-                    ProgressView()
-                        .padding(.top, 100)
-                } else if let error = viewModel.errorMessage {
+                if let error = viewModel.errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 48))
@@ -363,12 +364,14 @@ struct UserProfileView: View {
             _ = await (solvesTask, achievementsTask, streakTask)
         }
         .refreshable {
-            // Force refresh all data on pull-to-refresh
-            await viewModel.loadProfile(force: true)
-            async let solvesTask: () = viewModel.loadSolves(force: true)
-            async let achievementsTask: () = viewModel.loadAchievements(force: true)
-            async let streakTask: () = viewModel.loadFriendStreakStatus(force: true)
-            _ = await (solvesTask, achievementsTask, streakTask)
+            // Use Task to prevent early cancellation from pull-to-refresh gesture
+            await Task {
+                await viewModel.loadProfile(force: true)
+                async let solvesTask: () = viewModel.loadSolves(force: true)
+                async let achievementsTask: () = viewModel.loadAchievements(force: true)
+                async let streakTask: () = viewModel.loadFriendStreakStatus(force: true)
+                _ = await (solvesTask, achievementsTask, streakTask)
+            }.value
         }
         .onChange(of: viewModel.selectedTab) { _, newValue in
             if newValue == 0 && viewModel.solves.isEmpty {

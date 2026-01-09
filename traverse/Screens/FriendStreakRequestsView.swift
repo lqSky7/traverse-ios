@@ -91,9 +91,7 @@ struct FriendStreakRequestsView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.isLoading {
-                    ProgressView()
-                } else if viewModel.receivedRequests.isEmpty && viewModel.sentRequests.isEmpty {
+                if viewModel.receivedRequests.isEmpty && viewModel.sentRequests.isEmpty {
                     emptyState
                 } else {
                     requestsList

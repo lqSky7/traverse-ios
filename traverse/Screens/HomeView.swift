@@ -19,10 +19,7 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .padding(.top, 100)
-                    } else if let error = viewModel.errorMessage {
+                    if let error = viewModel.errorMessage {
                         ErrorView(message: error, retry: {
                             Task {
                                 await viewModel.loadData(username: authViewModel.currentUser?.username ?? "", forceRefresh: true)

@@ -41,6 +41,10 @@ class FriendsViewModel: ObservableObject {
             friends = try await NetworkService.shared.getFriends()
             DataManager.shared.friends = friends
             hasLoadedFriends = true
+        } catch is CancellationError {
+            // Ignore - user released pull-to-refresh
+        } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
+            // Ignore - request was cancelled
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -70,6 +74,10 @@ class FriendsViewModel: ObservableObject {
             DataManager.shared.sentRequests = sentRequests
             
             hasLoadedRequests = true
+        } catch is CancellationError {
+            // Ignore - user released pull-to-refresh
+        } catch let error as NSError where error.domain == NSURLErrorDomain && error.code == NSURLErrorCancelled {
+            // Ignore - request was cancelled
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -173,9 +181,7 @@ struct FriendsView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.isLoading {
-                    ProgressView()
-                } else if let error = viewModel.errorMessage {
+                if let error = viewModel.errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.system(size: 48))
@@ -244,9 +250,12 @@ struct FriendsView: View {
                 }
             }
             .refreshable {
-                await viewModel.loadFriends(force: true)
-                await viewModel.loadRequests(force: true)
-                await viewModel.loadFriendStreaks(force: true)
+                // Use Task to prevent early cancellation from pull-to-refresh gesture
+                await Task {
+                    await viewModel.loadFriends(force: true)
+                    await viewModel.loadRequests(force: true)
+                    await viewModel.loadFriendStreaks(force: true)
+                }.value
             }
             .sheet(isPresented: $showingSearch) {
                 UserSearchView()

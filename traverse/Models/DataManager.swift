@@ -26,6 +26,11 @@ class DataManager: ObservableObject {
     @Published var recentSolves: [Solve]?
     @Published var lastFetchTimestamp: Date?
     
+    // Revision data
+    @Published var revisionGroups: [RevisionGroup] = []
+    @Published var revisionStats: RevisionStatsResponse?
+    @Published var revisionMode: String = "normal"
+    
     private var hasFetchedInitialData = false
     
     var isCacheFresh: Bool {
@@ -112,6 +117,22 @@ class DataManager: ObservableObject {
         if userStats != nil || submissionStats != nil || solveStats != nil || achievementStats != nil || recentSolves != nil {
             hasFetchedInitialData = true
         }
+        
+        // Load revision data
+        if let revisionGroupsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionGroups.json")),
+           let decodedGroups = try? decoder.decode([RevisionGroup].self, from: revisionGroupsData) {
+            self.revisionGroups = decodedGroups
+        }
+        
+        if let revisionStatsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionStats.json")),
+           let decodedStats = try? decoder.decode(RevisionStatsResponse.self, from: revisionStatsData) {
+            self.revisionStats = decodedStats
+        }
+        
+        if let revisionModeData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionMode.json")),
+           let decodedMode = try? decoder.decode(String.self, from: revisionModeData) {
+            self.revisionMode = decodedMode
+        }
     }
     
     private func saveData<T: Encodable>(_ data: T, filename: String) {
@@ -150,6 +171,13 @@ class DataManager: ObservableObject {
         if let timestamp = lastFetchTimestamp {
             saveData(timestamp, filename: "lastFetchTimestamp.json")
         }
+        
+        // Save revision data
+        saveData(revisionGroups, filename: "revisionGroups.json")
+        if let revisionStats = revisionStats {
+            saveData(revisionStats, filename: "revisionStats.json")
+        }
+        saveData(revisionMode, filename: "revisionMode.json")
     }
     
     func fetchAllData(username: String) async throws {
@@ -242,6 +270,9 @@ class DataManager: ObservableObject {
         solveStats = nil
         achievementStats = nil
         recentSolves = nil
+        revisionGroups = []
+        revisionStats = nil
+        revisionMode = "normal"
         hasFetchedInitialData = false
     }
     

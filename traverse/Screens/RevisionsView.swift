@@ -152,6 +152,13 @@ struct RevisionsView: View {
         }
         .onAppear {
             useMLRevision = revisionMode == "ml"
+            // Load from cache first
+            if !DataManager.shared.revisionGroups.isEmpty {
+                revisionGroups = DataManager.shared.revisionGroups
+            }
+            if let cachedStats = DataManager.shared.revisionStats {
+                stats = cachedStats
+            }
             Task {
                 await loadData()
                 await checkNotificationStatus()
@@ -207,6 +214,12 @@ struct RevisionsView: View {
             }
             errorMessage = "Failed to load revisions"
         }
+        
+        // Save to DataManager cache
+        DataManager.shared.revisionGroups = revisionGroups
+        DataManager.shared.revisionStats = stats
+        DataManager.shared.revisionMode = useMLRevision ? "ml" : "normal"
+        DataManager.shared.persistData()
         
         isLoading = false
     }
