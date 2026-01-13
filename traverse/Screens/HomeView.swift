@@ -2649,7 +2649,9 @@ class HomeViewModel: ObservableObject {
             async let achievementStatsTask = NetworkService.shared.getAchievementStats()
             async let recentSolvesTask = NetworkService.shared.getSolves(limit: 10)
             // Fetch upcoming only - backend filters for incomplete revisions
-            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50)
+            // Use revisionMode to fetch ML or normal revisions based on user setting
+            let revisionType = DataManager.shared.revisionMode
+            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50, type: revisionType)
             
             let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse) = try await (
                 userStatsTask,

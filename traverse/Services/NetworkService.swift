@@ -1631,4 +1631,43 @@ class NetworkService {
             throw NetworkError.serverError("Failed to delete friend streak (Status: \(httpResponse.statusCode))")
         }
     }
+    
+    // MARK: - Subscription Status
+    
+    /// Get subscription status for the authenticated user
+    func getSubscriptionStatus() async throws -> SubscriptionStatusResponse {
+        guard let url = URL(string: "\(baseURL)/subscription/status") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 200 {
+            do {
+                let statusResponse = try JSONDecoder().decode(SubscriptionStatusResponse.self, from: data)
+                return statusResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to get subscription status (Status: \(httpResponse.statusCode))")
+        }
+    }
 }
+

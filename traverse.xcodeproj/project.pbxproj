@@ -11,6 +11,7 @@
 		6A07DEA42F0165C2009A4EB8 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A07DEA32F0165C2009A4EB8 /* WidgetKit.framework */; };
 		6A07DEA62F0165C2009A4EB8 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A07DEA52F0165C2009A4EB8 /* SwiftUI.framework */; };
 		6A07DEB52F0165C3009A4EB8 /* TraverseWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6A07DEA12F0165C2009A4EB8 /* TraverseWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6AA5C77B2F14C90A00E0117C /* loopbg.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 6AA5C7792F14C90A00E0117C /* loopbg.mp4 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -42,6 +43,7 @@
 		6A07DEA32F0165C2009A4EB8 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		6A07DEA52F0165C2009A4EB8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		6A07DEC42F016670009A4EB8 /* TraverseWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraverseWidgetExtension.entitlements; sourceTree = "<group>"; };
+		6AA5C7792F14C90A00E0117C /* loopbg.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = loopbg.mp4; sourceTree = "<group>"; };
 		6AAF62C82EF90FE6006944A1 /* traverse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = traverse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -110,9 +112,19 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		6AA5C77A2F14C90A00E0117C /* assets */ = {
+			isa = PBXGroup;
+			children = (
+				6AA5C7792F14C90A00E0117C /* loopbg.mp4 */,
+			);
+			name = assets;
+			path = traverse/assets;
+			sourceTree = "<group>";
+		};
 		6AAF62BF2EF90FE6006944A1 = {
 			isa = PBXGroup;
 			children = (
+				6AA5C77A2F14C90A00E0117C /* assets */,
 				6A07DEC42F016670009A4EB8 /* TraverseWidgetExtension.entitlements */,
 				6AAF62CA2EF90FE6006944A1 /* traverse */,
 				6A07DEA22F0165C2009A4EB8 /* Frameworks */,
@@ -233,6 +245,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6AA5C77B2F14C90A00E0117C /* loopbg.mp4 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

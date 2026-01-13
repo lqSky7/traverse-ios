@@ -138,3 +138,8 @@ struct AchievementDetail: Codable, Identifiable {
     let unlocked: Bool
     let unlockedAt: String?
 }
+
+// MARK: - Subscription Status
+struct SubscriptionStatusResponse: Codable {
+    let isSubscriptionActive: Bool
+}

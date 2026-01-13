@@ -18,6 +18,8 @@ struct RevisionsView: View {
     @State private var showMLAttemptSheet = false
     @AppStorage("revisionMode") private var revisionMode: String = "normal"
     @State private var loadTask: Task<Void, Never>?
+    @State private var isSubscribed = false
+    @State private var showProUpgradeSheet = false
     
     var body: some View {
         NavigationStack {
@@ -116,13 +118,21 @@ struct RevisionsView: View {
                             Task { await loadData() }
                         }
                         
-                        Toggle(isOn: $useMLRevision) {
+                        Toggle(isOn: Binding(
+                            get: { useMLRevision },
+                            set: { newValue in
+                                if newValue && !isSubscribed {
+                                    // Non-subscriber trying to enable ML - show upgrade sheet
+                                    showProUpgradeSheet = true
+                                } else {
+                                    useMLRevision = newValue
+                                    revisionMode = newValue ? "ml" : "normal"
+                                    let typeToLoad = newValue ? "ml" : "normal"
+                                    Task { await loadData(forceType: typeToLoad) }
+                                }
+                            }
+                        )) {
                             Label("ML-Based Scheduling", systemImage: useMLRevision ? "brain.head.profile.fill" : "brain.head.profile")
-                        }
-                        .onChange(of: useMLRevision) { _, newValue in
-                            revisionMode = newValue ? "ml" : "normal"
-                            let typeToLoad = newValue ? "ml" : "normal"
-                            Task { await loadData(forceType: typeToLoad) }
                         }
                         
                         Divider()
@@ -150,6 +160,9 @@ struct RevisionsView: View {
                 MLAttemptSheet(revision: revision)
             }
         }
+        .sheet(isPresented: $showProUpgradeSheet) {
+            ProUpgradeSheet()
+        }
         .onAppear {
             useMLRevision = revisionMode == "ml"
             // Load from cache first
@@ -162,6 +175,7 @@ struct RevisionsView: View {
             Task {
                 await loadData()
                 await checkNotificationStatus()
+                await checkSubscriptionStatus()
             }
         }
     }
@@ -226,6 +240,27 @@ struct RevisionsView: View {
     
     private func checkNotificationStatus() async {
         notificationsEnabled = await NotificationManager.shared.checkAuthorizationStatus()
+    }
+    
+    private func checkSubscriptionStatus() async {
+        do {
+            let status = try await NetworkService.shared.getSubscriptionStatus()
+            await MainActor.run {
+                isSubscribed = status.isSubscriptionActive
+                // If ML mode is on but user is not subscribed, reset to normal
+                if useMLRevision && !isSubscribed {
+                    useMLRevision = false
+                    revisionMode = "normal"
+                    Task { await loadData(forceType: "normal") }
+                }
+            }
+        } catch {
+            print("Failed to check subscription status: \(error.localizedDescription)")
+            // Default to not subscribed on error
+            await MainActor.run {
+                isSubscribed = false
+            }
+        }
     }
     
     private func toggleNotifications() async {
