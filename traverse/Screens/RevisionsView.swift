@@ -20,6 +20,10 @@ struct RevisionsView: View {
     @State private var loadTask: Task<Void, Never>?
     @State private var isSubscribed = false
     @State private var showProUpgradeSheet = false
+
+    // Subscription caching - only check once per day at 00:01
+    @AppStorage("cachedSubscriptionStatus") private var cachedSubscriptionStatus: Bool = false
+    @AppStorage("lastSubscriptionCheckDate") private var lastSubscriptionCheckDate: Double = 0
     
     var body: some View {
         NavigationStack {
@@ -121,14 +125,26 @@ struct RevisionsView: View {
                         Toggle(isOn: Binding(
                             get: { useMLRevision },
                             set: { newValue in
-                                if newValue && !isSubscribed {
-                                    // Non-subscriber trying to enable ML - show upgrade sheet
-                                    showProUpgradeSheet = true
+                                if newValue {
+                                    // User is trying to enable ML - force check subscription status
+                                    Task {
+                                        await checkSubscriptionStatus(forceCheck: true)
+                                        await MainActor.run {
+                                            if isSubscribed {
+                                                useMLRevision = true
+                                                revisionMode = "ml"
+                                                Task { await loadData(forceType: "ml") }
+                                            } else {
+                                                // Not subscribed - show upgrade sheet
+                                                showProUpgradeSheet = true
+                                            }
+                                        }
+                                    }
                                 } else {
-                                    useMLRevision = newValue
-                                    revisionMode = newValue ? "ml" : "normal"
-                                    let typeToLoad = newValue ? "ml" : "normal"
-                                    Task { await loadData(forceType: typeToLoad) }
+                                    // Turning off ML - no need to check subscription
+                                    useMLRevision = false
+                                    revisionMode = "normal"
+                                    Task { await loadData(forceType: "normal") }
                                 }
                             }
                         )) {
@@ -242,11 +258,43 @@ struct RevisionsView: View {
         notificationsEnabled = await NotificationManager.shared.checkAuthorizationStatus()
     }
     
-    private func checkSubscriptionStatus() async {
+    private func checkSubscriptionStatus(forceCheck: Bool = false) async {
+        // Use cached value first
+        isSubscribed = cachedSubscriptionStatus
+
+        // Check if we need to refresh from network
+        let now = Date()
+        let lastCheckDate = Date(timeIntervalSince1970: lastSubscriptionCheckDate)
+        let calendar = Calendar.current
+
+        // Calculate 00:01 today
+        let todayStart = calendar.startOfDay(for: now)
+        guard let todayAt0001 = calendar.date(byAdding: .minute, value: 1, to: todayStart) else { return }
+
+        // Only fetch from network if:
+        // 1. forceCheck is true (ML toggle was pressed), OR
+        // 2. It's past 00:01 today AND we haven't checked today yet
+        let lastCheckWasBeforeToday = !calendar.isDate(lastCheckDate, inSameDayAs: now)
+        let isPast0001 = now >= todayAt0001
+        let shouldRefresh = forceCheck || (isPast0001 && lastCheckWasBeforeToday)
+
+        guard shouldRefresh else {
+            // Use cached value and ensure ML mode is correct
+            if useMLRevision && !isSubscribed {
+                useMLRevision = false
+                revisionMode = "normal"
+                Task { await loadData(forceType: "normal") }
+            }
+            return
+        }
+
         do {
             let status = try await NetworkService.shared.getSubscriptionStatus()
             await MainActor.run {
                 isSubscribed = status.isSubscriptionActive
+                cachedSubscriptionStatus = status.isSubscriptionActive
+                lastSubscriptionCheckDate = now.timeIntervalSince1970
+
                 // If ML mode is on but user is not subscribed, reset to normal
                 if useMLRevision && !isSubscribed {
                     useMLRevision = false
@@ -256,10 +304,7 @@ struct RevisionsView: View {
             }
         } catch {
             print("Failed to check subscription status: \(error.localizedDescription)")
-            // Default to not subscribed on error
-            await MainActor.run {
-                isSubscribed = false
-            }
+            // Keep using cached value on error
         }
     }
     

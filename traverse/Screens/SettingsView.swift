@@ -149,7 +149,8 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingDreamPicker) {
                 HuePicker()
-                    .presentationDetents([.medium])
+                    .presentationDetents([.fraction(0.48)])
+                    .presentationBackground(.background)
             }
             .alert("Logout", isPresented: $showingLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }
