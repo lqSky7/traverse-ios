@@ -16,6 +16,7 @@ struct BentoSettingsGrid: View {
     @Binding var showingLogoutConfirmation: Bool
     @Binding var showingImportPalette: Bool
     @Binding var showingDreamPicker: Bool
+    @Binding var showingFreezeShop: Bool
     
     // Haptic generators
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -217,7 +218,43 @@ struct BentoSettingsGrid: View {
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)
             
-            // Row 4: Delete Account (full width)
+            // Row 4: Freeze Shop (full width)
+            Button {
+                mediumFeedback.impactOccurred()
+                showingFreezeShop = true
+            } label: {
+                HStack {
+                    Image(systemName: "snowflake")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(.cyan)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Freeze Shop")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Protect your streak with freezes")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.cyan.opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
+            
+            // Horizontal Divider
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+            
+            // Row 5: Delete Account (full width)
+
             Button {
                 mediumFeedback.impactOccurred()
                 showingDeleteAccount = true
@@ -300,7 +337,8 @@ struct BentoCellButtonStyle: ButtonStyle {
             showingDeleteAccount: .constant(false),
             showingLogoutConfirmation: .constant(false),
             showingImportPalette: .constant(false),
-            showingDreamPicker: .constant(false)
+            showingDreamPicker: .constant(false),
+            showingFreezeShop: .constant(false)
         )
         .padding(.vertical)
     }

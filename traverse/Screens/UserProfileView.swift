@@ -72,6 +72,18 @@ class UserProfileViewModel: ObservableObject {
             return
         }
         
+        // Immediately check DataManager for cached friends list to set initial state
+        if !force && DataManager.shared.friends.contains(where: { $0.username == username }) {
+            friendshipStatus = .friends
+            // If we already know they're a friend, don't show loading
+            if let cached = Self.profileCache[username], cached.isValid {
+                self.profile = cached.profile
+                self.statistics = cached.statistics
+                hasLoadedProfile = true
+                return
+            }
+        }
+        
         // Use cache if valid and not forcing refresh
         if !force, let cached = Self.profileCache[username], cached.isValid {
             self.profile = cached.profile
@@ -288,6 +300,18 @@ class UserProfileViewModel: ObservableObject {
             HapticManager.shared.error()
         }
     }
+    
+    func giftFreeze() async -> Bool {
+        do {
+            _ = try await NetworkService.shared.giftFreeze(toUsername: username)
+            HapticManager.shared.success()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.shared.error()
+            return false
+        }
+    }
 }
 
 struct UserProfileView: View {
@@ -295,6 +319,9 @@ struct UserProfileView: View {
     @StateObject private var viewModel: UserProfileViewModel
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var showingGiftConfirmation = false
+    @State private var isGifting = false
+    @State private var giftSuccessMessage: String?
     
     init(username: String) {
         self.username = username
@@ -396,6 +423,15 @@ struct UserProfileView: View {
                 Text(error)
             }
         }
+        .alert("Freeze Gifted!", isPresented: .constant(giftSuccessMessage != nil)) {
+            Button("OK") {
+                giftSuccessMessage = nil
+            }
+        } message: {
+            if let message = giftSuccessMessage {
+                Text(message)
+            }
+        }
     }
     
     @ViewBuilder
@@ -421,19 +457,59 @@ struct UserProfileView: View {
             .padding(.horizontal)
             
         case .friends:
-            Group {
-                Button(role: .destructive) {
-                    Task {
-                        await viewModel.removeFriend()
-                    }
-                } label: {
-                    Text("Remove Friend")
+            VStack(spacing: 12) {
+                // Gift Freeze Button
+                Group {
+                    Button {
+                        showingGiftConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "snowflake")
+                            Text(isGifting ? "Sending..." : "Gift Freeze (70 XP)")
+                        }
                         .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isGifting)
+                    .tint(.cyan)
                 }
-                .tint(.red)
+                .applyGlassButtonStyle(.glassProminent)
+                .padding(.horizontal)
+                .confirmationDialog(
+                    "Gift a Streak Freeze?",
+                    isPresented: $showingGiftConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Gift for 70 XP") {
+                        Task {
+                            isGifting = true
+                            let success = await viewModel.giftFreeze()
+                            if success {
+                                giftSuccessMessage = "Freeze gifted to \(username)!"
+                            }
+                            isGifting = false
+                        }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will cost 70 XP from your balance. \(username) can use it to protect their streak!")
+                }
+                
+                // Remove Friend Button
+                Group {
+                    Button(role: .destructive) {
+                        Task {
+                            await viewModel.removeFriend()
+                        }
+                    } label: {
+                        Text("Remove Friend")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .tint(.red)
+                }
+                .applyGlassButtonStyle(.glassProminent)
+                .padding(.horizontal)
+
             }
-            .applyGlassButtonStyle(.glassProminent)
-            .padding(.horizontal)
             
         case .requestSent:
             HStack {

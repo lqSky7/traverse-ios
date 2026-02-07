@@ -10,7 +10,7 @@ struct HomeView: View {
     
     private var formattedDate: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
+        formatter.dateFormat = "EEEE, M"
         return formatter.string(from: Date())
     }
 
@@ -60,8 +60,9 @@ struct HomeView: View {
                                 // Difficulty and Activity side by side
                                 HStack(alignment: .top, spacing: 16) {
                                     DifficultyChartCard(stats: solveStats.stats, paletteManager: paletteManager)
-                                    NavigationLink(destination: ActivityDetailView(solves: solves, paletteManager: paletteManager)) {
-                                        SolveHeatmapCard(solves: solves, paletteManager: paletteManager)
+                                    NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)) {
+                                        SolveHeatmapCard(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)
+                                            .id(viewModel.frozenDates.count)  // Force re-render when frozenDates changes
                                     }
                                     .buttonStyle(PlainButtonStyle())
                                 }
@@ -1080,13 +1081,30 @@ struct AllAchievementsView: View {
     @StateObject private var viewModel = AchievementsViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var expandedCategories: Set<String> = []
-    @State private var gradientPhase: CGFloat = 0
+    @State private var filterMode: AchievementFilter = .all
+    
+    enum AchievementFilter: String, CaseIterable {
+        case all = "All"
+        case unlocked = "Unlocked"
+        case locked = "Locked"
+    }
+    
+    private var filteredAchievements: [AchievementDetail]? {
+        guard let achievements = viewModel.achievements else { return nil }
+        
+        switch filterMode {
+        case .all:
+            return achievements
+        case .unlocked:
+            return achievements.filter { $0.unlocked }
+        case .locked:
+            return achievements.filter { !$0.unlocked }
+        }
+    }
     
     var body: some View {
         ZStack(alignment: .top) {
-            // Background gradient
-            MeshGradientBackground(paletteManager: paletteManager, phase: gradientPhase)
-                .ignoresSafeArea()
+            Color.black.ignoresSafeArea()
             
             // Scrollable content
             ScrollView {
@@ -1100,7 +1118,7 @@ struct AllAchievementsView: View {
                                 await viewModel.loadAchievements()
                             }
                         })
-                    } else if let achievements = viewModel.achievements {
+                    } else if let achievements = filteredAchievements {
                         // Spacer for sticky card
                         Color.clear
                             .frame(height: 130)
@@ -1129,17 +1147,34 @@ struct AllAchievementsView: View {
         }
         .navigationTitle("All Achievements")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    ForEach(AchievementFilter.allCases, id: \.self) { filter in
+                        Button(action: {
+                            filterMode = filter
+                        }) {
+                            HStack {
+                                Text(filter.rawValue)
+                                if filterMode == filter {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
         .onAppear {
             if viewModel.achievements == nil {
                 Task {
                     await viewModel.loadAchievements()
                 }
             }
-            // Start gradient animation
-            withAnimation(.linear(duration: 8).repeatForever(autoreverses: true)) {
-                gradientPhase = 1
-            }
         }
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -1388,19 +1423,22 @@ struct AchievementCategoryCard: View {
             if isExpanded {
                 VStack(spacing: 0) {
                     Divider()
+                        .background(Color.gray.opacity(0.3))
                     
                     ForEach(achievements.sorted(by: { $0.unlocked && !$1.unlocked }), id: \.id) { achievement in
                         AchievementRow(achievement: achievement, paletteManager: paletteManager)
                         
                         if achievement.id != achievements.last?.id {
                             Divider()
+                                .background(Color.gray.opacity(0.3))
                                 .padding(.leading, 70)
                         }
                     }
                 }
             }
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(12)
     }
 }
 
@@ -1590,7 +1628,20 @@ struct SubmissionStatsCard: View {
 // MARK: - Solve Heatmap Card
 struct SolveHeatmapCard: View {
     let solves: [Solve]
+    let frozenDates: Set<String>  // YYYY-MM-DD format
     @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+    
+    init(solves: [Solve], frozenDates: Set<String> = [], paletteManager: ColorPaletteManager) {
+        self.solves = solves
+        self.frozenDates = frozenDates
+        self.paletteManager = paletteManager
+    }
     
     // Process solves into date -> difficulty data
     private var heatmapData: [Date: String] {
@@ -1642,7 +1693,14 @@ struct SolveHeatmapCard: View {
     }
     
     private func colorForDate(_ date: Date) -> Color {
-        guard let difficulty = heatmapData[date] else {
+        // Check if this date was frozen (ice blue color)
+        let dateString = Self.dateFormatter.string(from: date)
+        if frozenDates.contains(dateString) {
+            return Color(red: 0.31, green: 0.76, blue: 0.97) // Ice blue #4FC3F7
+        }
+        
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        guard let difficulty = heatmapData[normalizedDate] else {
             return Color.gray.opacity(0.15)
         }
         switch difficulty.lowercased() {
@@ -1725,7 +1783,14 @@ struct SolveHeatmapCard: View {
 // MARK: - Activity Detail View (Full Screen Heatmap)
 struct ActivityDetailView: View {
     let solves: [Solve]
+    var frozenDates: Set<String> = []  // YYYY-MM-DD format
     @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
     
     // Process solves into date -> difficulty data
     private var heatmapData: [Date: (difficulty: String, count: Int)] {
@@ -1776,7 +1841,14 @@ struct ActivityDetailView: View {
     }
     
     private func colorForDate(_ date: Date) -> Color {
-        guard let data = heatmapData[date] else {
+        // Check if this date is a frozen day (ice blue)
+        let dateString = Self.dateFormatter.string(from: date)
+        if frozenDates.contains(dateString) {
+            return Color(red: 0.31, green: 0.76, blue: 0.97)
+        }
+        
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        guard let data = heatmapData[normalizedDate] else {
             return Color.gray.opacity(0.15)
         }
         switch data.difficulty.lowercased() {
@@ -1924,19 +1996,20 @@ struct SubmissionBreakdownCard: View {
                 // Stacked Bar Chart
                 Chart {
                     BarMark(
-                        x: .value("Count", stats.accepted)
+                        x: .value("Count", max(stats.accepted, 1))
                     )
                     .foregroundStyle(paletteManager.color(at: 3).gradient)
                     .cornerRadius(6)
                     
                     BarMark(
-                        x: .value("Count", stats.failed),
+                        x: .value("Count", max(stats.failed, 1)),
                         stacking: .standard
                     )
                     .foregroundStyle(paletteManager.color(at: 4).gradient)
                     .cornerRadius(6)
                 }
                 .frame(height: 60)
+                .chartXScale(domain: 0...(Double(max(stats.accepted + stats.failed, 1))))
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
                 
@@ -2609,6 +2682,7 @@ class HomeViewModel: ObservableObject {
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
     @Published var todayRevisions: [Revision] = []
+    @Published var frozenDates: Set<String> = []  // YYYY-MM-DD format for reliable comparison
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -2625,6 +2699,16 @@ class HomeViewModel: ObservableObject {
     
     func loadData(username: String, forceRefresh: Bool = false) async {
         // Use cache if fresh (< 2 hours), otherwise fetch from server
+        
+        // Always fetch freeze dates first (lightweight, important for display)
+        do {
+            let freezeDatesResponse = try await NetworkService.shared.getUsedFreezeDates()
+            await MainActor.run {
+                self.frozenDates = Set(freezeDatesResponse.freezeDates)
+            }
+        } catch {
+            // Silent fail - freeze dates are not critical
+        }
         
         // Check if we can use cached data
         if !forceRefresh && DataManager.shared.isCacheFresh {
@@ -2679,6 +2763,7 @@ class HomeViewModel: ObservableObject {
                 self.achievementStats = achievementStats
                 self.recentSolves = solvesResponse.solves
                 self.todayRevisions = todayAndOverdue
+                // frozenDates already set at start of loadData
             }
             
             // Update DataManager cache
@@ -2786,3 +2871,4 @@ class HomeViewModel: ObservableObject {
     HomeView()
         .environmentObject(AuthViewModel())
 }
+

@@ -18,7 +18,9 @@ struct UserStatsData: Codable {
     let totalSubmissions: Int
     let totalStreakDays: Int
     let problemsByDifficulty: ProblemsByDifficulty
+    let availableFreezes: Int?
 }
+
 
 struct ProblemsByDifficulty: Codable {
     let easy: Int
@@ -142,4 +144,37 @@ struct AchievementDetail: Codable, Identifiable {
 // MARK: - Subscription Status
 struct SubscriptionStatusResponse: Codable {
     let isSubscriptionActive: Bool
+}
+
+// MARK: - Freeze Models
+struct FreezeInfoResponse: Codable {
+    let availableFreezes: Int
+    let usedFreezes: Int
+    let totalFreezes: Int
+    let costs: FreezeCosts
+}
+
+struct FreezeCosts: Codable {
+    let purchase: Int
+    let gift: Int
+}
+
+struct FreezePurchaseResponse: Codable {
+    let message: String
+    let freezesPurchased: Int
+    let xpSpent: Int
+    let availableFreezes: Int
+    let remainingXp: Int
+}
+
+struct FreezeGiftResponse: Codable {
+    let message: String
+    let freezesGifted: Int
+    let xpSpent: Int
+    let recipient: String
+    let remainingXp: Int
+}
+
+struct FreezeDatesResponse: Codable {
+    let freezeDates: [String]
 }

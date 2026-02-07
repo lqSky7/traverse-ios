@@ -166,7 +166,7 @@ struct MainView: View {
                         Text("Hello, \(user.username)!")
                             .font(.title2)
                         
-                        Text("Email: \(user.email)")
+                        Text("Email: \(user.email ?? "Not provided")")
                             .foregroundStyle(.secondary)
                         
                         Text("Current Streak: \(user.currentStreak) days")

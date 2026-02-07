@@ -42,7 +42,7 @@ struct RecoverAccountRequest: Codable {
 struct User: Codable {
     let id: Int
     let username: String
-    let email: String
+    let email: String?
     let timezone: String
     let visibility: String
     let currentStreak: Int

@@ -83,7 +83,7 @@ struct ProfileEditView: View {
     
     private func loadUserData() {
         if let user = authViewModel.currentUser {
-            email = user.email
+            email = user.email ?? ""
             visibility = user.visibility
         }
     }

@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var importError: String?
     @State private var isLoading = false
     @State private var showingDreamPicker = false
+    @State private var showingFreezeShop = false
 
     var body: some View {
         NavigationStack {
@@ -65,7 +66,7 @@ struct SettingsView: View {
                                             .foregroundStyle(.white)
                                             .opacity(0.9)
 
-                                        Text(user.email)
+                                        Text(user.email ?? "No email")
                                             .font(.subheadline)
                                             .foregroundStyle(.white)
                                             .opacity(0.75)
@@ -118,12 +119,13 @@ struct SettingsView: View {
                         showingDeleteAccount: $showingDeleteAccount,
                         showingLogoutConfirmation: $showingLogoutConfirmation,
                         showingImportPalette: $showingImportPalette,
-                        showingDreamPicker: $showingDreamPicker
+                        showingDreamPicker: $showingDreamPicker,
+                        showingFreezeShop: $showingFreezeShop
                     )
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Settings")
+            .navigationTitle("User")
             .sheet(isPresented: $showingEditProfile) {
                 ProfileEditView()
                     .environmentObject(authViewModel)
@@ -151,6 +153,11 @@ struct SettingsView: View {
                 HuePicker()
                     .presentationDetents([.fraction(0.48)])
                     .presentationBackground(.background)
+            }
+            .sheet(isPresented: $showingFreezeShop) {
+                FreezeShopSheet()
+                    .environmentObject(authViewModel)
+                    .presentationDetents([.large])
             }
             .alert("Logout", isPresented: $showingLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }

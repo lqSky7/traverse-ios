@@ -162,7 +162,7 @@ struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @StateObject private var streakRequestsViewModel = FriendStreakRequestsViewModel()
     @StateObject private var paletteManager = ColorPaletteManager.shared
-    @State private var showingSearch = false
+    @Binding var showingSearchFromTab: Bool
     @State private var showingRequests = false
     @State private var showingStreakRequests = false
     
@@ -238,13 +238,6 @@ struct FriendsView: View {
                                 }
                             }
                         }
-                        
-                        Button {
-                            showingSearch = true
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                                .frame(width: 24, height: 24)
-                        }
                     }
                     .padding(.trailing, 8)
                 }
@@ -256,9 +249,6 @@ struct FriendsView: View {
                     await viewModel.loadRequests(force: true)
                     await viewModel.loadFriendStreaks(force: true)
                 }.value
-            }
-            .sheet(isPresented: $showingSearch) {
-                UserSearchView()
             }
             .sheet(isPresented: $showingRequests) {
                 FriendRequestsView(viewModel: viewModel)
@@ -284,6 +274,7 @@ struct FriendsView: View {
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
     
     private var friendsList: some View {
@@ -699,5 +690,5 @@ struct EmptyFriendsView: View {
 }
 
 #Preview {
-    FriendsView()
+    FriendsView(showingSearchFromTab: .constant(false))
 }
