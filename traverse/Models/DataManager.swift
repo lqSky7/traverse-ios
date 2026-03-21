@@ -6,6 +6,10 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let revisionCompleted = Notification.Name("revisionCompleted")
+}
+
 @MainActor
 class DataManager: ObservableObject {
     static let shared = DataManager()
@@ -14,6 +18,9 @@ class DataManager: ObservableObject {
     @Published var friends: [Friend] = []
     @Published var receivedRequests: [FriendRequest] = []
     @Published var sentRequests: [FriendRequest] = []
+    @Published var receivedStreakRequests: [FriendStreakRequest] = []
+    @Published var sentStreakRequests: [FriendStreakRequest] = []
+    @Published var friendStreaks: [FriendStreak] = []
     
     // Home data
     @Published var userStats: UserStats?
@@ -22,6 +29,11 @@ class DataManager: ObservableObject {
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
     @Published var lastFetchTimestamp: Date?
+    
+    // Revision data
+    @Published var revisionGroups: [RevisionGroup] = []
+    @Published var revisionStats: RevisionStatsResponse?
+    @Published var revisionMode: String = "normal"
     
     private var hasFetchedInitialData = false
     
@@ -56,6 +68,21 @@ class DataManager: ObservableObject {
         if let sentRequestsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("sentRequests.json")),
            let decodedRequests = try? decoder.decode([FriendRequest].self, from: sentRequestsData) {
             self.sentRequests = decodedRequests
+        }
+        
+        if let receivedStreakRequestsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("receivedStreakRequests.json")),
+           let decodedRequests = try? decoder.decode([FriendStreakRequest].self, from: receivedStreakRequestsData) {
+            self.receivedStreakRequests = decodedRequests
+        }
+        
+        if let sentStreakRequestsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("sentStreakRequests.json")),
+           let decodedRequests = try? decoder.decode([FriendStreakRequest].self, from: sentStreakRequestsData) {
+            self.sentStreakRequests = decodedRequests
+        }
+        
+        if let friendStreaksData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("friendStreaks.json")),
+           let decodedStreaks = try? decoder.decode([FriendStreak].self, from: friendStreaksData) {
+            self.friendStreaks = decodedStreaks
         }
         
         // Load home data
@@ -94,6 +121,22 @@ class DataManager: ObservableObject {
         if userStats != nil || submissionStats != nil || solveStats != nil || achievementStats != nil || recentSolves != nil {
             hasFetchedInitialData = true
         }
+        
+        // Load revision data
+        if let revisionGroupsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionGroups.json")),
+           let decodedGroups = try? decoder.decode([RevisionGroup].self, from: revisionGroupsData) {
+            self.revisionGroups = decodedGroups
+        }
+        
+        if let revisionStatsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionStats.json")),
+           let decodedStats = try? decoder.decode(RevisionStatsResponse.self, from: revisionStatsData) {
+            self.revisionStats = decodedStats
+        }
+        
+        if let revisionModeData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionMode.json")),
+           let decodedMode = try? decoder.decode(String.self, from: revisionModeData) {
+            self.revisionMode = decodedMode
+        }
     }
     
     private func saveData<T: Encodable>(_ data: T, filename: String) {
@@ -110,6 +153,9 @@ class DataManager: ObservableObject {
         saveData(friends, filename: "friends.json")
         saveData(receivedRequests, filename: "receivedRequests.json")
         saveData(sentRequests, filename: "sentRequests.json")
+        saveData(receivedStreakRequests, filename: "receivedStreakRequests.json")
+        saveData(sentStreakRequests, filename: "sentStreakRequests.json")
+        saveData(friendStreaks, filename: "friendStreaks.json")
         
         if let userStats = userStats {
             saveData(userStats, filename: "userStats.json")
@@ -129,6 +175,13 @@ class DataManager: ObservableObject {
         if let timestamp = lastFetchTimestamp {
             saveData(timestamp, filename: "lastFetchTimestamp.json")
         }
+        
+        // Save revision data
+        saveData(revisionGroups, filename: "revisionGroups.json")
+        if let revisionStats = revisionStats {
+            saveData(revisionStats, filename: "revisionStats.json")
+        }
+        saveData(revisionMode, filename: "revisionMode.json")
     }
     
     func fetchAllData(username: String) async throws {
@@ -176,7 +229,7 @@ class DataManager: ObservableObject {
         checkSolvedTodayAndEndActivity()
     }
     
-    private func checkSolvedTodayAndEndActivity() {
+    func checkSolvedTodayAndEndActivity() {
         // Check if user solved today based on recent solves
         let calendar = Calendar.current
         let now = Date()
@@ -213,11 +266,17 @@ class DataManager: ObservableObject {
         friends = []
         receivedRequests = []
         sentRequests = []
+        receivedStreakRequests = []
+        sentStreakRequests = []
+        friendStreaks = []
         userStats = nil
         submissionStats = nil
         solveStats = nil
         achievementStats = nil
         recentSolves = nil
+        revisionGroups = []
+        revisionStats = nil
+        revisionMode = "normal"
         hasFetchedInitialData = false
     }
     

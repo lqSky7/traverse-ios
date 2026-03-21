@@ -58,17 +58,21 @@ struct DeleteAccountView: View {
                             ProgressView()
                                 .tint(.white)
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         } else {
                             Text("Delete My Account")
                                 .font(.headline)
-                                .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         }
                     }
-                    .listRowBackground(Color.red)
-                    .cornerRadius(.infinity)
+                    .tint(.red)
+                    .buttonStyle(.borderedProminent)
+                    .modifier(LiquidGlassCapsuleButton())
                     .disabled(isLoading || !isFormValid)
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                 
                 Section {
                     Text("Need to recover your account?")

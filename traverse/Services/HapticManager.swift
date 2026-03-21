@@ -77,4 +77,9 @@ class HapticManager: ObservableObject {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.error)
     }
+    
+    func selection() {
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+    }
 }

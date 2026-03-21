@@ -10,7 +10,7 @@ struct HomeView: View {
     
     private var formattedDate: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
+        formatter.dateFormat = "EEEE, M"
         return formatter.string(from: Date())
     }
 
@@ -19,10 +19,7 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .padding(.top, 100)
-                    } else if let error = viewModel.errorMessage {
+                    if let error = viewModel.errorMessage {
                         ErrorView(message: error, retry: {
                             Task {
                                 await viewModel.loadData(username: authViewModel.currentUser?.username ?? "", forceRefresh: true)
@@ -41,8 +38,21 @@ struct HomeView: View {
                         
                         // Charts Section
                         VStack(spacing: 16) {
-                            if let achievementStats = viewModel.achievementStats {
-                                AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
+                            // Achievements and Insights side by side
+                            if let achievementStats = viewModel.achievementStats,
+                               let solves = viewModel.recentSolves, !solves.isEmpty {
+                                HStack(alignment: .top, spacing: 16) {
+                                    NavigationLink(destination: AllAchievementsView()) {
+                                        AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    ProductivityInsightsCard(solves: solves, completedRevisions: viewModel.completedRevisions, paletteManager: paletteManager)
+                                }
+                            } else if let achievementStats = viewModel.achievementStats {
+                                NavigationLink(destination: AllAchievementsView()) {
+                                    AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
                             
                             if let solveStats = viewModel.solveStats,
@@ -50,15 +60,18 @@ struct HomeView: View {
                                 // Difficulty and Activity side by side
                                 HStack(alignment: .top, spacing: 16) {
                                     DifficultyChartCard(stats: solveStats.stats, paletteManager: paletteManager)
-                                    SolveHeatmapCard(solves: solves, paletteManager: paletteManager)
+                                    NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)) {
+                                        SolveHeatmapCard(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)
+                                            .id(viewModel.frozenDates.count)  // Force re-render when frozenDates changes
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                                 
-                                // Platforms full width
-                                PlatformChartCard(stats: solveStats.stats, paletteManager: paletteManager)
-                            }
-                            
-                            if let submissionStats = viewModel.submissionStats {
-                                SubmissionBreakdownCard(stats: submissionStats.stats, paletteManager: paletteManager)
+                                // Mistake Tags Analysis full width
+                                MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                
+                                // Best Solving Hours (replaces Submission Breakdown)
+                                BestSolvingHoursCard(solves: solves, paletteManager: paletteManager)
                             }
                             
                             if let solves = viewModel.recentSolves, !solves.isEmpty {
@@ -113,6 +126,13 @@ struct HomeView: View {
             if let username = newUsername, viewModel.solveStats == nil {
                 Task {
                     await viewModel.loadData(username: username)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .revisionCompleted)) { _ in
+            if let username = authViewModel.currentUser?.username {
+                Task {
+                    await viewModel.loadData(username: username, forceRefresh: true)
                 }
             }
         }
@@ -444,6 +464,7 @@ struct DifficultyChartCard: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
+        .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
@@ -632,7 +653,150 @@ struct PlatformProgressRow: View {
     }
 }
 
-// MARK: - Achievement Stats Card
+// MARK: - Mistake Tags Analysis Card
+struct MistakeTagsAnalysisCard: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private var tagCounts: [(String, Int)] {
+        var counts: [String: Int] = [:]
+        for solve in solves {
+            if let tags = solve.mistakeTags ?? solve.submission.mistakeTags {
+                for tag in tags {
+                    counts[tag, default: 0] += 1
+                }
+            }
+        }
+        return counts.sorted { $0.value > $1.value }
+    }
+    
+    private var totalTags: Int {
+        tagCounts.reduce(0) { $0 + $1.1 }
+    }
+    
+    private var maxCount: Int {
+        tagCounts.map { $0.1 }.max() ?? 1
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "tag.fill")
+                        .foregroundStyle(paletteManager.color(at: 5))
+                    Text("Mistake Analysis")
+                        .font(.headline)
+                }
+                Spacer()
+                Text("\(tagCounts.count)")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(paletteManager.color(at: 5))
+            }
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 8)
+            
+            Divider()
+                .background(Color.gray.opacity(0.3))
+            
+            if !tagCounts.isEmpty {
+                // Hero total
+                VStack(spacing: 4) {
+                    Text("\(totalTags)")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("Total Mistakes")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 16)
+                
+                // Horizontal bars for each tag
+                VStack(spacing: 12) {
+                    ForEach(Array(tagCounts.prefix(6).enumerated()), id: \.element.0) { index, item in
+                        MistakeTagProgressRow(
+                            label: item.0,
+                            count: item.1,
+                            maxCount: maxCount,
+                            color: paletteManager.color(at: index % 10)
+                        )
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.bottom)
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("No mistakes detected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("Keep solving problems!")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .frame(height: 120)
+                .padding()
+            }
+        }
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Mistake Tag Progress Row
+struct MistakeTagProgressRow: View {
+    let label: String
+    let count: Int
+    let maxCount: Int
+    let color: Color
+    
+    private var progress: CGFloat {
+        guard maxCount > 0 else { return 0 }
+        return CGFloat(count) / CGFloat(maxCount)
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 100, alignment: .leading)
+                .lineLimit(1)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 12)
+                    
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                }
+            }
+            .frame(height: 12)
+            
+            Text("\(count)")
+                .font(.subheadline)
+                .bold()
+                .foregroundStyle(color)
+                .frame(width: 30, alignment: .trailing)
+        }
+    }
+}
+
+// MARK: - Achievement Stats Card (Compact Half-Width)
 struct AchievementStatsCard: View {
     let stats: AchievementStatsData
     @ObservedObject var paletteManager: ColorPaletteManager
@@ -645,15 +809,8 @@ struct AchievementStatsCard: View {
     
     // Break up complex expressions for compiler
     private var glowFillOpacity: Double {
-        let baseOpacity: Double = 0.1
-        let progressMultiplier: Double = Double(progress) * 0.3
-        let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
-        return baseOpacity + progressMultiplier * animationFactor
-    }
-    
-    private var glowStrokeOpacity: Double {
-        let baseOpacity: Double = 0.3
-        let progressMultiplier: Double = Double(progress) * 0.5
+        let baseOpacity: Double = 0.15
+        let progressMultiplier: Double = Double(progress) * 0.4
         let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
         return baseOpacity + progressMultiplier * animationFactor
     }
@@ -662,129 +819,327 @@ struct AchievementStatsCard: View {
         paletteManager.color(at: 3)
     }
     
-    private var secondaryAccentColor: Color {
-        paletteManager.color(at: 4)
-    }
-    
     var body: some View {
         VStack(spacing: 0) {
-            headerView
+            Spacer()
             
-            Divider()
-                .background(Color.gray.opacity(0.3))
+            // Hero number only
+            VStack(spacing: 8) {
+                Text("\(stats.unlocked)")
+                    .font(.system(size: 72, weight: .bold))
+                    .foregroundStyle(accentColor)
+                Text("of \(stats.total)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("unlocked")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
             
-            heroSection
+            Spacer()
         }
+        .frame(maxWidth: .infinity, minHeight: 180)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-        .overlay(glowFillOverlay)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    RadialGradient(
+                        colors: [accentColor.opacity(glowFillOpacity), .clear],
+                        center: .bottom,
+                        startRadius: 0,
+                        endRadius: 150
+                    )
+                )
+                .allowsHitTesting(false)
+        )
         .onAppear {
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 glowPhase = .pi * 2
             }
         }
     }
-    
-    private var headerView: some View {
-        HStack {
-            HStack(spacing: 8) {
-                Image(systemName: "trophy.fill")
-                    .foregroundStyle(accentColor)
-                Text("Achievements")
-                    .font(.headline)
+}
+
+// MARK: - Productivity Insights Card (Weekly Activity)
+struct ProductivityInsightsCard: View {
+    let solves: [Solve]
+    let completedRevisions: [Revision]
+    @ObservedObject var paletteManager: ColorPaletteManager
+
+    private struct DayData: Identifiable {
+        let id = UUID()
+        let date: Date
+        let label: String
+        let solves: Int
+        let revisions: Int
+    }
+
+    private var last7DaysData: [DayData] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        // Count solves by day
+        var solveCounts: [Date: Int] = [:]
+        for solve in solves {
+            var date = formatter.date(from: solve.solvedAt)
+            if date == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                date = formatter.date(from: solve.solvedAt)
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             }
-            Spacer()
-            NavigationLink(destination: AllAchievementsView()) {
-                HStack(spacing: 4) {
-                    Text("View All")
-                        .font(.subheadline)
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
+            if let solveDate = date {
+                let dayStart = calendar.startOfDay(for: solveDate)
+                solveCounts[dayStart, default: 0] += 1
+            }
+        }
+
+        // Count completed revisions by day
+        var revisionCounts: [Date: Int] = [:]
+        for revision in completedRevisions {
+            guard let completedAtString = revision.completedAt else { continue }
+            var date = formatter.date(from: completedAtString)
+            if date == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                date = formatter.date(from: completedAtString)
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            }
+            if let completedDate = date {
+                let dayStart = calendar.startOfDay(for: completedDate)
+                revisionCounts[dayStart, default: 0] += 1
+            }
+        }
+
+        // Build last 7 days array
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "EEEEE"  // Single letter day (M, T, W, etc.)
+
+        var data: [DayData] = []
+        for dayOffset in (0..<7).reversed() {
+            guard let dayDate = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
+            let label = dayFormatter.string(from: dayDate)
+            data.append(DayData(
+                date: dayDate,
+                label: label,
+                solves: solveCounts[dayDate] ?? 0,
+                revisions: revisionCounts[dayDate] ?? 0
+            ))
+        }
+        return data
+    }
+
+    private var maxValue: Int {
+        let maxSolves = last7DaysData.map { $0.solves }.max() ?? 0
+        let maxRevisions = last7DaysData.map { $0.revisions }.max() ?? 0
+        return max(maxSolves, maxRevisions, 1)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            Text("Weekly Activity")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            // Chart
+            Chart {
+                ForEach(last7DaysData) { day in
+                    BarMark(
+                        x: .value("Day", day.label),
+                        y: .value("Count", day.solves)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 0))
+                    .position(by: .value("Type", "Solves"))
+
+                    BarMark(
+                        x: .value("Day", day.label),
+                        y: .value("Count", day.revisions)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 1))
+                    .position(by: .value("Type", "Revisions"))
                 }
-                .foregroundStyle(paletteManager.selectedPalette.primary)
+            }
+            .chartYAxis {
+                AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.gray.opacity(0.3))
+                    AxisValueLabel()
+                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                }
+            }
+            .chartXAxis {
+                AxisMarks { value in
+                    AxisValueLabel()
+                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                }
+            }
+            .frame(height: 100)
+
+            // Legend
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(paletteManager.color(at: 0))
+                        .frame(width: 8, height: 8)
+                    Text("Solves")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(paletteManager.color(at: 1))
+                        .frame(width: 8, height: 8)
+                    Text("Revisions")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding()
+        .frame(maxWidth: .infinity, minHeight: 180)
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
+}
+
+// MARK: - Best Solving Hours Card
+struct BestSolvingHoursCard: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var heroSection: some View {
-        HStack(spacing: 24) {
-            ringView
-            
-            Divider()
-                .frame(height: 80)
-            
-            percentageView
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal)
-        .padding(.vertical, 16)
-    }
-    
-    private var ringView: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.gray.opacity(0.2), lineWidth: 14)
-                .frame(width: 100, height: 100)
-            
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    LinearGradient(
-                        colors: [accentColor, secondaryAccentColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                )
-                .frame(width: 100, height: 100)
-                .rotationEffect(.degrees(-90))
-            
-            VStack(spacing: 0) {
-                Text("\(stats.unlocked)")
-                    .font(.system(size: 28, weight: .bold))
-                Text("of \(stats.total)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+    private var hourlyData: [(hour: Int, count: Int, avgTime: Double)] {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        var hourCounts: [Int: Int] = [:]
+        var hourTimes: [Int: [Int]] = [:]
+        
+        for solve in solves {
+            if let date = formatter.date(from: solve.solvedAt) {
+                let hour = Calendar.current.component(.hour, from: date)
+                hourCounts[hour, default: 0] += 1
+                if let time = solve.submission.timeTaken {
+                    hourTimes[hour, default: []].append(time)
+                }
             }
         }
-    }
-    
-    private var percentageView: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(stats.percentage)
-                .font(.system(size: 48, weight: .bold))
-                .foregroundStyle(accentColor)
-            Text("Complete")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        
+        return (0..<24).map { hour in
+            let count = hourCounts[hour] ?? 0
+            let times = hourTimes[hour] ?? []
+            let avgTime = times.isEmpty ? 0 : Double(times.reduce(0, +)) / Double(times.count)
+            return (hour, count, avgTime)
         }
     }
     
-    private var glowFillOverlay: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .fill(
-                LinearGradient(
-                    colors: [.clear, .clear, accentColor.opacity(glowFillOpacity)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .allowsHitTesting(false)
+    private var peakHour: (hour: Int, count: Int) {
+        if let max = hourlyData.max(by: { $0.count < $1.count }) {
+            return (max.hour, max.count)
+        }
+        return (0, 0)
     }
     
-    private var glowStrokeOverlay: some View {
-        RoundedRectangle(cornerRadius: 16)
-            .stroke(
-                LinearGradient(
-                    colors: [.clear, .clear, accentColor.opacity(glowStrokeOpacity)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
-                lineWidth: 2
-            )
-            .allowsHitTesting(false)
+    private var fastestHour: (hour: Int, avgTime: Double)? {
+        let validHours = hourlyData.filter { $0.avgTime > 0 }
+        return validHours.min(by: { $0.avgTime < $1.avgTime }).map { ($0.hour, $0.avgTime) }
+    }
+    
+    private func formatHour(_ hour: Int) -> String {
+        if hour == 0 { return "12am" }
+        if hour < 12 { return "\(hour)am" }
+        if hour == 12 { return "12pm" }
+        return "\(hour - 12)pm"
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        let mins = Int(seconds) / 60
+        if mins > 0 { return "\(mins)m" }
+        return "\(Int(seconds))s"
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(paletteManager.color(at: 6))
+                    Text("Solving Hours")
+                        .font(.headline)
+                }
+                Spacer()
+            }
+            
+            Divider()
+                .background(Color.gray.opacity(0.3))
+            
+            // Stats summary
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(formatHour(peakHour.hour))
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 6))
+                    Text("Peak Hour")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                if let fastest = fastestHour {
+                    Divider()
+                        .frame(height: 50)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(formatHour(fastest.hour))
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("Fastest (\(formatTime(fastest.avgTime)))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Spacer()
+            }
+            
+            // Bar chart showing activity by hour
+            Chart(hourlyData, id: \.hour) { data in
+                BarMark(
+                    x: .value("Hour", data.hour),
+                    y: .value("Count", data.count)
+                )
+                .foregroundStyle(
+                    data.hour == peakHour.hour
+                        ? paletteManager.color(at: 6).gradient
+                        : paletteManager.color(at: 6).opacity(0.4).gradient
+                )
+                .cornerRadius(2)
+            }
+            .frame(height: 80)
+            .chartXAxis {
+                AxisMarks(values: [0, 6, 12, 18]) { value in
+                    AxisValueLabel {
+                        if let hour = value.as(Int.self) {
+                            Text(formatHour(hour))
+                                .font(.caption2)
+                        }
+                    }
+                }
+            }
+            .chartYAxis(.hidden)
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -793,13 +1148,30 @@ struct AllAchievementsView: View {
     @StateObject private var viewModel = AchievementsViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var expandedCategories: Set<String> = []
-    @State private var gradientPhase: CGFloat = 0
+    @State private var filterMode: AchievementFilter = .all
+    
+    enum AchievementFilter: String, CaseIterable {
+        case all = "All"
+        case unlocked = "Unlocked"
+        case locked = "Locked"
+    }
+    
+    private var filteredAchievements: [AchievementDetail]? {
+        guard let achievements = viewModel.achievements else { return nil }
+        
+        switch filterMode {
+        case .all:
+            return achievements
+        case .unlocked:
+            return achievements.filter { $0.unlocked }
+        case .locked:
+            return achievements.filter { !$0.unlocked }
+        }
+    }
     
     var body: some View {
         ZStack(alignment: .top) {
-            // Background gradient
-            MeshGradientBackground(paletteManager: paletteManager, phase: gradientPhase)
-                .ignoresSafeArea()
+            Color.black.ignoresSafeArea()
             
             // Scrollable content
             ScrollView {
@@ -813,7 +1185,7 @@ struct AllAchievementsView: View {
                                 await viewModel.loadAchievements()
                             }
                         })
-                    } else if let achievements = viewModel.achievements {
+                    } else if let achievements = filteredAchievements {
                         // Spacer for sticky card
                         Color.clear
                             .frame(height: 130)
@@ -842,17 +1214,34 @@ struct AllAchievementsView: View {
         }
         .navigationTitle("All Achievements")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    ForEach(AchievementFilter.allCases, id: \.self) { filter in
+                        Button(action: {
+                            filterMode = filter
+                        }) {
+                            HStack {
+                                Text(filter.rawValue)
+                                if filterMode == filter {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                }
+            }
+        }
         .onAppear {
             if viewModel.achievements == nil {
                 Task {
                     await viewModel.loadAchievements()
                 }
             }
-            // Start gradient animation
-            withAnimation(.linear(duration: 8).repeatForever(autoreverses: true)) {
-                gradientPhase = 1
-            }
         }
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -1101,19 +1490,22 @@ struct AchievementCategoryCard: View {
             if isExpanded {
                 VStack(spacing: 0) {
                     Divider()
+                        .background(Color.gray.opacity(0.3))
                     
                     ForEach(achievements.sorted(by: { $0.unlocked && !$1.unlocked }), id: \.id) { achievement in
                         AchievementRow(achievement: achievement, paletteManager: paletteManager)
                         
                         if achievement.id != achievements.last?.id {
                             Divider()
+                                .background(Color.gray.opacity(0.3))
                                 .padding(.leading, 70)
                         }
                     }
                 }
             }
         }
-        .glassEffect(in: RoundedRectangle(cornerRadius: 12))
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(12)
     }
 }
 
@@ -1303,7 +1695,20 @@ struct SubmissionStatsCard: View {
 // MARK: - Solve Heatmap Card
 struct SolveHeatmapCard: View {
     let solves: [Solve]
+    let frozenDates: Set<String>  // YYYY-MM-DD format
     @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+    
+    init(solves: [Solve], frozenDates: Set<String> = [], paletteManager: ColorPaletteManager) {
+        self.solves = solves
+        self.frozenDates = frozenDates
+        self.paletteManager = paletteManager
+    }
     
     // Process solves into date -> difficulty data
     private var heatmapData: [Date: String] {
@@ -1339,7 +1744,7 @@ struct SolveHeatmapCard: View {
         var weeks: [[Date]] = []
         
         // Start from 8 weeks ago (9 weeks total)
-        for weekOffset in (0..<9).reversed() {
+        for weekOffset in (0..<7).reversed() {
             var week: [Date] = []
             let weekStart = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: today)!
             let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekStart))!
@@ -1355,7 +1760,14 @@ struct SolveHeatmapCard: View {
     }
     
     private func colorForDate(_ date: Date) -> Color {
-        guard let difficulty = heatmapData[date] else {
+        // Check if this date was frozen (ice blue color)
+        let dateString = Self.dateFormatter.string(from: date)
+        if frozenDates.contains(dateString) {
+            return Color(red: 0.31, green: 0.76, blue: 0.97) // Ice blue #4FC3F7
+        }
+        
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        guard let difficulty = heatmapData[normalizedDate] else {
             return Color.gray.opacity(0.15)
         }
         switch difficulty.lowercased() {
@@ -1428,9 +1840,209 @@ struct SolveHeatmapCard: View {
             
             Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+// MARK: - Activity Detail View (Full Screen Heatmap)
+struct ActivityDetailView: View {
+    let solves: [Solve]
+    var frozenDates: Set<String> = []  // YYYY-MM-DD format
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+    
+    // Process solves into date -> difficulty data
+    private var heatmapData: [Date: (difficulty: String, count: Int)] {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var data: [Date: (String, Int)] = [:]
+        
+        for solve in solves {
+            guard let date = formatter.date(from: solve.solvedAt) else { continue }
+            let day = Calendar.current.startOfDay(for: date)
+            if let existing = data[day] {
+                let newDifficulty = harderDifficulty(existing.0, solve.problem.difficulty)
+                data[day] = (newDifficulty, existing.1 + 1)
+            } else {
+                data[day] = (solve.problem.difficulty, 1)
+            }
+        }
+        return data
+    }
+    
+    private func harderDifficulty(_ a: String, _ b: String) -> String {
+        let order = ["easy": 0, "medium": 1, "hard": 2]
+        let aVal = order[a.lowercased()] ?? 0
+        let bVal = order[b.lowercased()] ?? 0
+        return aVal >= bVal ? a : b
+    }
+    
+    // Generate last 20 weeks of dates (fits on screen)
+    private var weekDates: [[Date]] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        var weeks: [[Date]] = []
+        
+        for weekOffset in (0..<20).reversed() {
+            var week: [Date] = []
+            let weekStart = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: today)!
+            let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekStart))!
+            
+            for dayOffset in 0..<7 {
+                if let day = calendar.date(byAdding: .day, value: dayOffset, to: startOfWeek) {
+                    week.append(day)
+                }
+            }
+            weeks.append(week)
+        }
+        return weeks
+    }
+    
+    private func colorForDate(_ date: Date) -> Color {
+        // Check if this date is a frozen day (ice blue)
+        let dateString = Self.dateFormatter.string(from: date)
+        if frozenDates.contains(dateString) {
+            return Color(red: 0.31, green: 0.76, blue: 0.97)
+        }
+        
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        guard let data = heatmapData[normalizedDate] else {
+            return Color.gray.opacity(0.15)
+        }
+        switch data.difficulty.lowercased() {
+        case "easy": return paletteManager.color(at: 0)
+        case "medium": return paletteManager.color(at: 1)
+        case "hard": return paletteManager.color(at: 2)
+        default: return Color.gray.opacity(0.3)
+        }
+    }
+    
+    private var totalActiveDays: Int {
+        heatmapData.count
+    }
+    
+    private var totalSolves: Int {
+        heatmapData.values.reduce(0) { $0 + $1.1 }
+    }
+    
+    private let dayLabels = ["", "Mon", "", "Wed", "", "Fri", ""]
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                // Summary stats
+                HStack(spacing: 32) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(totalActiveDays)")
+                            .font(.system(size: 48, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 3))
+                        Text("Active Days")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(totalSolves)")
+                            .font(.system(size: 48, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("Total Solves")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+                
+                // Heatmap card
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Last 20 Weeks")
+                        .font(.headline)
+                    
+                    // Heatmap grid with day labels
+                    GeometryReader { geometry in
+                        let availableWidth = geometry.size.width - 40 // Account for day labels
+                        let cellSize = (availableWidth - CGFloat(19 * 3)) / 20 // 20 weeks, 3pt spacing
+                        
+                        HStack(alignment: .top, spacing: 4) {
+                            // Day labels
+                            VStack(spacing: max(cellSize * 0.2, 2)) {
+                                ForEach(Array(dayLabels.enumerated()), id: \.offset) { _, day in
+                                    Text(day)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 32, height: cellSize, alignment: .trailing)
+                                }
+                            }
+                            
+                            // Heatmap grid
+                            HStack(spacing: 3) {
+                                ForEach(Array(weekDates.enumerated()), id: \.offset) { _, week in
+                                    VStack(spacing: 3) {
+                                        ForEach(week, id: \.self) { date in
+                                            RoundedRectangle(cornerRadius: 3)
+                                                .fill(colorForDate(date))
+                                                .frame(width: cellSize, height: cellSize)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .frame(height: 140)
+                    
+                    // Legend
+                    HStack {
+                        HStack(spacing: 8) {
+                            Text("Less")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            HStack(spacing: 4) {
+                                ForEach([Color.gray.opacity(0.15), paletteManager.color(at: 0), paletteManager.color(at: 1), paletteManager.color(at: 2)], id: \.self) { color in
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(color)
+                                        .frame(width: 12, height: 12)
+                                }
+                            }
+                            
+                            Text("More")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    // Difficulty legend
+                    HStack(spacing: 16) {
+                        ForEach([(paletteManager.color(at: 0), "Easy"), (paletteManager.color(at: 1), "Medium"), (paletteManager.color(at: 2), "Hard")], id: \.1) { color, label in
+                            HStack(spacing: 6) {
+                                Circle().fill(color).frame(width: 10, height: 10)
+                                Text(label)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(Color(UIColor.systemGray6))
+                .cornerRadius(16)
+            }
+            .padding()
+        }
+        .background(Color.black)
+        .navigationTitle("Activity")
+        .navigationBarTitleDisplayMode(.large)
     }
 }
 
@@ -1451,19 +2063,20 @@ struct SubmissionBreakdownCard: View {
                 // Stacked Bar Chart
                 Chart {
                     BarMark(
-                        x: .value("Count", stats.accepted)
+                        x: .value("Count", max(stats.accepted, 1))
                     )
                     .foregroundStyle(paletteManager.color(at: 3).gradient)
                     .cornerRadius(6)
                     
                     BarMark(
-                        x: .value("Count", stats.failed),
+                        x: .value("Count", max(stats.failed, 1)),
                         stacking: .standard
                     )
                     .foregroundStyle(paletteManager.color(at: 4).gradient)
                     .cornerRadius(6)
                 }
                 .frame(height: 60)
+                .chartXScale(domain: 0...(Double(max(stats.accepted + stats.failed, 1))))
                 .chartXAxis(.hidden)
                 .chartYAxis(.hidden)
                 
@@ -1564,9 +2177,13 @@ struct RecentSolvesCard: View {
             .padding(.bottom, 12)
             
             // Solve list
-            VStack(spacing: 8) {
-                ForEach(solves.prefix(5)) { solve in
+            VStack(spacing: 0) {
+                ForEach(Array(solves.prefix(5).enumerated()), id: \.element.id) { index, solve in
                     SolveRow(solve: solve, paletteManager: paletteManager)
+                    if index < min(4, solves.count - 1) {
+                        Divider()
+                            .background(Color.gray.opacity(0.3))
+                    }
                 }
             }
             .padding(.horizontal)
@@ -1624,7 +2241,8 @@ struct SolveRow: View {
                         Text(solve.problem.title)
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                         
                         HStack(spacing: 8) {
                             Text(solve.problem.difficulty.capitalized)
@@ -1714,10 +2332,44 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            Text(analysis)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(5)
+                            if let attributedAnalysis = try? AttributedString(markdown: analysis, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+                                Text(attributedAnalysis)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text(analysis)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    
+                    // Mistake Tags
+                    if let tags = solve.mistakeTags ?? solve.submission.mistakeTags, !tags.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag.fill")
+                                    .foregroundStyle(paletteManager.color(at: 5))
+                                    .font(.caption)
+                                Text("Mistake Tags")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(tags, id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(paletteManager.color(at: 5).opacity(0.2))
+                                            .foregroundStyle(paletteManager.color(at: 5))
+                                            .cornerRadius(6)
+                                    }
+                                }
+                            }
                         }
                         .padding(.top, 4)
                     }
@@ -2097,6 +2749,8 @@ class HomeViewModel: ObservableObject {
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
     @Published var todayRevisions: [Revision] = []
+    @Published var completedRevisions: [Revision] = []  // Completed revisions for last 7 days
+    @Published var frozenDates: Set<String> = []  // YYYY-MM-DD format for reliable comparison
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -2113,6 +2767,16 @@ class HomeViewModel: ObservableObject {
     
     func loadData(username: String, forceRefresh: Bool = false) async {
         // Use cache if fresh (< 2 hours), otherwise fetch from server
+        
+        // Always fetch freeze dates first (lightweight, important for display)
+        do {
+            let freezeDatesResponse = try await NetworkService.shared.getUsedFreezeDates()
+            await MainActor.run {
+                self.frozenDates = Set(freezeDatesResponse.freezeDates)
+            }
+        } catch {
+            // Silent fail - freeze dates are not critical
+        }
         
         // Check if we can use cached data
         if !forceRefresh && DataManager.shared.isCacheFresh {
@@ -2137,27 +2801,48 @@ class HomeViewModel: ObservableObject {
             async let achievementStatsTask = NetworkService.shared.getAchievementStats()
             async let recentSolvesTask = NetworkService.shared.getSolves(limit: 10)
             // Fetch upcoming only - backend filters for incomplete revisions
-            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50)
-            
-            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse) = try await (
+            // Use revisionMode to fetch ML or normal revisions based on user setting
+            let revisionType = DataManager.shared.revisionMode
+            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50, type: revisionType)
+            async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true, type: revisionType)
+
+            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse, completedRevisionsResponse) = try await (
                 userStatsTask,
                 submissionStatsTask,
                 solveStatsTask,
                 achievementStatsTask,
                 recentSolvesTask,
-                revisionsTask
+                revisionsTask,
+                completedRevisionsTask
             )
             
             // Filter for today + overdue only (upcoming includes future dates we don't want)
             let calendar = Calendar.current
             let today = calendar.startOfDay(for: Date())
-            
+
             let todayAndOverdue = revisionsResponse.revisions.filter { revision in
                 let revisionDate = calendar.startOfDay(for: revision.scheduledDate)
                 return revisionDate <= today
             }
-            
-            
+
+            // Extract completed revisions from last 7 days
+            let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            let recentCompletedRevisions = completedRevisionsResponse.groups.flatMap { $0.revisions }
+                .filter { revision in
+                    guard let completedAtString = revision.completedAt else { return false }
+                    var completedDate = formatter.date(from: completedAtString)
+                    if completedDate == nil {
+                        formatter.formatOptions = [.withInternetDateTime]
+                        completedDate = formatter.date(from: completedAtString)
+                    }
+                    guard let date = completedDate else { return false }
+                    return date >= sevenDaysAgo
+                }
+
+
             await MainActor.run {
                 self.userStats = userStats
                 self.submissionStats = submissionStats
@@ -2165,6 +2850,8 @@ class HomeViewModel: ObservableObject {
                 self.achievementStats = achievementStats
                 self.recentSolves = solvesResponse.solves
                 self.todayRevisions = todayAndOverdue
+                self.completedRevisions = recentCompletedRevisions
+                // frozenDates already set at start of loadData
             }
             
             // Update DataManager cache
@@ -2182,7 +2869,10 @@ class HomeViewModel: ObservableObject {
             
             // Update widgets - send exactly what we want to display (today + overdue)
             updateWidgets(userStats: userStats.stats, recentSolve: solvesResponse.solves.first, revisions: todayAndOverdue)
-            
+
+            // Check if solved today and end live activity if needed
+            DataManager.shared.checkSolvedTodayAndEndActivity()
+
         } catch let error where error is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh
             await MainActor.run {
@@ -2272,3 +2962,4 @@ class HomeViewModel: ObservableObject {
     HomeView()
         .environmentObject(AuthViewModel())
 }
+

@@ -2,14 +2,6 @@
 
 import SwiftUI
 
-// MARK: - Hue Corner Colors
-struct HueCorners {
-    static let topLeft = Color(hex: "7B68EE")      // Purple/Blue
-    static let topRight = Color(hex: "FFB347")     // Yellow/Orange
-    static let bottomLeft = Color(hex: "20B2AA")   // Teal
-    static let bottomRight = Color(hex: "98D8AA")  // Green
-}
-
 // MARK: - Dot View
 struct DotView: View {
     let center: CGPoint
@@ -17,6 +9,7 @@ struct DotView: View {
     let influenceRadius: CGFloat
     let gridSize: CGSize
     let dotSize: CGFloat
+    let isGuideDot: Bool
     
     private var distance: CGFloat {
         guard let location = dragLocation else { return .infinity }
@@ -26,15 +19,15 @@ struct DotView: View {
     }
     
     private var scale: CGFloat {
-        guard dragLocation != nil else { return 0.3 }
+        guard dragLocation != nil else { return isGuideDot ? 0.5 : 0.3 }
         let normalized = distance / influenceRadius
-        return max(0.3, min(2.0, 2.0 - normalized))
+        return max(isGuideDot ? 0.5 : 0.3, min(1.5, 1.5 - normalized * 0.8))
     }
     
     private var opacity: CGFloat {
-        guard dragLocation != nil else { return 0.3 }
+        guard dragLocation != nil else { return isGuideDot ? 0.5 : 0.3 }
         let normalized = distance / influenceRadius
-        return max(0.3, min(1.0, 1.0 - normalized * 0.7))
+        return max(isGuideDot ? 0.5 : 0.3, min(1.0, 1.0 - normalized * 0.7))
     }
     
     private var dotColor: Color {
@@ -43,37 +36,23 @@ struct DotView: View {
         let normalizedX = center.x / gridSize.width
         let normalizedY = center.y / gridSize.height
         
-        let topColor = blendColors(HueCorners.topLeft, HueCorners.topRight, ratio: normalizedX)
-        let bottomColor = blendColors(HueCorners.bottomLeft, HueCorners.bottomRight, ratio: normalizedX)
-        return blendColors(topColor, bottomColor, ratio: normalizedY)
-    }
-    
-    private func blendColors(_ color1: Color, _ color2: Color, ratio: Double) -> Color {
-        let uiColor1 = UIColor(color1)
-        let uiColor2 = UIColor(color2)
+        // X = Hue (0-1 maps to full color spectrum)
+        // Y = Saturation (top = very pastel/0.3, bottom = soft pastel/0.6)
+        let hue = normalizedX
+        let saturation = 0.3 + (normalizedY * 0.3) // 0.3 to 0.6 (pastel only)
+        let brightness: CGFloat = 0.95
         
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        
-        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        
-        let r = r1 + (r2 - r1) * ratio
-        let g = g1 + (g2 - g1) * ratio
-        let b = b1 + (b2 - b1) * ratio
-        let a = a1 + (a2 - a1) * ratio
-        
-        return Color(UIColor(red: r, green: g, blue: b, alpha: a))
+        return Color(hue: hue, saturation: saturation, brightness: brightness)
     }
     
     var body: some View {
         Circle()
             .fill(dotColor)
-            .frame(width: dotSize, height: dotSize)
+            .frame(width: isGuideDot ? dotSize * 1.2 : dotSize, height: isGuideDot ? dotSize * 1.2 : dotSize)
             .scaleEffect(scale)
             .opacity(opacity)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: scale)
-            .animation(.spring(response: 0.2, dampingFraction: 0.6), value: opacity)
+            .animation(.spring(response: 0.2, dampingFraction: 0.3), value: scale)
+            .animation(.spring(response: 0.2, dampingFraction: 0.3), value: opacity)
     }
 }
 
@@ -82,71 +61,81 @@ struct HuePicker: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var dragLocation: CGPoint? = nil
-    @State private var currentColor: Color = HueCorners.bottomRight
+    @State private var currentColor: Color = Color(hue: 0.4, saturation: 0.6, brightness: 0.9)
     
     // Haptic tracking state
-    @State private var lastQuadrant: Int = -1
-    @State private var currentJokeIndex: Int = 0
+    @State private var currentMoodIndex: Int = 0
     @State private var hasStartedDragging: Bool = false
-    @State private var lastGridX: Int = -1
-    @State private var lastGridY: Int = -1
+    @State private var lastCrossedHorizontalGuide: Bool = false
+    @State private var lastCrossedVerticalGuide: Bool = false
+    @State private var wasNearEdge: Bool = false
     
-    private let columns = 12
+    private let columns = 13
     private let rows = 10
-    private let dotSize: CGFloat = 10
-    private let influenceRadius: CGFloat = 70
+    private let dotSize: CGFloat = 6
+    private let influenceRadius: CGFloat = 50
+    
+    // Center guide (single center dot)
+    private var centerRow: Int { rows / 2 }
+    private var centerCol: Int { columns / 2 }
     
     // Haptic generators
-    private let selectionFeedback = UISelectionFeedbackGenerator()
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
-    private let mediumFeedback = UIImpactFeedbackGenerator(style: .medium)
-    private let heavyFeedback = UIImpactFeedbackGenerator(style: .heavy)
     private let notificationFeedback = UINotificationFeedbackGenerator()
     
-    // Dad joke color picker names
-    private let colorJokes = [
-        "Hue Dunit?",
-        "Feeling Chroma-tic",
-        "Orange You Glad",
-        "Color Me Impressed",
-        "Fifty Shades of Yay",
-        "ROY G. BIV's Crib",
-        "Pigment of Imagination",
-        "Tint There, Done That",
-        "The Hue-man Touch",
-        "Shade-y Business",
-        "A Dye-lemma",
-        "Prism Break",
-        "In Living Color",
-        "Chromatic Chaos",
-        "The Palette Cleanser"
+    // Mood names instead of jokes - matches expected design
+    private let moodNames = [
+        "Gloom",
+        "Serenity",
+        "Warmth",
+        "Joy",
+        "Wonder",
+        "Nostalgia",
+        "Peace",
+        "Energy",
+        "Mystery",
+        "Hope",
+        "Calm",
+        "Bliss",
+        "Delight",
+        "Whimsy",
+        "Clarity"
     ]
     
     var body: some View {
-        VStack(spacing: 24) {
-            sheetJokeTextView
+        VStack(alignment: .leading, spacing: 8) {
+            sheetMoodTextView
             sheetDotGridView
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background { sheetBackground }
         .onAppear {
-            selectionFeedback.prepare()
             lightFeedback.prepare()
-            mediumFeedback.prepare()
-            heavyFeedback.prepare()
             notificationFeedback.prepare()
         }
     }
     
     // MARK: - Extracted Sub-views
     
-    private var sheetJokeTextView: some View {
-        Text("You pick! \(colorJokes[currentJokeIndex])")
-            .font(.system(.title3, design: .rounded))
-            .fontWeight(.semibold)
-            .foregroundStyle(currentColor)
-            .contentTransition(.numericText(countsDown: false))
-            .animation(.spring(response: 0.8, dampingFraction: 0.7), value: currentJokeIndex)
-            .padding(.top, 24)
+    private var sheetMoodTextView: some View {
+        HStack(spacing: 0) {
+            Text("Pick a hue, and we'll make\na ")
+                .font(.system(.title2, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundStyle(.primary)
+            + Text(moodNames[currentMoodIndex])
+                .font(.system(.title2, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundStyle(currentColor)
+            + Text(" palette for you")
+                .font(.system(.title2, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundStyle(.primary)
+        }
+        .contentTransition(.numericText(countsDown: false))
+        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentMoodIndex)
+        .padding(.horizontal, 20)
+        .padding(.top, 15)
     }
     
     private var sheetDotGridView: some View {
@@ -164,11 +153,11 @@ struct HuePicker: View {
             .gesture(sheetDragGesture(gridWidth: gridWidth, gridHeight: gridHeight, spacingX: spacingX, spacingY: spacingY, gridSize: geometry.size))
             .coordinateSpace(name: "sheetGrid")
         }
-        .padding(20)
+        .padding(6)
         .background { sheetGridBackground }
         .overlay { sheetGridBorder }
-        .padding(.horizontal)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 15)
+        .padding(.bottom, 8)
     }
     
     private func sheetDotsGrid(geometry: GeometryProxy, spacingX: CGFloat, spacingY: CGFloat) -> some View {
@@ -178,12 +167,16 @@ struct HuePicker: View {
                 let dotY = spacingY * (CGFloat(row) + 0.5)
                 let dotCenter = CGPoint(x: dotX, y: dotY)
                 
+                // Check if this is the center guide dot (single point at grid center)
+                let isGuideDot = row == centerRow && col == centerCol
+                
                 DotView(
                     center: dotCenter,
                     dragLocation: dragLocation,
                     influenceRadius: influenceRadius,
                     gridSize: geometry.size,
-                    dotSize: dotSize
+                    dotSize: dotSize,
+                    isGuideDot: isGuideDot
                 )
                 .position(dotCenter)
             }
@@ -194,8 +187,8 @@ struct HuePicker: View {
     private var sheetCursorView: some View {
         if let location = dragLocation {
             Circle()
-                .frame(width: 36, height: 36)
-                .glassEffect(.regular.interactive(), in: .circle)
+                .fill(.ultraThinMaterial)
+                .frame(width: 40, height: 40)
                 .position(location)
                 .animation(.interactiveSpring(response: 0.08, dampingFraction: 0.9), value: location)
         }
@@ -204,76 +197,86 @@ struct HuePicker: View {
     private func sheetDragGesture(gridWidth: CGFloat, gridHeight: CGFloat, spacingX: CGFloat, spacingY: CGFloat, gridSize: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                let clampedX = min(max(0, value.location.x), gridWidth)
-                let clampedY = min(max(0, value.location.y), gridHeight)
+                // Inset by cursor radius so it stays visually within the grid
+                let cursorRadius: CGFloat = 22
+                let clampedX = min(max(cursorRadius, value.location.x), gridWidth - cursorRadius)
+                let clampedY = min(max(cursorRadius, value.location.y), gridHeight - cursorRadius)
                 let newLocation = CGPoint(x: clampedX, y: clampedY)
                 
                 if !hasStartedDragging {
                     hasStartedDragging = true
-                    mediumFeedback.impactOccurred(intensity: 0.6)
                 }
                 
-                let gridX = Int(clampedX / spacingX)
-                let gridY = Int(clampedY / spacingY)
-                if (gridX != lastGridX || gridY != lastGridY) && lastGridX != -1 {
-                    lightFeedback.impactOccurred(intensity: 0.5)
+                // Check if crossing center guide lines (crosshair)
+                let centerY = gridHeight / 2
+                let centerX = gridWidth / 2
+                let guideThreshold: CGFloat = spacingY * 0.5
+                
+                let isNearHorizontalGuide = abs(clampedY - centerY) < guideThreshold
+                let isNearVerticalGuide = abs(clampedX - centerX) < guideThreshold
+                
+                // Trigger haptic when crossing the guides
+                if isNearHorizontalGuide && !lastCrossedHorizontalGuide {
+                    lightFeedback.impactOccurred(intensity: 0.4)
+                    currentMoodIndex = (currentMoodIndex + 1) % moodNames.count
                 }
-                lastGridX = gridX
-                lastGridY = gridY
-                
-                let quadrant = (clampedX < gridWidth / 2 ? 0 : 1) + (clampedY < gridHeight / 2 ? 0 : 2)
-                
-                if quadrant != lastQuadrant {
-                    lastQuadrant = quadrant
-                    currentJokeIndex = (currentJokeIndex + 1) % colorJokes.count
-                    heavyFeedback.impactOccurred(intensity: 1.0)
+                if isNearVerticalGuide && !lastCrossedVerticalGuide {
+                    lightFeedback.impactOccurred(intensity: 0.4)
+                    currentMoodIndex = (currentMoodIndex + 1) % moodNames.count
                 }
+                lastCrossedHorizontalGuide = isNearHorizontalGuide
+                lastCrossedVerticalGuide = isNearVerticalGuide
                 
-                let edgeThreshold: CGFloat = 25
+                // Trigger haptic when touching edges
+                let edgeThreshold: CGFloat = 15
                 let nearEdge = clampedX < edgeThreshold || clampedX > gridWidth - edgeThreshold ||
                                clampedY < edgeThreshold || clampedY > gridHeight - edgeThreshold
-                if nearEdge {
-                    selectionFeedback.selectionChanged()
+                if nearEdge && !wasNearEdge {
+                    lightFeedback.impactOccurred(intensity: 0.3)
                 }
+                wasNearEdge = nearEdge
                 
-                // Update location immediately - no withAnimation wrapper
-                // The view's own animation handles the smooth trailing
                 dragLocation = newLocation
-                
                 updateColor(at: newLocation, gridSize: gridSize)
             }
             .onEnded { _ in
                 notificationFeedback.notificationOccurred(.success)
-                mediumFeedback.impactOccurred(intensity: 0.8)
                 saveSelection()
                 dismiss()
             }
     }
     
     private var sheetGridBackground: some View {
-        RoundedRectangle(cornerRadius: 32)
-            .fill(Color.white.opacity(0.08))
+        RoundedRectangle(cornerRadius: 20)
+            .fill(Color(.secondarySystemBackground).opacity(0.6))
     }
     
     private var sheetGridBorder: some View {
-        RoundedRectangle(cornerRadius: 32)
-            .strokeBorder(currentColor.opacity(0.3), lineWidth: 1)
+        RoundedRectangle(cornerRadius: 20)
+            .strokeBorder(currentColor.opacity(0.2), lineWidth: 1)
             .allowsHitTesting(false)
             .animation(.easeInOut(duration: 0.3), value: currentColor)
     }
     
     private var sheetBackground: some View {
-        LinearGradient(
-            colors: [
-                currentColor.opacity(0.75),
-                currentColor.opacity(0.05),
-                .clear
-            ],
-            startPoint: .bottom,
-            endPoint: .top
-        )
-        .blur(radius: 60)
-        .ignoresSafeArea()
+        ZStack {
+            // Opaque base background
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            // Subtle corner gradient - top leading to bottom trailing
+            RadialGradient(
+                colors: [
+                    currentColor.opacity(0.25),
+                    currentColor.opacity(0.08),
+                    .clear
+                ],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 400
+            )
+            .ignoresSafeArea()
+        }
         .animation(.easeInOut(duration: 0.4), value: currentColor)
     }
     
@@ -281,7 +284,7 @@ struct HuePicker: View {
         let paletteColors = generatePalette(from: currentColor)
         let palette = ColorPalette(
             id: 1000,
-            name: colorJokes[currentJokeIndex],
+            name: moodNames[currentMoodIndex],
             colors: paletteColors
         )
         paletteManager.customPalette = palette
@@ -297,12 +300,18 @@ struct HuePicker: View {
         
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         
+        // Analogous color scheme with variations for better harmony
         let colors: [UIColor] = [
+            // Base color
             uiColor,
-            UIColor(hue: fmod(hue + 0.083, 1.0), saturation: saturation * 0.85, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
-            UIColor(hue: fmod(hue + 0.917, 1.0), saturation: saturation * 0.85, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
-            UIColor(hue: fmod(hue + 0.5, 1.0), saturation: saturation * 0.7, brightness: brightness, alpha: alpha),
-            UIColor(hue: fmod(hue + 0.417, 1.0), saturation: saturation * 0.8, brightness: min(brightness * 1.1, 1.0), alpha: alpha)
+            // Analogous +30° - slightly lighter
+            UIColor(hue: fmod(hue + 0.083, 1.0), saturation: saturation * 0.9, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+            // Analogous -30° - slightly lighter
+            UIColor(hue: fmod(hue + 0.917, 1.0), saturation: saturation * 0.9, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+            // Complementary with reduced saturation for balance
+            UIColor(hue: fmod(hue + 0.5, 1.0), saturation: saturation * 0.5, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
+            // Triadic accent - muted
+            UIColor(hue: fmod(hue + 0.333, 1.0), saturation: saturation * 0.6, brightness: brightness, alpha: alpha)
         ]
         
         return colors.map { Color($0).toHex() }
@@ -313,34 +322,17 @@ struct HuePicker: View {
         let normalizedY = location.y / gridSize.height
         
         let interpolatedColor = interpolateColor(x: normalizedX, y: normalizedY)
-        
-        
-            currentColor = interpolatedColor
-        
+        currentColor = interpolatedColor
     }
     
     private func interpolateColor(x: Double, y: Double) -> Color {
-        let topColor = blendColors(HueCorners.topLeft, HueCorners.topRight, ratio: x)
-        let bottomColor = blendColors(HueCorners.bottomLeft, HueCorners.bottomRight, ratio: x)
-        return blendColors(topColor, bottomColor, ratio: y)
-    }
-    
-    private func blendColors(_ color1: Color, _ color2: Color, ratio: Double) -> Color {
-        let uiColor1 = UIColor(color1)
-        let uiColor2 = UIColor(color2)
+        // X = Hue (0-1 maps to full 360° color spectrum)
+        // Y = Saturation (top = very pastel/0.3, bottom = soft pastel/0.6)
+        let hue = x
+        let saturation = 0.3 + (y * 0.3) // 0.3 to 0.6 (pastel only)
+        let brightness: CGFloat = 0.95
         
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        
-        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        
-        let r = r1 + (r2 - r1) * ratio
-        let g = g1 + (g2 - g1) * ratio
-        let b = b1 + (b2 - b1) * ratio
-        let a = a1 + (a2 - a1) * ratio
-        
-        return Color(UIColor(red: r, green: g, blue: b, alpha: a))
+        return Color(hue: hue, saturation: saturation, brightness: brightness)
     }
 }
 
@@ -365,5 +357,5 @@ extension View {
 #Preview("Sheet Picker") {
     HuePicker()
         .presentationDetents([.medium])
-        .presentationBackground(.ultraThinMaterial)
+        .presentationBackground(.background)
 }

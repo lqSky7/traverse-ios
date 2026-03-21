@@ -3,6 +3,7 @@ import SwiftUI
 struct ChangePasswordView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @Environment(\.dismiss) var dismiss
+    @StateObject private var paletteManager = ColorPaletteManager.shared
     
     @State private var currentPassword: String = ""
     @State private var newPassword: String = ""
@@ -63,19 +64,23 @@ struct ChangePasswordView: View {
                     } label: {
                         if isLoading {
                             ProgressView()
-                                .tint(Color(.systemBackground))
+                                .tint(.white)
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         } else {
                             Text("Change Password")
                                 .font(.headline)
-                                .foregroundStyle(Color(.systemBackground))
                                 .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
                         }
                     }
-                    .listRowBackground(Color.primary)
-                    .cornerRadius(.infinity)
+                    .tint(paletteManager.color(at: 2))
+                    .buttonStyle(.borderedProminent)
+                    .modifier(LiquidGlassCapsuleButton())
                     .disabled(isLoading || !isFormValid)
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
             }
             .navigationTitle("Change Password")
             .navigationBarTitleDisplayMode(.inline)

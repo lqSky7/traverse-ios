@@ -10,26 +10,26 @@ struct MainTabView: View {
             TabView(selection: $selectedTab) {
                 HomeTab()
                     .tabItem {
-                        Label("Home", systemImage: "house.fill")
+                        Label("Home", systemImage: "house")
                     }
                     .tag(0)
                 
                 RevisionsView()
                     .tabItem {
-                        Label("Revisions", systemImage: "calendar.badge.clock")
+                        Label("Revisions", systemImage: "clock.arrow.circlepath")
                     }
                     .tag(1)
                 
                 FriendsTab()
                     .tabItem {
-                        Label("Friends", systemImage: "person.2.fill")
+                        Label("Friends", systemImage: "person.2")
                     }
                     .tag(2)
                 
                 SettingsView()
                     .tint(.blue)
                     .tabItem {
-                        Label("Settings", systemImage: "gearshape.fill")
+                        Label("Settings", systemImage: "gear")
                     }
                     .tag(3)
             }
@@ -42,26 +42,26 @@ struct MainTabView: View {
             TabView(selection: $selectedTab) {
                 HomeTab()
                     .tabItem {
-                        Label("Home", systemImage: "house.fill")
+                        Label("Home", systemImage: selectedTab == 0 ? "house.fill" : "house")
                     }
                     .tag(0)
                 
                 RevisionsView()
                     .tabItem {
-                        Label("Revisions", systemImage: "calendar.badge.clock")
+                        Label("Revisions", systemImage: selectedTab == 1 ? "clock.arrow.circlepath" : "clock.arrow.circlepath")
                     }
                     .tag(1)
                 
                 FriendsTab()
                     .tabItem {
-                        Label("Friends", systemImage: "person.2.fill")
+                        Label("Friends", systemImage: selectedTab == 2 ? "person.2.fill" : "person.2")
                     }
                     .tag(2)
                 
                 SettingsView()
                     .tint(.blue)
                     .tabItem {
-                        Label("Settings", systemImage: "gearshape.fill")
+                        Label("Settings", systemImage: selectedTab == 3 ? "gearshape.fill" : "gearshape")
                     }
                     .tag(3)
             }
