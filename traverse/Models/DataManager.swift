@@ -6,6 +6,10 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let revisionCompleted = Notification.Name("revisionCompleted")
+}
+
 @MainActor
 class DataManager: ObservableObject {
     static let shared = DataManager()
@@ -225,7 +229,7 @@ class DataManager: ObservableObject {
         checkSolvedTodayAndEndActivity()
     }
     
-    private func checkSolvedTodayAndEndActivity() {
+    func checkSolvedTodayAndEndActivity() {
         // Check if user solved today based on recent solves
         let calendar = Calendar.current
         let now = Date()

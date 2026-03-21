@@ -300,7 +300,7 @@ struct FriendsView: View {
                 .padding(.horizontal, 4)
                 
                 // Friends List
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: 16) {
                     ForEach(Array(viewModel.friends.enumerated()), id: \.element.id) { index, friend in
                         NavigationLink(value: friend.username) {
                             FriendRow(

@@ -46,7 +46,7 @@ struct HomeView: View {
                                         AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    ProductivityInsightsCard(solves: solves, paletteManager: paletteManager)
+                                    ProductivityInsightsCard(solves: solves, completedRevisions: viewModel.completedRevisions, paletteManager: paletteManager)
                                 }
                             } else if let achievementStats = viewModel.achievementStats {
                                 NavigationLink(destination: AllAchievementsView()) {
@@ -126,6 +126,13 @@ struct HomeView: View {
             if let username = newUsername, viewModel.solveStats == nil {
                 Task {
                     await viewModel.loadData(username: username)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .revisionCompleted)) { _ in
+            if let username = authViewModel.currentUser?.username {
+                Task {
+                    await viewModel.loadData(username: username, forceRefresh: true)
                 }
             }
         }
@@ -856,84 +863,144 @@ struct AchievementStatsCard: View {
     }
 }
 
-// MARK: - Productivity Insights Card (Minimal Design)
+// MARK: - Productivity Insights Card (Weekly Activity)
 struct ProductivityInsightsCard: View {
     let solves: [Solve]
+    let completedRevisions: [Revision]
     @ObservedObject var paletteManager: ColorPaletteManager
-    
-    // Peak day calculation
-    private var peakWeekday: Int {
+
+    private struct DayData: Identifiable {
+        let id = UUID()
+        let date: Date
+        let label: String
+        let solves: Int
+        let revisions: Int
+    }
+
+    private var last7DaysData: [DayData] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        var dayCounts: [Int: Int] = [:]
+
+        // Count solves by day
+        var solveCounts: [Date: Int] = [:]
         for solve in solves {
-            if let date = formatter.date(from: solve.solvedAt) {
-                let weekday = Calendar.current.component(.weekday, from: date)
-                dayCounts[weekday, default: 0] += 1
+            var date = formatter.date(from: solve.solvedAt)
+            if date == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                date = formatter.date(from: solve.solvedAt)
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            }
+            if let solveDate = date {
+                let dayStart = calendar.startOfDay(for: solveDate)
+                solveCounts[dayStart, default: 0] += 1
             }
         }
-        return dayCounts.max(by: { $0.value < $1.value })?.key ?? 1
+
+        // Count completed revisions by day
+        var revisionCounts: [Date: Int] = [:]
+        for revision in completedRevisions {
+            guard let completedAtString = revision.completedAt else { continue }
+            var date = formatter.date(from: completedAtString)
+            if date == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                date = formatter.date(from: completedAtString)
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            }
+            if let completedDate = date {
+                let dayStart = calendar.startOfDay(for: completedDate)
+                revisionCounts[dayStart, default: 0] += 1
+            }
+        }
+
+        // Build last 7 days array
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "EEEEE"  // Single letter day (M, T, W, etc.)
+
+        var data: [DayData] = []
+        for dayOffset in (0..<7).reversed() {
+            guard let dayDate = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
+            let label = dayFormatter.string(from: dayDate)
+            data.append(DayData(
+                date: dayDate,
+                label: label,
+                solves: solveCounts[dayDate] ?? 0,
+                revisions: revisionCounts[dayDate] ?? 0
+            ))
+        }
+        return data
     }
-    
-    private var peakDayName: String {
-        let names = ["", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        return names[peakWeekday]
+
+    private var maxValue: Int {
+        let maxSolves = last7DaysData.map { $0.solves }.max() ?? 0
+        let maxRevisions = last7DaysData.map { $0.revisions }.max() ?? 0
+        return max(maxSolves, maxRevisions, 1)
     }
-    
-    private var firstTryRate: Double {
-        let firstTryCount = solves.filter { ($0.submission.numberOfTries ?? 1) == 1 }.count
-        guard !solves.isEmpty else { return 0 }
-        return Double(firstTryCount) / Double(solves.count)
-    }
-    
+
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            
-            // Hero percentage with subtle ring
-            ZStack {
-                // Background ring
-                Circle()
-                    .stroke(Color.gray.opacity(0.15), lineWidth: 8)
-                    .frame(width: 100, height: 100)
-                
-                // Progress ring
-                Circle()
-                    .trim(from: 0, to: firstTryRate)
-                    .stroke(
-                        paletteManager.color(at: 0),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            Text("Weekly Activity")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+
+            // Chart
+            Chart {
+                ForEach(last7DaysData) { day in
+                    BarMark(
+                        x: .value("Day", day.label),
+                        y: .value("Count", day.solves)
                     )
-                    .frame(width: 100, height: 100)
-                    .rotationEffect(.degrees(-90))
-                
-                // Percentage
-                VStack(spacing: 0) {
-                    Text("\(Int(firstTryRate * 100))")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundStyle(paletteManager.color(at: 0))
-                    Text("1st try")
+                    .foregroundStyle(paletteManager.color(at: 0))
+                    .position(by: .value("Type", "Solves"))
+
+                    BarMark(
+                        x: .value("Day", day.label),
+                        y: .value("Count", day.revisions)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 1))
+                    .position(by: .value("Type", "Revisions"))
+                }
+            }
+            .chartYAxis {
+                AxisMarks(values: .automatic(desiredCount: 3)) { value in
+                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5))
+                        .foregroundStyle(Color.gray.opacity(0.3))
+                    AxisValueLabel()
+                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                }
+            }
+            .chartXAxis {
+                AxisMarks { value in
+                    AxisValueLabel()
+                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                }
+            }
+            .frame(height: 100)
+
+            // Legend
+            HStack(spacing: 16) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(paletteManager.color(at: 0))
+                        .frame(width: 8, height: 8)
+                    Text("Solves")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
-            }
-            
-            Spacer()
-            
-            // Week strip - 7 dots, peak day highlighted
-            VStack(spacing: 6) {
-                HStack(spacing: 8) {
-                    ForEach(1...7, id: \.self) { day in
-                        Circle()
-                            .fill(day == peakWeekday ? paletteManager.color(at: 5) : Color.gray.opacity(0.3))
-                            .frame(width: day == peakWeekday ? 10 : 6, height: day == peakWeekday ? 10 : 6)
-                    }
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(paletteManager.color(at: 1))
+                        .frame(width: 8, height: 8)
+                    Text("Revisions")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
-                
-                Text("Peak: \(peakDayName)")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding()
@@ -2682,6 +2749,7 @@ class HomeViewModel: ObservableObject {
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
     @Published var todayRevisions: [Revision] = []
+    @Published var completedRevisions: [Revision] = []  // Completed revisions for last 7 days
     @Published var frozenDates: Set<String> = []  // YYYY-MM-DD format for reliable comparison
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -2736,26 +2804,45 @@ class HomeViewModel: ObservableObject {
             // Use revisionMode to fetch ML or normal revisions based on user setting
             let revisionType = DataManager.shared.revisionMode
             async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50, type: revisionType)
-            
-            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse) = try await (
+            async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true, type: revisionType)
+
+            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse, completedRevisionsResponse) = try await (
                 userStatsTask,
                 submissionStatsTask,
                 solveStatsTask,
                 achievementStatsTask,
                 recentSolvesTask,
-                revisionsTask
+                revisionsTask,
+                completedRevisionsTask
             )
             
             // Filter for today + overdue only (upcoming includes future dates we don't want)
             let calendar = Calendar.current
             let today = calendar.startOfDay(for: Date())
-            
+
             let todayAndOverdue = revisionsResponse.revisions.filter { revision in
                 let revisionDate = calendar.startOfDay(for: revision.scheduledDate)
                 return revisionDate <= today
             }
-            
-            
+
+            // Extract completed revisions from last 7 days
+            let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+            let recentCompletedRevisions = completedRevisionsResponse.groups.flatMap { $0.revisions }
+                .filter { revision in
+                    guard let completedAtString = revision.completedAt else { return false }
+                    var completedDate = formatter.date(from: completedAtString)
+                    if completedDate == nil {
+                        formatter.formatOptions = [.withInternetDateTime]
+                        completedDate = formatter.date(from: completedAtString)
+                    }
+                    guard let date = completedDate else { return false }
+                    return date >= sevenDaysAgo
+                }
+
+
             await MainActor.run {
                 self.userStats = userStats
                 self.submissionStats = submissionStats
@@ -2763,6 +2850,7 @@ class HomeViewModel: ObservableObject {
                 self.achievementStats = achievementStats
                 self.recentSolves = solvesResponse.solves
                 self.todayRevisions = todayAndOverdue
+                self.completedRevisions = recentCompletedRevisions
                 // frozenDates already set at start of loadData
             }
             
@@ -2781,7 +2869,10 @@ class HomeViewModel: ObservableObject {
             
             // Update widgets - send exactly what we want to display (today + overdue)
             updateWidgets(userStats: userStats.stats, recentSolve: solvesResponse.solves.first, revisions: todayAndOverdue)
-            
+
+            // Check if solved today and end live activity if needed
+            DataManager.shared.checkSolvedTodayAndEndActivity()
+
         } catch let error where error is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh
             await MainActor.run {

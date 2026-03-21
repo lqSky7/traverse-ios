@@ -343,6 +343,10 @@ struct RevisionsView: View {
         do {
             _ = try await NetworkService.shared.completeRevision(id: revision.id)
             HapticManager.shared.success()
+
+            // Notify HomeView to refresh and check live activity
+            NotificationCenter.default.post(name: .revisionCompleted, object: nil)
+
             await loadData()
         } catch {
             print("Failed to complete revision: \(error.localizedDescription)")
