@@ -39,6 +39,7 @@ struct RecentSolveData: Codable {
 struct RevisionData: Codable, Identifiable {
     let id: Int
     let problemTitle: String
+    let slug: String
     let platform: String
     let difficulty: String
     let revisionNumber: Int
@@ -47,6 +48,31 @@ struct RevisionData: Codable, Identifiable {
     
     var scheduledDate: Date {
         ISO8601DateFormatter().date(from: scheduledFor) ?? Date()
+    }
+    
+    // Memberwise init with slug defaulting to "" for backward compat
+    init(id: Int, problemTitle: String, slug: String = "", platform: String, difficulty: String, revisionNumber: Int, scheduledFor: String, isOverdue: Bool) {
+        self.id = id
+        self.problemTitle = problemTitle
+        self.slug = slug
+        self.platform = platform
+        self.difficulty = difficulty
+        self.revisionNumber = revisionNumber
+        self.scheduledFor = scheduledFor
+        self.isOverdue = isOverdue
+    }
+    
+    // Decoder init — handles missing slug in older encoded data
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        problemTitle = try container.decode(String.self, forKey: .problemTitle)
+        slug = try container.decodeIfPresent(String.self, forKey: .slug) ?? ""
+        platform = try container.decode(String.self, forKey: .platform)
+        difficulty = try container.decode(String.self, forKey: .difficulty)
+        revisionNumber = try container.decode(Int.self, forKey: .revisionNumber)
+        scheduledFor = try container.decode(String.self, forKey: .scheduledFor)
+        isOverdue = try container.decode(Bool.self, forKey: .isOverdue)
     }
 }
 

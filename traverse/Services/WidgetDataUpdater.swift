@@ -2,6 +2,9 @@
 //  WidgetDataUpdater.swift
 //  traverse
 //
+//  Updates shared widget data in App Group UserDefaults (for iOS widgets)
+//  AND sends the same data to Apple Watch via WatchSyncManager.
+//
 
 import Foundation
 import WidgetKit
@@ -69,6 +72,7 @@ class WidgetDataUpdater {
                 RevisionData(
                     id: revision.id,
                     problemTitle: revision.problem.title,
+                    slug: revision.problem.slug,
                     platform: revision.problem.platform,
                     difficulty: revision.problem.difficulty,
                     revisionNumber: revision.revisionNumber,
@@ -102,11 +106,14 @@ class WidgetDataUpdater {
             )
         }
         
-        // Save to shared UserDefaults
+        // Save to shared UserDefaults (for iOS widgets)
         WidgetDataManager.shared.saveWidgetData(widgetData)
         
-        // Reload all widgets
+        // Reload all iOS widgets
         WidgetCenter.shared.reloadAllTimelines()
+        
+        // Sync to Apple Watch
+        WatchSyncManager.shared.syncWidgetData(widgetData)
     }
     
     func updateStreakStatus(solvedToday: Bool, currentStreak: Int, totalXp: Int, totalSolves: Int) {
@@ -139,5 +146,8 @@ class WidgetDataUpdater {
         WidgetCenter.shared.reloadTimelines(ofKind: "StreakWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "StreakLockScreenWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "MotivationalLockScreenWidget")
+        
+        // Sync to Apple Watch
+        WatchSyncManager.shared.syncWidgetData(widgetData)
     }
 }

@@ -8,11 +8,17 @@
 import SwiftUI
 import UserNotifications
 import WidgetKit
+import WatchConnectivity
 
 @main
 struct traverseApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.scenePhase) var scenePhase
+    
+    init() {
+        // Activate WatchConnectivity session early
+        WatchSyncManager.shared.activate()
+    }
     
     var body: some Scene {
         WindowGroup {
@@ -27,6 +33,11 @@ struct traverseApp: App {
                 
                 // Refresh all widgets when app opens
                 WidgetCenter.shared.reloadAllTimelines()
+                
+                // Push latest data to Watch when app becomes active
+                if let widgetData = WidgetDataManager.shared.loadWidgetData() {
+                    WatchSyncManager.shared.syncWidgetData(widgetData)
+                }
             }
         }
     }
