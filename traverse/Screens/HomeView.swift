@@ -117,15 +117,21 @@ struct HomeView: View {
         }
         .onAppear {
             if let username = authViewModel.currentUser?.username {
+                // Set username for Watch sync
+                WidgetDataUpdater.shared.currentUsername = username
                 Task {
                     await viewModel.loadData(username: username)
                 }
             }
         }
         .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
-            if let username = newUsername, viewModel.solveStats == nil {
-                Task {
-                    await viewModel.loadData(username: username)
+            if let username = newUsername {
+                // Update username for Watch sync
+                WidgetDataUpdater.shared.currentUsername = username
+                if viewModel.solveStats == nil {
+                    Task {
+                        await viewModel.loadData(username: username)
+                    }
                 }
             }
         }

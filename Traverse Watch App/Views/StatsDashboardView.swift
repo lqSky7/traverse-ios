@@ -23,7 +23,6 @@ struct StatsDashboardView: View {
                 dashboard
             }
         }
-        .navigationTitle("Traverse")
         .onAppear {
             dataManager.loadData()
         }
@@ -97,19 +96,54 @@ struct StatsDashboardView: View {
                     )
                 }
                 
-                // Revisions
-                revisionsSummaryCard
-                
-                // Achievements
-                achievementsCard
+                // Quick summary cards (tap Page 2 for details)
+                HStack(spacing: 6) {
+                    // Revisions quick stat
+                    VStack(spacing: 4) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.blue)
+                        Text("\(dataManager.revisionsDueCount)")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        Text("Due")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                            .fill(cardBackground)
+                    )
+                    
+                    // Achievements quick stat
+                    VStack(spacing: 4) {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.purple)
+                        Text("\(dataManager.achievementsUnlocked)")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        Text("Unlocked")
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .textCase(.uppercase)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: cardRadius, style: .continuous)
+                            .fill(cardBackground)
+                    )
+                }
                 
                 // Recent solve
                 if let solve = dataManager.recentSolve {
                     recentSolveCard(solve)
                 }
                 
-                // Sync footer
-                syncFooter
+                // Scroll hint
+                scrollHint
             }
             .padding(.horizontal, 0)
         }
@@ -117,6 +151,21 @@ struct StatsDashboardView: View {
             dataManager.refresh()
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
+    }
+    
+    // MARK: - Scroll Hint
+    
+    private var scrollHint: some View {
+        VStack(spacing: 2) {
+            Image(systemName: "chevron.compact.down")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.tertiary)
+            Text("Crown to see more")
+                .font(.system(size: 9, weight: .regular, design: .rounded))
+                .foregroundStyle(.quaternary)
+        }
+        .padding(.top, 4)
+        .padding(.bottom, 8)
     }
     
     // MARK: - Streak Card

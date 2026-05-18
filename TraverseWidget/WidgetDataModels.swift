@@ -12,6 +12,8 @@ struct WidgetData: Codable {
     let revisions: [RevisionData]?
     let revisionsDueCount: Int  // Simple count - no datetime BS
     let achievements: AchievementsData?
+    let username: String?
+    let qrCodeImageData: Data?
     let lastUpdated: Date
 }
 

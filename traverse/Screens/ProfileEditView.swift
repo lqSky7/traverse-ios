@@ -97,7 +97,8 @@ struct ProfileEditView: View {
             try await authViewModel.updateProfile(
                 email: email,
                 timezone: TimeZone.current.identifier,
-                visibility: visibility
+                visibility: visibility,
+                maxDailyReviews: authViewModel.currentUser?.maxDailyReviews
             )
             successMessage = "Profile updated successfully"
             

@@ -9,11 +9,23 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var dataManager: WatchDataManager
+    @State private var selectedPage = 0
     
     var body: some View {
-        NavigationStack {
+        TabView(selection: $selectedPage) {
+            // Page 1: Stats Dashboard
             StatsDashboardView()
+                .tag(0)
+            
+            // Page 2: Achievements & Revisions
+            AchievementsRevisionsPage()
+                .tag(1)
+            
+            // Page 3: QR Code
+            WatchQRCodePage()
+                .tag(2)
         }
+        .tabViewStyle(.verticalPage(transitionStyle: .blur))
     }
 }
 

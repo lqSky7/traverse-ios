@@ -147,14 +147,25 @@ class AuthViewModel: ObservableObject {
         }
     }
     
-    func updateProfile(email: String, timezone: String, visibility: String) async throws {
+    func updateProfile(
+        email: String?,
+        timezone: String?,
+        visibility: String?,
+        maxDailyReviews: Int? = nil
+    ) async throws {
         do {
             let updatedUser = try await networkService.updateProfile(
                 email: email,
                 timezone: timezone,
-                visibility: visibility
+                visibility: visibility,
+                maxDailyReviews: maxDailyReviews
             )
-            currentUser = updatedUser
+            var mergedUser = updatedUser
+            if mergedUser.profileImageURL == nil {
+                mergedUser.profileImageURL = currentUser?.profileImageURL
+            }
+            currentUser = mergedUser
+            profileImageUrl = mergedUser.profileImageURL
             errorMessage = nil
         } catch let error as NetworkError {
             errorMessage = error.localizedDescription

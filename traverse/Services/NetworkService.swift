@@ -198,7 +198,12 @@ class NetworkService {
     }
     
     // MARK: - Update Profile
-    func updateProfile(email: String?, timezone: String?, visibility: String?) async throws -> User {
+    func updateProfile(
+        email: String?,
+        timezone: String?,
+        visibility: String?,
+        maxDailyReviews: Int? = nil
+    ) async throws -> User {
         guard let url = URL(string: "\(baseURL)/auth/profile") else {
             throw NetworkError.invalidURL
         }
@@ -207,7 +212,12 @@ class NetworkService {
             throw NetworkError.serverError("Not authenticated")
         }
         
-        let requestBody = UpdateProfileRequest(email: email, timezone: timezone, visibility: visibility)
+        let requestBody = UpdateProfileRequest(
+            email: email,
+            timezone: timezone,
+            visibility: visibility,
+            maxDailyReviews: maxDailyReviews
+        )
         
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
@@ -266,6 +276,72 @@ class NetworkService {
                 throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to change password (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    // MARK: - Password Reset (Request)
+    func requestPasswordReset(username: String) async throws -> PasswordResetRequestResponse {
+        guard let url = URL(string: "\(baseURL)/auth/password-reset/request") else {
+            throw NetworkError.invalidURL
+        }
+
+        let requestBody = PasswordResetRequest(username: username)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                let resetResponse = try JSONDecoder().decode(PasswordResetRequestResponse.self, from: data)
+                return resetResponse
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to request password reset (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    // MARK: - Password Reset (Confirm)
+    func confirmPasswordReset(username: String, code: String, newPassword: String) async throws {
+        guard let url = URL(string: "\(baseURL)/auth/password-reset/confirm") else {
+            throw NetworkError.invalidURL
+        }
+
+        let requestBody = PasswordResetConfirmRequest(
+            username: username,
+            code: code,
+            newPassword: newPassword
+        )
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(requestBody)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to reset password (Status: \(httpResponse.statusCode))")
         }
     }
     
@@ -1259,6 +1335,114 @@ class NetworkService {
                 throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to get revision stats (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    // MARK: - Get ML Revision Analytics
+    func getRevisionAnalytics() async throws -> RevisionAnalyticsResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/analytics") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                let analytics = try JSONDecoder().decode(RevisionAnalyticsResponse.self, from: data)
+                return analytics
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to get revision analytics (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    // MARK: - Get ML Daily Revisions (Capped)
+    func getTodayRevisions() async throws -> RevisionTodayResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/today") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                let response = try JSONDecoder().decode(RevisionTodayResponse.self, from: data)
+                return response
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to get today revisions (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    // MARK: - Recalibrate ML Revisions
+    func recalibrateMLRevisions() async throws -> RevisionRecalibrationResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/recalibrate") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                let response = try JSONDecoder().decode(RevisionRecalibrationResponse.self, from: data)
+                return response
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to recalibrate revisions (Status: \(httpResponse.statusCode))")
         }
     }
     

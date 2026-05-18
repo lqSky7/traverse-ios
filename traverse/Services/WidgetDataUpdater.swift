@@ -8,11 +8,45 @@
 
 import Foundation
 import WidgetKit
+import UIKit
 
 class WidgetDataUpdater {
     static let shared = WidgetDataUpdater()
     
     private init() {}
+    
+    /// Current username for QR code sync to Watch
+    var currentUsername: String? {
+        didSet {
+            // Regenerate QR when username changes
+            if let username = currentUsername {
+                cachedQRImageData = generateQRImageData(for: username)
+                print("[WidgetDataUpdater] Generated QR for \(username), data size: \(cachedQRImageData?.count ?? 0) bytes")
+            } else {
+                cachedQRImageData = nil
+            }
+        }
+    }
+    
+    /// Cached QR code image data for Watch sync
+    private var cachedQRImageData: Data?
+    
+    /// Generate QR code image data for a username
+    private func generateQRImageData(for username: String) -> Data? {
+        guard let qrImage = QRCodeGenerator.shared.generateFriendQR(for: username, size: 200) else {
+            print("[WidgetDataUpdater] Failed to generate QR image for \(username)")
+            return nil
+        }
+        return qrImage.pngData()
+    }
+    
+    /// Ensure QR is generated for current username
+    private func ensureQRGenerated() -> Data? {
+        if cachedQRImageData == nil, let username = currentUsername {
+            cachedQRImageData = generateQRImageData(for: username)
+        }
+        return cachedQRImageData
+    }
     
     func updateWidgetData(
         userStats: UserStatsData?,
@@ -21,12 +55,17 @@ class WidgetDataUpdater {
         achievementStats: AchievementStatsData? = nil,
         solvedToday: Bool = false
     ) {
+        // Ensure QR is generated before syncing
+        let qrData = ensureQRGenerated()
+        
         var widgetData = WidgetData(
             streak: nil,
             recentSolve: nil,
             revisions: nil,
             revisionsDueCount: 0,
             achievements: nil,
+            username: currentUsername,
+            qrCodeImageData: qrData,
             lastUpdated: Date()
         )
         
@@ -43,6 +82,8 @@ class WidgetDataUpdater {
                 revisions: widgetData.revisions,
                 revisionsDueCount: widgetData.revisionsDueCount,
                 achievements: widgetData.achievements,
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -62,6 +103,8 @@ class WidgetDataUpdater {
                 revisions: widgetData.revisions,
                 revisionsDueCount: widgetData.revisionsDueCount,
                 achievements: widgetData.achievements,
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -87,6 +130,8 @@ class WidgetDataUpdater {
                 revisions: revisionDataArray,
                 revisionsDueCount: revs.count,  // Simple count - no datetime parsing
                 achievements: widgetData.achievements,
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -102,6 +147,8 @@ class WidgetDataUpdater {
                     unlocked: achievements.unlocked,
                     total: achievements.total
                 ),
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -117,6 +164,9 @@ class WidgetDataUpdater {
     }
     
     func updateStreakStatus(solvedToday: Bool, currentStreak: Int, totalXp: Int, totalSolves: Int) {
+        // Ensure QR is generated
+        let qrData = ensureQRGenerated()
+        
         // Load existing data
         var widgetData = WidgetDataManager.shared.loadWidgetData() ?? WidgetData(
             streak: nil,
@@ -124,6 +174,8 @@ class WidgetDataUpdater {
             revisions: nil,
             revisionsDueCount: 0,
             achievements: nil,
+            username: currentUsername,
+            qrCodeImageData: qrData,
             lastUpdated: Date()
         )
         
@@ -139,6 +191,8 @@ class WidgetDataUpdater {
             revisions: widgetData.revisions,
             revisionsDueCount: widgetData.revisionsDueCount,
             achievements: widgetData.achievements,
+            username: currentUsername,
+            qrCodeImageData: qrData,
             lastUpdated: Date()
         )
         

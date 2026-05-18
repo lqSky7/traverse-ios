@@ -4,26 +4,45 @@
 //
 
 import SwiftUI
+import Charts
 
 struct RevisionsView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @State private var revisionGroups: [RevisionGroup] = []
     @State private var stats: RevisionStatsResponse?
+    @State private var analytics: RevisionAnalyticsResponse?
+    @State private var todaySummary: RevisionTodayResponse?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var isAnalyticsLoading = false
+    @State private var analyticsError: String?
     @State private var showCompletedRevisions = false
     @State private var notificationsEnabled = false
     @State private var useMLRevision = false
     @State private var selectedRevision: Revision?
     @State private var showMLAttemptSheet = false
+    @State private var dailyCapDraft: Int = 20
+    @State private var isSavingDailyCap = false
+    @State private var dailyCapMessage: String?
     @AppStorage("revisionMode") private var revisionMode: String = "normal"
     @State private var loadTask: Task<Void, Never>?
     @State private var isSubscribed = false
     @State private var showProUpgradeSheet = false
+    @State private var mlTab: MLTab = .upcoming
+    @State private var isRecalibrating = false
+    @State private var showRecalibrateConfirm = false
 
     // Subscription caching - only check once per day at 00:01
     @AppStorage("cachedSubscriptionStatus") private var cachedSubscriptionStatus: Bool = false
     @AppStorage("lastSubscriptionCheckDate") private var lastSubscriptionCheckDate: Double = 0
+
+    private enum MLTab: String, CaseIterable, Identifiable {
+        case upcoming = "Upcoming"
+        case analytics = "Analytics"
+
+        var id: String { rawValue }
+    }
     
     var body: some View {
         NavigationStack {
@@ -32,48 +51,86 @@ struct RevisionsView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        if isLoading && revisionGroups.isEmpty {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
-                                .padding(.top, 100)
-                        } else if let errorMessage = errorMessage {
-                            VStack(spacing: 16) {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .font(.system(size: 60))
-                                    .foregroundStyle(.red)
-                                Text(errorMessage)
-                                    .foregroundStyle(.red)
-                            }
-                            .padding(.top, 100)
-                        } else if revisionGroups.isEmpty {
-                            VStack(spacing: 16) {
-                                Image(systemName: "calendar.badge.clock")
-                                    .font(.system(size: 60))
-                                    .foregroundStyle(.secondary)
-                                Text("No Revisions Scheduled")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.white)
-                                Text("Complete problems to schedule revisions")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.top, 100)
-                        } else {
-                            ForEach(revisionGroups) { group in
-                                RevisionGroupCard(
-                                    group: group,
-                                    useMLMode: useMLRevision,
-                                    onComplete: { revision in
-                                        await completeRevision(revision)
-                                    },
-                                    onMLAttempt: { revision in
-                                        selectedRevision = revision
-                                        showMLAttemptSheet = true
-                                    },
-                                    onDelete: { revision in
-                                        await deleteRevision(revision)
+                        if useMLRevision {
+                            if isSubscribed {
+                                Picker("ML View", selection: $mlTab) {
+                                    ForEach(MLTab.allCases) { tab in
+                                        Text(tab.rawValue).tag(tab)
                                     }
+                                }
+                                .pickerStyle(.segmented)
+                            }
+
+                            if mlTab == .upcoming {
+                                DailyReviewLimitCard(
+                                    currentCap: authViewModel.currentUser?.maxDailyReviews ?? 20,
+                                    draftCap: $dailyCapDraft,
+                                    isSaving: isSavingDailyCap,
+                                    message: dailyCapMessage,
+                                    summary: todaySummary,
+                                    onSave: { Task { await saveDailyCap() } }
                                 )
+                            }
+
+                            if mlTab == .analytics {
+                                if isAnalyticsLoading {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
+                                        .padding(.top, 8)
+                                } else if let analytics = analytics {
+                                    RevisionAnalyticsSection(analytics: analytics)
+                                } else if let analyticsError = analyticsError {
+                                    Text(analyticsError)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+
+                        if !useMLRevision || mlTab == .upcoming {
+                            if isLoading && revisionGroups.isEmpty {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
+                                    .padding(.top, 100)
+                            } else if let errorMessage = errorMessage {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.system(size: 60))
+                                        .foregroundStyle(.red)
+                                    Text(errorMessage)
+                                        .foregroundStyle(.red)
+                                }
+                                .padding(.top, 100)
+                            } else if revisionGroups.isEmpty {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "calendar.badge.clock")
+                                        .font(.system(size: 60))
+                                        .foregroundStyle(.secondary)
+                                    Text("No Revisions Scheduled")
+                                        .font(.title2)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+                                    Text("Complete problems to schedule revisions")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.top, 100)
+                            } else {
+                                ForEach(revisionGroups) { group in
+                                    RevisionGroupCard(
+                                        group: group,
+                                        useMLMode: useMLRevision,
+                                        onComplete: { revision in
+                                            await completeRevision(revision)
+                                        },
+                                        onMLAttempt: { revision in
+                                            selectedRevision = revision
+                                            showMLAttemptSheet = true
+                                        },
+                                        onDelete: { revision in
+                                            await deleteRevision(revision)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -115,40 +172,44 @@ struct RevisionsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        Toggle(isOn: $showCompletedRevisions) {
-                            Label("Show Completed", systemImage: showCompletedRevisions ? "checkmark.circle.fill" : "circle")
+                        if !useMLRevision {
+                            Toggle(isOn: $showCompletedRevisions) {
+                                Label("Show Completed", systemImage: showCompletedRevisions ? "checkmark.circle.fill" : "circle")
+                            }
+                            .onChange(of: showCompletedRevisions) { _, _ in
+                                Task { await loadData() }
+                            }
                         }
-                        .onChange(of: showCompletedRevisions) { _, _ in
-                            Task { await loadData() }
-                        }
-                        
-                        Toggle(isOn: Binding(
-                            get: { useMLRevision },
-                            set: { newValue in
-                                if newValue {
-                                    // User is trying to enable ML - force check subscription status
-                                    Task {
-                                        await checkSubscriptionStatus(forceCheck: true)
-                                        await MainActor.run {
-                                            if isSubscribed {
-                                                useMLRevision = true
-                                                revisionMode = "ml"
-                                                Task { await loadData(forceType: "ml") }
-                                            } else {
-                                                // Not subscribed - show upgrade sheet
-                                                showProUpgradeSheet = true
+
+                        if !isSubscribed {
+                            Toggle(isOn: Binding(
+                                get: { useMLRevision },
+                                set: { newValue in
+                                    if newValue {
+                                        // User is trying to enable ML - force check subscription status
+                                        Task {
+                                            await checkSubscriptionStatus(forceCheck: true)
+                                            await MainActor.run {
+                                                if isSubscribed {
+                                                    useMLRevision = true
+                                                    revisionMode = "ml"
+                                                    Task { await loadData(forceType: "ml") }
+                                                } else {
+                                                    // Not subscribed - show upgrade sheet
+                                                    showProUpgradeSheet = true
+                                                }
                                             }
                                         }
+                                    } else {
+                                        // Turning off ML - no need to check subscription
+                                        useMLRevision = false
+                                        revisionMode = "normal"
+                                        Task { await loadData(forceType: "normal") }
                                     }
-                                } else {
-                                    // Turning off ML - no need to check subscription
-                                    useMLRevision = false
-                                    revisionMode = "normal"
-                                    Task { await loadData(forceType: "normal") }
                                 }
+                            )) {
+                                Label("ML-Based Scheduling", systemImage: useMLRevision ? "brain.head.profile.fill" : "brain.head.profile")
                             }
-                        )) {
-                            Label("ML-Based Scheduling", systemImage: useMLRevision ? "brain.head.profile.fill" : "brain.head.profile")
                         }
                         
                         Divider()
@@ -162,6 +223,13 @@ struct RevisionsView: View {
                         
                         Button(action: { Task { await scheduleAllNotifications() } }) {
                             Label("Reschedule All Notifications", systemImage: "arrow.clockwise")
+                        }
+
+                        if useMLRevision {
+                            Button(action: { showRecalibrateConfirm = true }) {
+                                Label("Recalibrate Schedule", systemImage: "arrow.triangle.2.circlepath")
+                            }
+                            .disabled(isRecalibrating)
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -179,8 +247,21 @@ struct RevisionsView: View {
         .sheet(isPresented: $showProUpgradeSheet) {
             ProUpgradeSheet()
         }
+        .confirmationDialog("Recalibrate ML schedule?", isPresented: $showRecalibrateConfirm, titleVisibility: .visible) {
+            Button("Recalibrate Now", role: .destructive) {
+                Task { await recalibrateRevisions() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will reschedule all pending ML revisions starting today based on your daily cap.")
+        }
         .onAppear {
             useMLRevision = revisionMode == "ml"
+            if cachedSubscriptionStatus {
+                useMLRevision = true
+                revisionMode = "ml"
+            }
+            dailyCapDraft = authViewModel.currentUser?.maxDailyReviews ?? 20
             // Load from cache first
             if !DataManager.shared.revisionGroups.isEmpty {
                 revisionGroups = DataManager.shared.revisionGroups
@@ -189,9 +270,19 @@ struct RevisionsView: View {
                 stats = cachedStats
             }
             Task {
+                await checkSubscriptionStatus(reloadIfNeeded: false)
                 await loadData()
                 await checkNotificationStatus()
-                await checkSubscriptionStatus()
+            }
+        }
+        .onChange(of: authViewModel.currentUser?.maxDailyReviews) { _, newValue in
+            if let newValue = newValue {
+                dailyCapDraft = newValue
+            }
+        }
+        .onChange(of: mlTab) { _, newValue in
+            if newValue == .analytics && analytics == nil && !isAnalyticsLoading {
+                Task { await loadAnalytics() }
             }
         }
     }
@@ -207,6 +298,16 @@ struct RevisionsView: View {
             
             guard !Task.isCancelled else { return }
             await loadRevisions(type: revisionType)
+
+            guard !Task.isCancelled else { return }
+            if revisionType == "ml" {
+                await loadAnalytics()
+            } else {
+                analytics = nil
+                todaySummary = nil
+                analyticsError = nil
+                isAnalyticsLoading = false
+            }
         }
         
         await loadTask?.value
@@ -225,15 +326,25 @@ struct RevisionsView: View {
         errorMessage = nil
         
         do {
-            let response = try await NetworkService.shared.getGroupedRevisions(
-                includeCompleted: showCompletedRevisions,
-                type: type
-            )
-            revisionGroups = response.groups
-            
-            if notificationsEnabled {
-                let allRevisions = response.groups.flatMap { $0.revisions }
-                await NotificationManager.shared.scheduleRevisionNotifications(for: allRevisions)
+            if type == "ml" {
+                let response = try await NetworkService.shared.getTodayRevisions()
+                todaySummary = response
+                revisionGroups = groupRevisionsByDate(response.revisions)
+
+                if notificationsEnabled {
+                    await NotificationManager.shared.scheduleRevisionNotifications(for: response.revisions)
+                }
+            } else {
+                let response = try await NetworkService.shared.getGroupedRevisions(
+                    includeCompleted: showCompletedRevisions,
+                    type: type
+                )
+                revisionGroups = response.groups
+
+                if notificationsEnabled {
+                    let allRevisions = response.groups.flatMap { $0.revisions }
+                    await NotificationManager.shared.scheduleRevisionNotifications(for: allRevisions)
+                }
             }
         } catch let error as NetworkError {
             errorMessage = error.errorDescription
@@ -253,12 +364,23 @@ struct RevisionsView: View {
         
         isLoading = false
     }
+
+    private func loadAnalytics() async {
+        isAnalyticsLoading = true
+        analyticsError = nil
+        do {
+            analytics = try await NetworkService.shared.getRevisionAnalytics()
+        } catch {
+            analyticsError = "Revision analytics unavailable"
+        }
+        isAnalyticsLoading = false
+    }
     
     private func checkNotificationStatus() async {
         notificationsEnabled = await NotificationManager.shared.checkAuthorizationStatus()
     }
     
-    private func checkSubscriptionStatus(forceCheck: Bool = false) async {
+    private func checkSubscriptionStatus(forceCheck: Bool = false, reloadIfNeeded: Bool = true) async {
         // Use cached value first
         isSubscribed = cachedSubscriptionStatus
 
@@ -279,11 +401,22 @@ struct RevisionsView: View {
         let shouldRefresh = forceCheck || (isPast0001 && lastCheckWasBeforeToday)
 
         guard shouldRefresh else {
-            // Use cached value and ensure ML mode is correct
-            if useMLRevision && !isSubscribed {
-                useMLRevision = false
-                revisionMode = "normal"
-                Task { await loadData(forceType: "normal") }
+            await MainActor.run {
+                if isSubscribed {
+                    if !useMLRevision {
+                        useMLRevision = true
+                        revisionMode = "ml"
+                        if reloadIfNeeded {
+                            Task { await loadData(forceType: "ml") }
+                        }
+                    }
+                } else if useMLRevision {
+                    useMLRevision = false
+                    revisionMode = "normal"
+                    if reloadIfNeeded {
+                        Task { await loadData(forceType: "normal") }
+                    }
+                }
             }
             return
         }
@@ -295,11 +428,20 @@ struct RevisionsView: View {
                 cachedSubscriptionStatus = status.isSubscriptionActive
                 lastSubscriptionCheckDate = now.timeIntervalSince1970
 
-                // If ML mode is on but user is not subscribed, reset to normal
-                if useMLRevision && !isSubscribed {
+                if isSubscribed {
+                    if !useMLRevision {
+                        useMLRevision = true
+                        revisionMode = "ml"
+                        if reloadIfNeeded {
+                            Task { await loadData(forceType: "ml") }
+                        }
+                    }
+                } else if useMLRevision {
                     useMLRevision = false
                     revisionMode = "normal"
-                    Task { await loadData(forceType: "normal") }
+                    if reloadIfNeeded {
+                        Task { await loadData(forceType: "normal") }
+                    }
                 }
             }
         } catch {
@@ -362,6 +504,60 @@ struct RevisionsView: View {
             print("Failed to delete revision: \(error.localizedDescription)")
             HapticManager.shared.error()
         }
+    }
+
+    private func saveDailyCap() async {
+        guard let user = authViewModel.currentUser else { return }
+        let currentCap = user.maxDailyReviews ?? 20
+        guard dailyCapDraft != currentCap else { return }
+
+        isSavingDailyCap = true
+        dailyCapMessage = nil
+        do {
+            try await authViewModel.updateProfile(
+                email: user.email,
+                timezone: user.timezone,
+                visibility: user.visibility,
+                maxDailyReviews: dailyCapDraft
+            )
+            dailyCapMessage = "Daily limit updated"
+            await loadData(forceType: "ml")
+        } catch {
+            dailyCapMessage = "Failed to update daily limit"
+        }
+        isSavingDailyCap = false
+    }
+
+    private func recalibrateRevisions() async {
+        guard !isRecalibrating else { return }
+        isRecalibrating = true
+        do {
+            _ = try await NetworkService.shared.recalibrateMLRevisions()
+            await loadData(forceType: "ml")
+            if notificationsEnabled {
+                await scheduleAllNotifications()
+            }
+        } catch { }
+        isRecalibrating = false
+    }
+
+    private func groupRevisionsByDate(_ revisions: [Revision]) -> [RevisionGroup] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+
+        var grouped: [String: [Revision]] = [:]
+        for revision in revisions {
+            let key = formatter.string(from: revision.scheduledDate)
+            grouped[key, default: []].append(revision)
+        }
+
+        return grouped
+            .map { key, items in
+                let sorted = items.sorted { $0.scheduledDate < $1.scheduledDate }
+                return RevisionGroup(date: key, revisions: sorted, count: sorted.count)
+            }
+            .sorted { $0.displayDate < $1.displayDate }
     }
 }
 
@@ -563,6 +759,755 @@ struct StatBadge: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Daily Review Limit Card
+struct DailyReviewLimitCard: View {
+    let currentCap: Int
+    @Binding var draftCap: Int
+    let isSaving: Bool
+    let message: String?
+    let summary: RevisionTodayResponse?
+    let onSave: () -> Void
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundStyle(paletteManager.color(at: 2))
+                    Text("Daily Review Limit")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+            }
+
+            Text("Cap the number of ML revisions shown each day. Overflow rolls into the next days.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Stepper(value: $draftCap, in: 1...200) {
+                HStack {
+                    Text("Max per day")
+                        .font(.subheadline)
+                    Spacer()
+                    Text("\(draftCap)")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
+                }
+            }
+
+            if let summary = summary {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(summary.revisions.count)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(paletteManager.color(at: 1))
+                        Text("Showing")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(summary.total)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
+                        Text("Total Due")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(summary.overflow)")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        Text("Overflow")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+
+            if let message = message {
+                Text(message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button(action: onSave) {
+                if isSaving {
+                    ProgressView()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                } else {
+                    Text("Save Limit")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+            }
+            .tint(paletteManager.selectedPalette.primary)
+            .buttonStyle(.borderedProminent)
+            .disabled(isSaving || draftCap == currentCap)
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+
+// MARK: - Revision Analytics Section
+struct RevisionAnalyticsSection: View {
+    let analytics: RevisionAnalyticsResponse
+
+    var body: some View {
+        VStack(spacing: 16) {
+            RevisionOverviewCard(overview: analytics.overview, streaks: analytics.streaks)
+            RevisionStabilityDistributionCard(distribution: analytics.stabilityDistribution)
+            RevisionAccuracyTrendCard(points: analytics.accuracyTrend)
+            RevisionIntervalGrowthCard(points: analytics.averageIntervalGrowth)
+            RevisionProjectedLoadCard(points: analytics.projectedLoad)
+            RevisionRetentionRiskCard(items: analytics.retentionHeatmap)
+        }
+    }
+}
+
+struct RevisionOverviewCard: View {
+    let overview: RevisionAnalyticsOverview
+    let streaks: RevisionAnalyticsStreaks
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    private var retrievabilityPercent: String {
+        String(format: "%.0f", overview.averageRetrievability * 100)
+    }
+
+    private var successRatePercent: String {
+        String(format: "%.0f", streaks.overallSuccessRate * 100)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .foregroundStyle(paletteManager.color(at: 3))
+                Text("Revision Analytics")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            HStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(overview.totalProblemsTracked)")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("Problems Tracked")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+                    .frame(height: 44)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(retrievabilityPercent)%")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 1))
+                    Text("Avg Retrievability")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Divider()
+                    .frame(height: 44)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(successRatePercent)%")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 2))
+                    Text("Success Rate")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+struct RevisionStabilityDistributionCard: View {
+    let distribution: RevisionStabilityDistribution
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    private struct Bucket: Identifiable {
+        let id = UUID()
+        let label: String
+        let count: Int
+        let color: Color
+    }
+
+    private var buckets: [Bucket] {
+        [
+            Bucket(label: "Critical", count: distribution.critical, color: paletteManager.color(at: 0)),
+            Bucket(label: "Weak", count: distribution.weak, color: paletteManager.color(at: 1)),
+            Bucket(label: "Developing", count: distribution.developing, color: paletteManager.color(at: 2)),
+            Bucket(label: "Strong", count: distribution.strong, color: paletteManager.color(at: 3)),
+            Bucket(label: "Mastered", count: distribution.mastered, color: paletteManager.color(at: 4)),
+        ]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(paletteManager.color(at: 4))
+                Text("Retention Health")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            Chart(buckets) { bucket in
+                BarMark(
+                    x: .value("Bucket", bucket.label),
+                    y: .value("Count", bucket.count)
+                )
+                .foregroundStyle(bucket.color.gradient)
+                .cornerRadius(3)
+            }
+            .frame(height: 120)
+            .chartXAxis {
+                AxisMarks(values: buckets.map { $0.label }) { value in
+                    AxisValueLabel {
+                        if let label = value.as(String.self) {
+                            Text(label)
+                                .font(.caption2)
+                        }
+                    }
+                }
+            }
+            .chartYAxis(.hidden)
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+struct RevisionAccuracyTrendCard: View {
+    let points: [RevisionAccuracyPoint]
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    private var sortedPoints: [RevisionAccuracyPoint] {
+        points.sorted { $0.date < $1.date }
+    }
+
+    private var averageRate: Double {
+        guard !points.isEmpty else { return 0 }
+        return points.map { $0.successRate }.reduce(0, +) / Double(points.count)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .foregroundStyle(paletteManager.color(at: 5))
+                Text("Accuracy Trend")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            HStack(spacing: 12) {
+                Text(String(format: "%.0f%%", averageRate * 100))
+                    .font(.system(size: 32, weight: .bold))
+                    .foregroundStyle(paletteManager.color(at: 5))
+                Text("30-day average")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if sortedPoints.isEmpty {
+                Text("No recent attempts")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                Chart(Array(sortedPoints.enumerated()), id: \.offset) { index, point in
+                    LineMark(
+                        x: .value("Day", index),
+                        y: .value("Accuracy", point.successRate * 100)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 5))
+                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
+
+                    AreaMark(
+                        x: .value("Day", index),
+                        y: .value("Accuracy", point.successRate * 100)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 5).opacity(0.2))
+                }
+                .frame(height: 110)
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+struct RevisionProjectedLoadCard: View {
+    let points: [RevisionProjectedLoad]
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    private struct LoadBar: Identifiable {
+        let id = UUID()
+        let dayIndex: Int
+        let count: Int
+        let kind: String
+    }
+
+    private var series: [LoadBar] {
+        let sorted = points.sorted { $0.date < $1.date }
+        return sorted.enumerated().flatMap { index, point in
+            var bars: [LoadBar] = [LoadBar(dayIndex: index, count: point.dueCount, kind: "Due")]
+            if point.overdueCount > 0 {
+                bars.append(LoadBar(dayIndex: index, count: point.overdueCount, kind: "Overdue"))
+            }
+            return bars
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "calendar")
+                    .foregroundStyle(paletteManager.color(at: 6))
+                Text("Projected Load")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            if series.isEmpty {
+                Text("No upcoming data")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                Chart(series) { bar in
+                    BarMark(
+                        x: .value("Day", bar.dayIndex),
+                        y: .value("Count", bar.count)
+                    )
+                    .foregroundStyle(bar.kind == "Overdue" ? paletteManager.color(at: 0) : paletteManager.color(at: 6))
+                    .position(by: .value("Type", bar.kind))
+                    .cornerRadius(2)
+                }
+                .frame(height: 110)
+                .chartXAxis {
+                    AxisMarks(values: [0, 3, 6]) { value in
+                        AxisValueLabel {
+                            if let index = value.as(Int.self) {
+                                Text(index == 0 ? "Today" : "T+\(index)")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .chartYAxis(.hidden)
+
+                HStack(spacing: 12) {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(paletteManager.color(at: 6))
+                            .frame(width: 8, height: 8)
+                        Text("Due")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(paletteManager.color(at: 0))
+                            .frame(width: 8, height: 8)
+                        Text("Overdue")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+struct RevisionIntervalGrowthCard: View {
+    let points: [RevisionIntervalGrowth]
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    private struct IntervalPoint: Identifiable {
+        let id = UUID()
+        let index: Int
+        let label: String
+        let avgInterval: Double
+        let count: Int
+    }
+
+    private static let monthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    private static let monthDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    private static let isoFractionalFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private func parseMonthDate(_ raw: String) -> Date? {
+        if let date = Self.monthFormatter.date(from: raw) {
+            return date
+        }
+        if let date = Self.monthDayFormatter.date(from: raw) {
+            return date
+        }
+        if let date = Self.isoFractionalFormatter.date(from: raw) {
+            return date
+        }
+        if let date = Self.isoFormatter.date(from: raw) {
+            return date
+        }
+        return nil
+    }
+
+    private func monthLabel(for date: Date?, fallback: String) -> String {
+        guard let date = date else { return fallback }
+        let formatter = DateFormatter()
+        formatter.dateFormat = Calendar.current.component(.year, from: date) == Calendar.current.component(.year, from: Date()) ? "MMM" : "MMM yy"
+        return formatter.string(from: date)
+    }
+
+    private var intervalPoints: [IntervalPoint] {
+        let sorted = points.sorted { lhs, rhs in
+            let left = parseMonthDate(lhs.month)
+            let right = parseMonthDate(rhs.month)
+            switch (left, right) {
+            case let (l?, r?): return l < r
+            case (_?, nil): return false
+            case (nil, _?): return true
+            default: return lhs.month < rhs.month
+            }
+        }
+
+        return sorted.enumerated().map { index, point in
+            let date = parseMonthDate(point.month)
+            return IntervalPoint(
+                index: index,
+                label: monthLabel(for: date, fallback: point.month),
+                avgInterval: point.avgInterval,
+                count: point.count
+            )
+        }
+    }
+
+    private var latestInterval: Double? {
+        intervalPoints.last?.avgInterval
+    }
+
+    private var intervalDelta: Double? {
+        guard intervalPoints.count >= 2 else { return nil }
+        return intervalPoints[intervalPoints.count - 1].avgInterval - intervalPoints[intervalPoints.count - 2].avgInterval
+    }
+
+    private var axisIndices: [Int] {
+        let count = intervalPoints.count
+        guard count > 0 else { return [] }
+        if count <= 4 {
+            return intervalPoints.map { $0.index }
+        }
+        let mid = count / 2
+        return [0, mid, count - 1]
+    }
+
+    private func formatInterval(_ value: Double?) -> String {
+        guard let value = value else { return "0" }
+        return String(format: "%.1f", value)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .foregroundStyle(paletteManager.color(at: 4))
+                Text("Interval Growth")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(formatInterval(latestInterval))d")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 4))
+                    Text("Latest average interval")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let delta = intervalDelta {
+                    Divider()
+                        .frame(height: 44)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
+                            .foregroundStyle(delta >= 0 ? paletteManager.color(at: 3) : paletteManager.color(at: 0))
+                        Text(String(format: "%+.1fd", delta))
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(delta >= 0 ? paletteManager.color(at: 3) : paletteManager.color(at: 0))
+                    }
+                }
+            }
+
+            if intervalPoints.isEmpty {
+                Text("Not enough history")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                Chart(intervalPoints) { point in
+                    LineMark(
+                        x: .value("Month", point.index),
+                        y: .value("Avg Interval", point.avgInterval)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 4))
+                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
+
+                    AreaMark(
+                        x: .value("Month", point.index),
+                        y: .value("Avg Interval", point.avgInterval)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 4).opacity(0.2))
+                }
+                .frame(height: 110)
+                .chartXAxis {
+                    AxisMarks(values: axisIndices) { value in
+                        AxisValueLabel {
+                            if let index = value.as(Int.self),
+                               let label = intervalPoints.first(where: { $0.index == index })?.label {
+                                Text(label)
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .chartYAxis(.hidden)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+    }
+}
+
+struct RevisionRetentionRiskCard: View {
+    let items: [RevisionRetentionItem]
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+
+    private struct RiskItem: Identifiable {
+        let id = UUID()
+        let index: Int
+        let title: String
+        let shortTitle: String
+        let retrievability: Double
+        let lapses: Int
+        let isLeech: Bool
+    }
+
+    private var focusItems: [RiskItem] {
+        let filtered = items.filter { $0.isLeech || $0.lapses > 0 || $0.retrievability < 0.7 }
+        let base = filtered.isEmpty ? items : filtered
+        let sorted = base.sorted {
+            if $0.isLeech != $1.isLeech { return $0.isLeech && !$1.isLeech }
+            if $0.retrievability != $1.retrievability { return $0.retrievability < $1.retrievability }
+            return $0.lapses > $1.lapses
+        }
+
+        return Array(sorted.prefix(6)).enumerated().map { index, item in
+            let short = item.problemTitle.count > 12 ? String(item.problemTitle.prefix(12)) + "..." : item.problemTitle
+            return RiskItem(
+                index: index,
+                title: item.problemTitle,
+                shortTitle: short,
+                retrievability: item.retrievability,
+                lapses: item.lapses,
+                isLeech: item.isLeech
+            )
+        }
+    }
+
+    private var leechCount: Int {
+        items.filter { $0.isLeech }.count
+    }
+
+    private var lowRetrievabilityCount: Int {
+        items.filter { $0.retrievability < 0.6 }.count
+    }
+
+    private func barColor(for item: RiskItem) -> Color {
+        if item.isLeech || item.retrievability < 0.5 {
+            return paletteManager.color(at: 0)
+        }
+        if item.retrievability < 0.7 {
+            return paletteManager.color(at: 1)
+        }
+        return paletteManager.color(at: 2)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(paletteManager.color(at: 0))
+                Text("At-Risk Problems")
+                    .font(.headline)
+                Spacer()
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(leechCount)")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    Text("Leeches")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(lowRetrievabilityCount)")
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 1))
+                    Text("Below 60%")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if focusItems.isEmpty {
+                Text("No at-risk items yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                Chart(focusItems) { item in
+                    BarMark(
+                        x: .value("Retrievability", item.retrievability * 100),
+                        y: .value("Problem", item.shortTitle)
+                    )
+                    .foregroundStyle(barColor(for: item))
+                    .cornerRadius(2)
+                }
+                .frame(height: 130)
+                .chartXAxis {
+                    AxisMarks(values: [0, 50, 100]) { value in
+                        AxisValueLabel {
+                            if let number = value.as(Int.self) {
+                                Text("\(number)%")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks { value in
+                        AxisValueLabel {
+                            if let label = value.as(String.self) {
+                                Text(label)
+                                    .font(.caption2)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(focusItems) { item in
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(barColor(for: item))
+                                .frame(width: 6, height: 6)
+                            Text(item.title)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(String(format: "%.0f%%", item.retrievability * 100))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
 }
 
@@ -786,4 +1731,5 @@ struct InfoRow: View {
 
 #Preview {
     RevisionsView()
+        .environmentObject(AuthViewModel())
 }

@@ -23,7 +23,22 @@ struct WatchWidgetData: Codable {
     let revisions: [WatchRevisionData]?
     let revisionsDueCount: Int
     let achievements: WatchAchievementsData?
+    let username: String?
+    let qrCodeImageData: Data?
     let lastUpdated: Date
+    
+    // Custom decoder for backward compatibility with older cached data
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        streak = try container.decodeIfPresent(WatchStreakData.self, forKey: .streak)
+        recentSolve = try container.decodeIfPresent(WatchRecentSolveData.self, forKey: .recentSolve)
+        revisions = try container.decodeIfPresent([WatchRevisionData].self, forKey: .revisions)
+        revisionsDueCount = try container.decodeIfPresent(Int.self, forKey: .revisionsDueCount) ?? 0
+        achievements = try container.decodeIfPresent(WatchAchievementsData.self, forKey: .achievements)
+        username = try container.decodeIfPresent(String.self, forKey: .username)
+        qrCodeImageData = try container.decodeIfPresent(Data.self, forKey: .qrCodeImageData)
+        lastUpdated = try container.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? Date()
+    }
 }
 
 struct WatchStreakData: Codable {
@@ -185,6 +200,14 @@ class WatchDataManager: NSObject, ObservableObject {
     
     var achievementsTotal: Int {
         data?.achievements?.total ?? 0
+    }
+    
+    var username: String? {
+        data?.username
+    }
+    
+    var qrCodeImageData: Data? {
+        data?.qrCodeImageData
     }
     
     var lastUpdated: Date? {
