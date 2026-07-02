@@ -31,7 +31,7 @@ enum NetworkError: LocalizedError {
 class NetworkService {
     static let shared = NetworkService()
     
-    private let baseURL = "https://traverse-backend-api.azurewebsites.net/api"
+    private let baseURL = "https://155-248-241-153.sslip.io/api"
     
     private init() {}
     

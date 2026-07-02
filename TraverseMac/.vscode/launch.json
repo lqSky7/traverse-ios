@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:TraverseMac}",
+            "name": "Debug TraverseMac",
+            "target": "TraverseMac",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug TraverseMac"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:TraverseMac}",
+            "name": "Release TraverseMac",
+            "target": "TraverseMac",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release TraverseMac"
+        }
+    ]
+}
