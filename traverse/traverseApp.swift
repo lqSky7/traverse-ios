@@ -30,11 +30,6 @@ struct traverseApp: App {
         }
         .onChange(of: scenePhase) { oldPhase, newPhase in
             if newPhase == .active {
-                // Check streak reminder when app becomes active
-                Task {
-                    await DataManager.shared.checkAndScheduleStreakReminder()
-                }
-                
                 // Refresh all widgets when app opens
                 WidgetCenter.shared.reloadAllTimelines()
                 

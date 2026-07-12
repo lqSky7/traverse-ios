@@ -11,6 +11,7 @@ class AuthViewModel: ObservableObject {
     @Published var username: String = ""
     @Published var email: String = ""
     @Published var password: String = ""
+    @Published var otpCode: String = ""
     @Published var isAuthenticated: Bool = false
     @Published var currentUser: User?
     @Published var errorMessage: String?

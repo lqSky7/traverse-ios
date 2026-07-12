@@ -1,3 +1,11 @@
+//
+//  StreakReminderActivity.swift
+//  TraverseWidget
+//
+//  Created by Antigravity
+//
+
+/*
 import ActivityKit
 import Foundation
 
@@ -9,3 +17,4 @@ struct StreakReminderAttributes: ActivityAttributes {
     
     var streakEndsAt: Date
 }
+*/

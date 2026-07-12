@@ -89,6 +89,9 @@ struct Problem: Codable {
     let slug: String
     let title: String
     let difficulty: String
+    let category: Int?
+    let topic: String?
+    let subtopic: String?
 }
 
 struct Submission: Codable {

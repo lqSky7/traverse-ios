@@ -12,7 +12,6 @@ struct TraverseWidgetBundle: WidgetBundle {
         StreakWidget()
         RecentSolveWidget()
         RevisionsWidget()
-        StreakReminderLiveActivity()
         
         // Lock Screen Widgets
         StreakLockScreenWidget()
