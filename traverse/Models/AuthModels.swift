@@ -61,6 +61,7 @@ struct User: Codable {
     let maxDailyReviews: Int?
     let createdAt: String?
     var profileImageURL: String?
+    var calendarToken: String?
 }
 
 struct AuthResponse: Codable {

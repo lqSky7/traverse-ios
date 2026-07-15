@@ -8,6 +8,7 @@ import SwiftUI
 // MARK: - Bento Settings Grid
 struct BentoSettingsGrid: View {
     @ObservedObject var paletteManager: ColorPaletteManager
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     // Sheet bindings
     @Binding var showingEditProfile: Bool
@@ -253,6 +254,41 @@ struct BentoSettingsGrid: View {
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)
             
+            // Row 4.5: Calendar Subscription (full width)
+            Button {
+                mediumFeedback.impactOccurred()
+                subscribeToCalendar()
+            } label: {
+                HStack {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(.green)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Calendar Subscription")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Sync revisions to your Calendar app")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(.green.opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
+            
+            // Horizontal Divider
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+            
             // Row 5: Delete Account (full width)
 
             Button {
@@ -295,6 +331,15 @@ struct BentoSettingsGrid: View {
             lightFeedback.prepare()
             mediumFeedback.prepare()
         }
+    }
+    
+    private func subscribeToCalendar() {
+        guard let user = authViewModel.currentUser else { return }
+        let username = user.username
+        let token = user.calendarToken ?? ""
+        let webcalUrlString = "webcal://155-248-241-153.sslip.io/api/revisions/calendar/\(username)?token=\(token)"
+        guard let url = URL(string: webcalUrlString) else { return }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 }
 
@@ -343,4 +388,5 @@ struct BentoCellButtonStyle: ButtonStyle {
         .padding(.vertical)
     }
     .background(Color(.systemBackground))
+    .environmentObject(AuthViewModel())
 }
