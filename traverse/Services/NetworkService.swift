@@ -1554,6 +1554,65 @@ class NetworkService {
         }
     }
     
+    // MARK: - Reschedule Revision
+    func rescheduleRevision(id: Int, days: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/revisions/\(id)/reschedule") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        let requestBody = ["days": days]
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to reschedule revision (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
+    // MARK: - Delete Problem Revisions
+    func deleteProblemRevisions(problemId: Int) async throws {
+        guard let url = URL(string: "\(baseURL)/revisions/problem/\(problemId)") else {
+            throw NetworkError.invalidURL
+        }
+        
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+        
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to delete problem revisions (Status: \(httpResponse.statusCode))")
+        }
+    }
+    
     // MARK: - Friend Streaks
     
     /// Send a friend streak request to a friend

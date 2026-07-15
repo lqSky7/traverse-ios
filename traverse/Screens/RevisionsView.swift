@@ -128,6 +128,12 @@ struct RevisionsView: View {
                                         },
                                         onDelete: { revision in
                                             await deleteRevision(revision)
+                                        },
+                                        onReschedule: { revision, days in
+                                            await rescheduleRevision(revision, days: days)
+                                        },
+                                        onDeleteProblem: { revision in
+                                            await deleteProblemFromRevisionList(revision)
                                         }
                                     )
                                 }
@@ -505,6 +511,28 @@ struct RevisionsView: View {
             HapticManager.shared.error()
         }
     }
+    
+    private func rescheduleRevision(_ revision: Revision, days: Int) async {
+        do {
+            try await NetworkService.shared.rescheduleRevision(id: revision.id, days: days)
+            HapticManager.shared.success()
+            await loadData()
+        } catch {
+            print("Failed to reschedule revision: \(error.localizedDescription)")
+            HapticManager.shared.error()
+        }
+    }
+    
+    private func deleteProblemFromRevisionList(_ revision: Revision) async {
+        do {
+            try await NetworkService.shared.deleteProblemRevisions(problemId: revision.problem.id)
+            HapticManager.shared.success()
+            await loadData()
+        } catch {
+            print("Failed to delete problem revisions: \(error.localizedDescription)")
+            HapticManager.shared.error()
+        }
+    }
 
     private func saveDailyCap() async {
         guard let user = authViewModel.currentUser else { return }
@@ -567,6 +595,8 @@ struct RevisionGroupCard: View {
     let onComplete: (Revision) async -> Void
     let onMLAttempt: (Revision) -> Void
     let onDelete: (Revision) async -> Void
+    let onReschedule: (Revision, Int) async -> Void
+    let onDeleteProblem: (Revision) async -> Void
     @StateObject private var paletteManager = ColorPaletteManager.shared
     
     var body: some View {
@@ -593,7 +623,15 @@ struct RevisionGroupCard: View {
             // Card with revisions
             VStack(spacing: 0) {
                 ForEach(Array(group.revisions.enumerated()), id: \.element.id) { index, revision in
-                    RevisionCard(revision: revision, useMLMode: useMLMode, onComplete: onComplete, onMLAttempt: onMLAttempt, onDelete: onDelete)
+                    RevisionCard(
+                        revision: revision,
+                        useMLMode: useMLMode,
+                        onComplete: onComplete,
+                        onMLAttempt: onMLAttempt,
+                        onDelete: onDelete,
+                        onReschedule: onReschedule,
+                        onDeleteProblem: onDeleteProblem
+                    )
                     
                     // Add inset divider between items (not after last)
                     if index < group.revisions.count - 1 {
@@ -646,6 +684,8 @@ struct RevisionCard: View {
     let onComplete: (Revision) async -> Void
     let onMLAttempt: (Revision) -> Void
     let onDelete: (Revision) async -> Void
+    let onReschedule: (Revision, Int) async -> Void
+    let onDeleteProblem: (Revision) async -> Void
     @State private var isCompleting = false
     @State private var isDeleting = false
     @StateObject private var paletteManager = ColorPaletteManager.shared
@@ -714,15 +754,42 @@ struct RevisionCard: View {
         .padding(.horizontal, 16)
         .opacity(revision.isCompleted ? 0.6 : 1.0)
         .contextMenu {
-            if useMLMode && !revision.isCompleted {
-                Button(role: .destructive) {
+            if !revision.isCompleted {
+                Button {
                     Task {
-                        isDeleting = true
-                        await onDelete(revision)
-                        isDeleting = false
+                        await onReschedule(revision, 7)
                     }
                 } label: {
-                    Label("Delete Revision", systemImage: "trash")
+                    Label("Reschedule 7 Days Later", systemImage: "calendar.badge.plus")
+                }
+                
+                Button {
+                    Task {
+                        await onReschedule(revision, 14)
+                    }
+                } label: {
+                    Label("Reschedule 14 Days Later", systemImage: "calendar.badge.plus")
+                }
+                
+                Button(role: .destructive) {
+                    Task {
+                        await onDeleteProblem(revision)
+                    }
+                } label: {
+                    Label("Remove from Revision List", systemImage: "trash")
+                }
+                
+                if useMLMode {
+                    Divider()
+                    Button(role: .destructive) {
+                        Task {
+                            isDeleting = true
+                            await onDelete(revision)
+                            isDeleting = false
+                        }
+                    } label: {
+                        Label("Delete Single ML Revision", systemImage: "minus.circle")
+                    }
                 }
             }
         }
