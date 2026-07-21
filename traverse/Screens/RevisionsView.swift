@@ -336,7 +336,6 @@ struct RevisionsView: View {
                 Task { await recalibrateRevisions() }
             }
             Button("Cancel", role: .cancel) {}
-        }
         } message: {
             Text("This will reschedule all pending ML revisions starting today based on your daily cap.")
         }

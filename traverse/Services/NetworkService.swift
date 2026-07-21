@@ -1444,6 +1444,8 @@ class NetworkService {
             }
             throw NetworkError.serverError("Failed to recalibrate revisions (Status: \(httpResponse.statusCode))")
         }
+    }
+
     // MARK: - Pause / Resume ML Revisions
     func pauseMLRevisions(pauseDays: Int = 7) async throws -> PauseRevisionsResponse {
         guard let url = URL(string: "\(baseURL)/revisions/pause") else {
