@@ -177,7 +177,32 @@ struct RevisionTodayResponse: Codable {
     let maxDaily: Int
     let overflow: Int
     let overdue: Int
+    let isPaused: Bool?
+    let pausedUntil: String?
 }
+
+// MARK: - Pause / Resume Models
+struct PauseRevisionsRequest: Codable {
+    let pauseDays: Int
+}
+
+struct PauseRevisionsResponse: Codable {
+    let message: String
+    let pausedUntil: String
+    let isPaused: Bool
+}
+
+struct ResumeRevisionsRequest: Codable {
+    let backlogDays: Int
+}
+
+struct ResumeRevisionsResponse: Codable {
+    let message: String
+    let rescheduled: Int
+    let backlogDays: Int
+    let isPaused: Bool
+}
+
 
 // MARK: - Revision Analytics
 struct RevisionAnalyticsResponse: Codable {

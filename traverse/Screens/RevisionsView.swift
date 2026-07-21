@@ -32,6 +32,11 @@ struct RevisionsView: View {
     @State private var mlTab: MLTab = .upcoming
     @State private var isRecalibrating = false
     @State private var showRecalibrateConfirm = false
+    @State private var showPauseConfirm = false
+    @State private var showResumeConfirm = false
+    @State private var pauseDaysInput: Int = 7
+    @State private var backlogDaysInput: Int = 3
+    @State private var isPausingOrResuming = false
 
     // Subscription caching - only check once per day at 00:01
     @AppStorage("cachedSubscriptionStatus") private var cachedSubscriptionStatus: Bool = false
@@ -62,14 +67,59 @@ struct RevisionsView: View {
                             }
 
                             if mlTab == .upcoming {
-                                DailyReviewLimitCard(
-                                    currentCap: authViewModel.currentUser?.maxDailyReviews ?? 20,
-                                    draftCap: $dailyCapDraft,
-                                    isSaving: isSavingDailyCap,
-                                    message: dailyCapMessage,
-                                    summary: todaySummary,
-                                    onSave: { Task { await saveDailyCap() } }
-                                )
+                                if todaySummary?.isPaused == true {
+                                    VStack(alignment: .leading, spacing: 14) {
+                                        HStack {
+                                            Image(systemName: "graduationcap.fill")
+                                                .font(.title)
+                                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text("Exam Mode Active")
+                                                    .font(.headline)
+                                                    .foregroundStyle(.white)
+                                                Text("Revisions are currently paused")
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            Spacer()
+                                        }
+                                        
+                                        if let pausedUntil = todaySummary?.pausedUntil {
+                                            Text("Paused until \(formattedPausedDate(pausedUntil))")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        Text("🎓 Rest up! Calendar feed is serving motivational quotes & easter eggs.")
+                                            .font(.caption)
+                                            .foregroundStyle(paletteManager.selectedPalette.primary)
+
+                                        Button(action: { showResumeConfirm = true }) {
+                                            HStack {
+                                                Spacer()
+                                                Text("Resume Revisions Now")
+                                                    .fontWeight(.semibold)
+                                                Spacer()
+                                            }
+                                            .padding(.vertical, 10)
+                                            .background(paletteManager.selectedPalette.primary)
+                                            .foregroundColor(.black)
+                                            .cornerRadius(8)
+                                        }
+                                    }
+                                    .padding(16)
+                                    .background(Color(UIColor.systemGray6))
+                                    .cornerRadius(12)
+                                } else {
+                                    DailyReviewLimitCard(
+                                        currentCap: authViewModel.currentUser?.maxDailyReviews ?? 20,
+                                        draftCap: $dailyCapDraft,
+                                        isSaving: isSavingDailyCap,
+                                        message: dailyCapMessage,
+                                        summary: todaySummary,
+                                        onSave: { Task { await saveDailyCap() } }
+                                    )
+                                }
                             }
 
                             if mlTab == .analytics {
@@ -232,6 +282,16 @@ struct RevisionsView: View {
                         }
 
                         if useMLRevision {
+                            if todaySummary?.isPaused == true {
+                                Button(action: { showResumeConfirm = true }) {
+                                    Label("Resume Revisions", systemImage: "play.circle.fill")
+                                }
+                            } else {
+                                Button(action: { showPauseConfirm = true }) {
+                                    Label("Stop Revisions (Exam Mode)", systemImage: "graduationcap.fill")
+                                }
+                            }
+
                             Button(action: { showRecalibrateConfirm = true }) {
                                 Label("Recalibrate Schedule", systemImage: "arrow.triangle.2.circlepath")
                             }
@@ -253,11 +313,30 @@ struct RevisionsView: View {
         .sheet(isPresented: $showProUpgradeSheet) {
             ProUpgradeSheet()
         }
+        .sheet(isPresented: $showPauseConfirm) {
+            PauseExamModeSheet(
+                pauseDays: $pauseDaysInput,
+                isSubmitting: isPausingOrResuming,
+                onConfirm: { days in
+                    Task { await pauseRevisions(days: days) }
+                }
+            )
+        }
+        .sheet(isPresented: $showResumeConfirm) {
+            ResumeRevisionsSheet(
+                backlogDays: $backlogDaysInput,
+                isSubmitting: isPausingOrResuming,
+                onConfirm: { days in
+                    Task { await resumeRevisions(backlogDays: days) }
+                }
+            )
+        }
         .confirmationDialog("Recalibrate ML schedule?", isPresented: $showRecalibrateConfirm, titleVisibility: .visible) {
             Button("Recalibrate Now", role: .destructive) {
                 Task { await recalibrateRevisions() }
             }
             Button("Cancel", role: .cancel) {}
+        }
         } message: {
             Text("This will reschedule all pending ML revisions starting today based on your daily cap.")
         }
@@ -502,13 +581,24 @@ struct RevisionsView: View {
     }
     
     private func deleteRevision(_ revision: Revision) async {
+        // Optimistically remove from UI so backend fetch doesn't backfill new items into capped list
+        withAnimation {
+            for i in 0..<revisionGroups.count {
+                revisionGroups[i] = RevisionGroup(
+                    date: revisionGroups[i].date,
+                    revisions: revisionGroups[i].revisions.filter { $0.id != revision.id },
+                    count: revisionGroups[i].revisions.filter { $0.id != revision.id }.count
+                )
+            }
+            revisionGroups.removeAll { $0.revisions.isEmpty }
+        }
         do {
             try await NetworkService.shared.deleteRevision(id: revision.id)
             HapticManager.shared.success()
-            await loadData()
         } catch {
             print("Failed to delete revision: \(error.localizedDescription)")
             HapticManager.shared.error()
+            await loadData()
         }
     }
     
@@ -524,14 +614,65 @@ struct RevisionsView: View {
     }
     
     private func deleteProblemFromRevisionList(_ revision: Revision) async {
+        // Optimistically remove all revisions of this problem from UI
+        withAnimation {
+            for i in 0..<revisionGroups.count {
+                let filtered = revisionGroups[i].revisions.filter { $0.problem.id != revision.problem.id }
+                revisionGroups[i] = RevisionGroup(
+                    date: revisionGroups[i].date,
+                    revisions: filtered,
+                    count: filtered.count
+                )
+            }
+            revisionGroups.removeAll { $0.revisions.isEmpty }
+        }
         do {
             try await NetworkService.shared.deleteProblemRevisions(problemId: revision.problem.id)
             HapticManager.shared.success()
-            await loadData()
         } catch {
             print("Failed to delete problem revisions: \(error.localizedDescription)")
             HapticManager.shared.error()
+            await loadData()
         }
+    }
+
+    private func pauseRevisions(days: Int) async {
+        isPausingOrResuming = true
+        do {
+            _ = try await NetworkService.shared.pauseMLRevisions(pauseDays: days)
+            HapticManager.shared.success()
+            showPauseConfirm = false
+            await loadData(forceType: "ml")
+        } catch {
+            print("Failed to pause revisions: \(error.localizedDescription)")
+            HapticManager.shared.error()
+        }
+        isPausingOrResuming = false
+    }
+
+    private func resumeRevisions(backlogDays: Int) async {
+        isPausingOrResuming = true
+        do {
+            _ = try await NetworkService.shared.resumeMLRevisions(backlogDays: backlogDays)
+            HapticManager.shared.success()
+            showResumeConfirm = false
+            await loadData(forceType: "ml")
+        } catch {
+            print("Failed to resume revisions: \(error.localizedDescription)")
+            HapticManager.shared.error()
+        }
+        isPausingOrResuming = false
+    }
+
+    private func formattedPausedDate(_ dateString: String) -> String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: dateString) ?? ISO8601DateFormatter().date(from: dateString) else {
+            return dateString
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        return formatter.string(from: date)
     }
 
     private func saveDailyCap() async {
@@ -1796,7 +1937,150 @@ struct InfoRow: View {
     }
 }
 
+// MARK: - Pause Exam Mode Sheet
+struct PauseExamModeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var pauseDays: Int
+    let isSubmitting: Bool
+    let onConfirm: (Int) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Image(systemName: "graduationcap.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.purple)
+
+                    Text("Pause Revisions")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text("Stop all revisions while preparing for exams. Your calendar feed will display motivational quotes & easter eggs.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 20)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Pause Duration")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+
+                    Stepper("\(pauseDays) Days", value: $pauseDays, in: 1...30)
+                        .padding()
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal)
+
+                Spacer()
+
+                Button(action: { onConfirm(pauseDays) }) {
+                    if isSubmitting {
+                        ProgressView()
+                    } else {
+                        Text("Confirm Pause")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.purple)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+                }
+                .disabled(isSubmitting)
+                .padding(.horizontal)
+                .padding(.bottom, 20)
+            }
+            .navigationTitle("Exam Mode")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Resume Revisions Sheet
+struct ResumeRevisionsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var backlogDays: Int
+    let isSubmitting: Bool
+    let onConfirm: (Int) -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundStyle(.green)
+
+                    Text("Resume Revisions")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text("Choose how many days you want to spread your accumulated backlog over.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+                .padding(.top, 20)
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Spread Backlog Over")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+
+                    Stepper("\(backlogDays) Days", value: $backlogDays, in: 1...14)
+                        .padding()
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(12)
+                }
+                .padding(.horizontal)
+
+                Spacer()
+
+                Button(action: { onConfirm(backlogDays) }) {
+                    if isSubmitting {
+                        ProgressView()
+                    } else {
+                        Text("Resume Schedule")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.green)
+                            .foregroundColor(.black)
+                            .cornerRadius(12)
+                    }
+                }
+                .disabled(isSubmitting)
+                .padding(.horizontal)
+                .padding(.bottom, 20)
+            }
+            .navigationTitle("Catch Up")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
 #Preview {
     RevisionsView()
         .environmentObject(AuthViewModel())
 }
+

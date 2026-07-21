@@ -1444,7 +1444,71 @@ class NetworkService {
             }
             throw NetworkError.serverError("Failed to recalibrate revisions (Status: \(httpResponse.statusCode))")
         }
+    // MARK: - Pause / Resume ML Revisions
+    func pauseMLRevisions(pauseDays: Int = 7) async throws -> PauseRevisionsResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/pause") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        let body = PauseRevisionsRequest(pauseDays: pauseDays)
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            return try JSONDecoder().decode(PauseRevisionsResponse.self, from: data)
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to pause revisions (Status: \(httpResponse.statusCode))")
+        }
     }
+
+    func resumeMLRevisions(backlogDays: Int = 3) async throws -> ResumeRevisionsResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/resume") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        let body = ResumeRevisionsRequest(backlogDays: backlogDays)
+        request.httpBody = try JSONEncoder().encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            return try JSONDecoder().decode(ResumeRevisionsResponse.self, from: data)
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to resume revisions (Status: \(httpResponse.statusCode))")
+        }
+    }
+
     
     // MARK: - Complete Revision
     func completeRevision(id: Int) async throws -> CompleteRevisionResponse {
