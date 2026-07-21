@@ -120,7 +120,7 @@ class WidgetDataUpdater {
                     difficulty: revision.problem.difficulty,
                     revisionNumber: revision.revisionNumber,
                     scheduledFor: revision.scheduledFor,
-                    isOverdue: revision.isOverdue
+                    isOverdue: false
                 )
             }
             

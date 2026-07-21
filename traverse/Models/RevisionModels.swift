@@ -72,11 +72,6 @@ struct Revision: Codable, Identifiable {
     var isCompleted: Bool {
         completedAt != nil
     }
-    
-    var isOverdue: Bool {
-        guard !isCompleted else { return false }
-        return scheduledDate < Date()
-    }
 }
 
 struct RevisionProblem: Codable {
@@ -122,7 +117,6 @@ struct RevisionGroup: Codable, Identifiable {
 struct RevisionStatsResponse: Codable {
     let total: Int
     let completed: Int
-    let overdue: Int
     let dueToday: Int
     let completionRate: Int
 }
@@ -176,7 +170,6 @@ struct RevisionTodayResponse: Codable {
     let total: Int
     let maxDaily: Int
     let overflow: Int
-    let overdue: Int
     let isPaused: Bool?
     let pausedUntil: String?
 }

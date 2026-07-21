@@ -68,48 +68,79 @@ struct RevisionsView: View {
 
                             if mlTab == .upcoming {
                                 if todaySummary?.isPaused == true {
-                                    VStack(alignment: .leading, spacing: 14) {
-                                        HStack {
-                                            Image(systemName: "graduationcap.fill")
-                                                .font(.title)
-                                                .foregroundStyle(paletteManager.selectedPalette.primary)
-                                            VStack(alignment: .leading, spacing: 2) {
+                                    VStack(alignment: .leading, spacing: 16) {
+                                        HStack(spacing: 14) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(paletteManager.selectedPalette.primary.opacity(0.2))
+                                                    .frame(width: 48, height: 48)
+                                                Image(systemName: "graduationcap.fill")
+                                                    .font(.title2)
+                                                    .foregroundStyle(paletteManager.selectedPalette.primary)
+                                            }
+                                            
+                                            VStack(alignment: .leading, spacing: 3) {
                                                 Text("Exam Mode Active")
                                                     .font(.headline)
+                                                    .fontWeight(.bold)
                                                     .foregroundStyle(.white)
-                                                Text("Revisions are currently paused")
-                                                    .font(.subheadline)
-                                                    .foregroundStyle(.secondary)
+                                                
+                                                if let pausedUntil = todaySummary?.pausedUntil {
+                                                    Text("Paused until \(formattedPausedDate(pausedUntil))")
+                                                        .font(.subheadline)
+                                                        .foregroundStyle(.secondary)
+                                                } else {
+                                                    Text("Revisions are currently paused")
+                                                        .font(.subheadline)
+                                                        .foregroundStyle(.secondary)
+                                                }
                                             }
                                             Spacer()
                                         }
                                         
-                                        if let pausedUntil = todaySummary?.pausedUntil {
-                                            Text("Paused until \(formattedPausedDate(pausedUntil))")
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "sparkles")
                                                 .font(.caption)
+                                                .foregroundStyle(paletteManager.color(at: 2))
+                                            Text("Calendar feed is serving motivational quotes & easter eggs.")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
                                                 .foregroundStyle(.secondary)
                                         }
-                                        
-                                        Text("🎓 Rest up! Calendar feed is serving motivational quotes & easter eggs.")
-                                            .font(.caption)
-                                            .foregroundStyle(paletteManager.selectedPalette.primary)
+                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 10)
+                                        .background(paletteManager.color(at: 2).opacity(0.12), in: Capsule())
 
                                         Button(action: { showResumeConfirm = true }) {
                                             HStack {
                                                 Spacer()
-                                                Text("Resume Revisions Now")
+                                                Label("Resume Revisions Now", systemImage: "play.fill")
+                                                    .font(.subheadline)
                                                     .fontWeight(.semibold)
                                                 Spacer()
                                             }
-                                            .padding(.vertical, 10)
-                                            .background(paletteManager.selectedPalette.primary)
-                                            .foregroundColor(.black)
-                                            .cornerRadius(8)
+                                            .padding(.vertical, 12)
+                                            .foregroundStyle(.black)
+                                            .background(paletteManager.selectedPalette.primary, in: Capsule())
+                                            .shadow(color: paletteManager.selectedPalette.primary.opacity(0.4), radius: 8, x: 0, y: 4)
                                         }
                                     }
-                                    .padding(16)
-                                    .background(Color(UIColor.systemGray6))
-                                    .cornerRadius(12)
+                                    .padding(18)
+                                    .modifier(LiquidGlassCardModifier())
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        paletteManager.selectedPalette.primary.opacity(0.5),
+                                                        paletteManager.color(at: 2).opacity(0.2)
+                                                    ],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1
+                                            )
+                                    )
                                 } else {
                                     DailyReviewLimitCard(
                                         currentCap: authViewModel.currentUser?.maxDailyReviews ?? 20,
@@ -199,8 +230,8 @@ struct RevisionsView: View {
                     VStack(spacing: 10) {
                         if #available(iOS 26.0, *) {
                             HStack(spacing: 16) {
+                                StatBadge(title: "Tracked", value: "\(stats.total)", color: paletteManager.color(at: 4))
                                 StatBadge(title: "Due Today", value: "\(stats.dueToday)", color: paletteManager.color(at: 2))
-                                StatBadge(title: "Overdue", value: "\(stats.overdue)", color: paletteManager.color(at: 0))
                                 StatBadge(title: "Done", value: "\(stats.completionRate)%", color: paletteManager.color(at: 1))
                             }
                             .padding(.horizontal, 20)
@@ -210,8 +241,8 @@ struct RevisionsView: View {
                             .padding(.top, 10)
                         } else {
                             HStack(spacing: 16) {
+                                StatBadge(title: "Tracked", value: "\(stats.total)", color: paletteManager.color(at: 4))
                                 StatBadge(title: "Due Today", value: "\(stats.dueToday)", color: paletteManager.color(at: 2))
-                                StatBadge(title: "Overdue", value: "\(stats.overdue)", color: paletteManager.color(at: 0))
                                 StatBadge(title: "Done", value: "\(stats.completionRate)%", color: paletteManager.color(at: 1))
                             }
                             .padding(.horizontal, 20)
@@ -799,8 +830,6 @@ struct RevisionGroupCard: View {
             return "calendar.badge.clock"
         } else if calendar.isDateInTomorrow(group.displayDate) {
             return "calendar.badge.plus"
-        } else if group.displayDate < Date() {
-            return "calendar.badge.exclamationmark"
         } else {
             return "calendar"
         }
@@ -810,8 +839,6 @@ struct RevisionGroupCard: View {
         let calendar = Calendar.current
         if calendar.isDateInToday(group.displayDate) {
             return paletteManager.color(at: 2)
-        } else if group.displayDate < Date() {
-            return paletteManager.color(at: 0)
         } else {
             return paletteManager.color(at: 4)
         }
@@ -867,7 +894,7 @@ struct RevisionCard: View {
             } else if useMLMode {
                 Button(action: { onMLAttempt(revision) }) {
                     Image(systemName: "brain.head.profile")
-                        .foregroundStyle(revision.isOverdue ? paletteManager.color(at: 0) : paletteManager.selectedPalette.primary)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
                         .font(.title2)
                 }
             } else {
@@ -883,7 +910,7 @@ struct RevisionCard: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
                     } else {
                         Image(systemName: "circle")
-                            .foregroundStyle(revision.isOverdue ? paletteManager.color(at: 0) : paletteManager.selectedPalette.primary)
+                            .foregroundStyle(paletteManager.selectedPalette.primary)
                             .font(.title2)
                     }
                 }
