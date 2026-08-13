@@ -2132,7 +2132,7 @@ struct ExamModeActiveView: View {
                     guard let motion = motion else { return }
                     let x = motion.attitude.roll
                     let y = motion.attitude.pitch
-                    tiltPosition = CGPoint(x: 180 + CGFloat(x) * 350, y: 140 + CGFloat(y) * 350)
+                    tiltPosition = CGPoint(x: 180 + CGFloat(x) * 50, y: 140 + CGFloat(y) * 50)
                 }
             }
         }
