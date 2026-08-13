@@ -2076,7 +2076,6 @@ struct ExamModeActiveView: View {
                         ),
                         maxSampleOffset: .zero
                     )
-                    .blur(radius: 8)
                     .cornerRadius(32)
                     .shadow(color: paletteManager.selectedPalette.primary.opacity(0.35), radius: 24, x: 0, y: 12)
 
