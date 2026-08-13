@@ -16,7 +16,10 @@ final class IntelligenceManager: ObservableObject {
     private var session: LanguageModelSession?
     
     private init() {
-        // Initialize session with system instructions
+        initSession()
+    }
+    
+    private func initSession() {
         if SystemLanguageModel.default.isAvailable {
             session = LanguageModelSession(instructions: systemPrompt)
         }
@@ -24,154 +27,152 @@ final class IntelligenceManager: ObservableObject {
     
     private var systemPrompt: String {
         """
-        You are a coding coach for a LeetCode tracking app. Analyze user data and provide personalized advice in 2-3 sentences. Be specific, supportive, and concise. Never use emojis or special characters.
+        You are a concise DSA & LeetCode AI mentor in the Traverse app. Analyze code attempts and error patterns for revision problems.
+        RULES:
+        1. Output ONLY 1 to 3 plain conversational sentences of technical hint or comparison.
+        2. NEVER output JSON, code blocks (` ``` `), backticks, or preamble phrases (such as "Analyze the mistake tags and summary.").
+        3. Ignore typos, syntax slips, and silly formatting errors. Never use emojis.
         """
     }
     
-    func generateSummary(
-        streak: Int,
-        solvedToday: Bool,
-        totalSolves: Int,
-        recentSolves: [Solve],
-        difficulty: ProblemsByDifficulty
-    ) async {
-        print("[Intelligence] Starting generation...")
-        print("[Intelligence] System available: \(SystemLanguageModel.default.isAvailable)")
-        
-        guard SystemLanguageModel.default.isAvailable else {
-            state = .error("Apple Intelligence not available on this device")
-            return
+    // MARK: - Single Revision Problem Hint (Pending Revision)
+    func generateRevisionHintForPending(
+        problemTitle: String,
+        difficulty: String,
+        attempts: [CodeAttempt],
+        mistakeTags: [String]?,
+        aiAnalysis: String?
+    ) async -> String {
+        var cleanSummary = aiAnalysis ?? "None"
+        if cleanSummary.contains("```") || cleanSummary.contains("{") {
+            cleanSummary = cleanAIFeedbackOutput(cleanSummary)
         }
         
-        state = .generating
-        
-        // Build context from user data
-        let context = buildContext(
-            streak: streak,
-            solvedToday: solvedToday,
-            totalSolves: totalSolves,
-            recentSolves: recentSolves,
-            difficulty: difficulty
-        )
-        
-        print("[Intelligence] Context built:")
-        print("Input Data:")
-        print("   - Streak: \(streak)")
-        print("   - Solved Today: \(solvedToday)")
-        print("   - Total Solves: \(totalSolves)")
-        print("   - Difficulty: Easy=\(difficulty.easy), Medium=\(difficulty.medium), Hard=\(difficulty.hard)")
-        print("   - Recent Solves Count: \(recentSolves.count)")
-        print("\nFull Context String:")
-        print("─────────────────────────────────────")
-        print(context)
-        print("─────────────────────────────────────\n")
-        
-        do {
-            guard let session = session else {
-                print("[Intelligence] Session not initialized")
-                state = .error("Session not initialized")
-                return
-            }
-            
-            print("[Intelligence] Sending request to model...")
-            let response = try await session.respond(to: context)
-            print("[Intelligence] Response received:")
-            print("   Content: \(response.content)")
-            
-            let summary = IntelligenceSummary(
-                message: response.content,
-                generatedAt: Date(),
-                streak: streak,
-                totalSolves: totalSolves
-            )
-            
-            state = .ready(summary)
-            print("[Intelligence] Summary ready")
-            
-        } catch {
-            print("[Intelligence] Error occurred:")
-            print("   Error: \(error)")
-            print("   Localized: \(error.localizedDescription)")
-            if let nsError = error as NSError? {
-                print("   Domain: \(nsError.domain)")
-                print("   Code: \(nsError.code)")
-                print("   UserInfo: \(nsError.userInfo)")
-            }
-            state = .error("Failed to generate summary: \(error.localizedDescription)")
-        }
-    }
-    
-    private func buildContext(
-        streak: Int,
-        solvedToday: Bool,
-        totalSolves: Int,
-        recentSolves: [Solve],
-        difficulty: ProblemsByDifficulty
-    ) -> String {
         var context = """
-        Current streak: \(streak) days
-        Solved today: \(solvedToday ? "Yes" : "No")
-        Total solved: \(totalSolves) problems
-        Breakdown: \(difficulty.easy) easy, \(difficulty.medium) medium, \(difficulty.hard) hard
+        Problem: \(problemTitle) (\(difficulty.capitalized))
+        Mistake Tags: \((mistakeTags ?? []).joined(separator: ", "))
+        Previous Analysis: \(cleanSummary)
         
+        Historical Code Iterations (failed attempts & final correct):
         """
         
-        // Add recent solve patterns
-        if !recentSolves.isEmpty {
-            let last5 = Array(recentSolves.prefix(5))
-            context += "Recent activity:\n"
-            
-            for solve in last5 {
-                let daysAgo = daysAgoText(from: solve.solvedAt)
-                context += "\(solve.problem.difficulty) on \(solve.problem.platform) (\(daysAgo))\n"
-            }
-            
-            // Analyze patterns
-            let recentDifficulties = last5.map { $0.problem.difficulty }
-            let easyCount = recentDifficulties.filter { $0.lowercased() == "easy" }.count
-            let mediumCount = recentDifficulties.filter { $0.lowercased() == "medium" }.count
-            let hardCount = recentDifficulties.filter { $0.lowercased() == "hard" }.count
-            
-            context += "\nRecent mix: \(easyCount) easy, \(mediumCount) medium, \(hardCount) hard\n"
-        }
-        
-        // Add streak context
-        if streak >= 7 {
-            context += "\nStrong momentum with week-long streak.\n"
-        } else if streak > 0 {
-            context += "\nBuilding momentum.\n"
+        if attempts.isEmpty {
+            context += "\n(No raw attempt code stored; rely on mistake tags and summary)"
         } else {
-            context += "\nReady to start a new streak.\n"
-        }
-        
-        // Add urgency if needed
-        if streak > 0 && !solvedToday {
-            context += "Active streak needs a solve today.\n"
+            for (idx, att) in attempts.enumerated() {
+                let status = att.successful == true ? "Accepted" : "Failed"
+                let codeSnippet = String((att.code ?? "").prefix(800))
+                context += "\nAttempt #\(idx + 1) [\(att.type ?? "code"), \(status)]:\n\(codeSnippet)\n"
+            }
         }
         
         context += """
         
-        Provide a personalized 2-3 sentence coaching message. Reference specific numbers. Be supportive and actionable. No emojis.
+        INSTRUCTION:
+        State the main algorithmic/logic mistake made in previous attempts and give a 2-sentence actionable hint to avoid repeating it today. Output ONLY plain text sentences. No JSON. No code fences. No preamble.
         """
         
-        return context
+        do {
+            if session == nil { initSession() }
+            guard let activeSession = session else {
+                return "Watch out for edge cases and boundary conditions when attempting this problem today."
+            }
+            let response = try await activeSession.respond(to: context)
+            return cleanAIFeedbackOutput(response.content)
+        } catch {
+            return "Watch out for edge cases and boundary conditions when attempting this problem today."
+        }
     }
     
-    private func daysAgoText(from isoString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        guard let date = formatter.date(from: isoString) else {
-            return "recently"
-        }
+    // MARK: - Single Revision Problem Comparison (Completed/Attempted Revision Today)
+    func generateRevisionComparisonForCompleted(
+        problemTitle: String,
+        difficulty: String,
+        previousAttempts: [CodeAttempt],
+        todayAttempts: [CodeAttempt],
+        mistakeTags: [String]?
+    ) async -> String {
+        var context = """
+        Problem: \(problemTitle) (\(difficulty.capitalized))
+        Mistake Tags: \((mistakeTags ?? []).joined(separator: ", "))
         
-        let days = Calendar.current.dateComponents([.day], from: date, to: Date()).day ?? 0
+        Previous Historical Attempts:
+        """
         
-        if days == 0 {
-            return "today"
-        } else if days == 1 {
-            return "yesterday"
+        if previousAttempts.isEmpty {
+            context += "\n(No historical attempt code stored)"
         } else {
-            return "\(days) days ago"
+            for (idx, att) in previousAttempts.enumerated() {
+                let codeSnippet = String((att.code ?? "").prefix(800))
+                context += "\nPrev #\(idx + 1):\n\(codeSnippet)\n"
+            }
         }
+        
+        context += "\nToday's Attempt Code:"
+        if todayAttempts.isEmpty {
+            context += "\n(Completed today)"
+        } else {
+            for (idx, att) in todayAttempts.enumerated() {
+                let codeSnippet = String((att.code ?? "").prefix(800))
+                let status = att.successful == true ? "Accepted" : "Failed"
+                context += "\nToday #\(idx + 1) [\(status)]:\n\(codeSnippet)\n"
+            }
+        }
+        
+        context += """
+        
+        INSTRUCTION:
+        Compare today's code against previous attempt history. Output ONLY 2 plain text sentences answering if the user repeated the same mistake or solved it cleanly. No JSON. No code fences. No preamble.
+        """
+        
+        do {
+            if session == nil { initSession() }
+            guard let activeSession = session else {
+                return "Compare your code logic against previous attempt history."
+            }
+            let response = try await activeSession.respond(to: context)
+            return cleanAIFeedbackOutput(response.content)
+        } catch {
+            print("[Intelligence] Comparison error: \(error)")
+            return "Check your implementation logic to ensure previous edge cases were resolved."
+        }
+    }
+    
+    // MARK: - Output Sanitizer Helper
+    func cleanAIFeedbackOutput(_ raw: String) -> String {
+        var text = raw
+        
+        // Remove ```json ... ``` blocks
+        if let jsonRegex = try? NSRegularExpression(pattern: "```(?:json)?\\s*\\{[\\s\\S]*?\\}\\s*```", options: [.caseInsensitive]) {
+            text = jsonRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        }
+        
+        // Remove raw { ... } JSON structures if any remain
+        if let braceRegex = try? NSRegularExpression(pattern: "\\{[\\s\\S]*?\\}", options: []) {
+            text = braceRegex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
+        }
+        
+        // Remove preamble phrases
+        let preambles = [
+            "Analyze the mistake tags and summary.",
+            "Analyze mistake tags and summary.",
+            "INSTRUCTION:",
+            "Analyze the exact logic/algorithmic mistake made in previous attempts."
+        ]
+        for preamble in preambles {
+            text = text.replacingOccurrences(of: preamble, with: "", options: [.caseInsensitive])
+        }
+        
+        // Remove stray code block backticks
+        text = text.replacingOccurrences(of: "```", with: "")
+        
+        // Trim extra spaces and newlines
+        let cleanedLines = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        
+        let result = cleanedLines.joined(separator: "\n\n")
+        return result.isEmpty ? "Review past attempts carefully to resolve edge case logic errors." : result
     }
     
     func reset() {

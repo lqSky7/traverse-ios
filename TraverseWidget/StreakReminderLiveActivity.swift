@@ -1,3 +1,11 @@
+//
+//  StreakReminderLiveActivity.swift
+//  TraverseWidget
+//
+//  Created by Antigravity
+//
+
+/*
 import ActivityKit
 import WidgetKit
 import SwiftUI
@@ -85,3 +93,4 @@ struct StreakReminderLiveActivity: Widget {
         }
     }
 }
+*/

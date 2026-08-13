@@ -89,6 +89,12 @@ class ColorPaletteManager: ObservableObject {
         }
     }
     
+    @Published var vibrancy: Double {
+        didSet {
+            UserDefaults.standard.set(vibrancy, forKey: ColorPaletteManager.vibrancyKey)
+        }
+    }
+    
     var allAvailablePalettes: [ColorPalette] {
         var palettes = ColorPalette.allPalettes
         if let custom = customPalette {
@@ -99,6 +105,7 @@ class ColorPaletteManager: ObservableObject {
     
     private static let userDefaultsKey = "selectedColorPaletteID"
     private static let customPaletteKey = "customColorPalette"
+    private static let vibrancyKey = "huePickerVibrancy"
     
     private init() {
         // Compute custom palette if it exists
@@ -126,9 +133,12 @@ class ColorPaletteManager: ObservableObject {
             }
         }()
 
+        let savedVibrancy = UserDefaults.standard.object(forKey: ColorPaletteManager.vibrancyKey) as? Double ?? 0.15
+
         // Now assign to stored properties
         self.customPalette = loadedCustom
         self.selectedPalette = selected
+        self.vibrancy = savedVibrancy
     }
     
     private func savePalette() {

@@ -267,20 +267,29 @@ class VideoPlayerManager: ObservableObject {
 }
 
 
-struct VideoPlayerView: UIViewControllerRepresentable {
+struct VideoPlayerView: UIViewRepresentable {
     let player: AVPlayer
     
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.showsPlaybackControls = false
-        controller.videoGravity = .resizeAspectFill
-        controller.view.backgroundColor = .clear
-        return controller
+    func makeUIView(context: Context) -> PlayerContainerView {
+        let view = PlayerContainerView()
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
+        view.backgroundColor = .clear
+        return view
     }
     
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // No updates needed
+    func updateUIView(_ uiView: PlayerContainerView, context: Context) {
+        uiView.playerLayer.player = player
+    }
+    
+    class PlayerContainerView: UIView {
+        override class var layerClass: AnyClass {
+            AVPlayerLayer.self
+        }
+        
+        var playerLayer: AVPlayerLayer {
+            layer as! AVPlayerLayer
+        }
     }
 }
 

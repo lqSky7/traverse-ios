@@ -27,6 +27,36 @@ struct ProfileEditView: View {
                     }
                 }
                 
+                Section("Theme Preferences") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Shade Tone")
+                                .font(.body)
+                            
+                            Spacer()
+                            
+                            Text(vibrancyLabel)
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                        }
+                        
+                        HStack(spacing: 12) {
+                            Text("Pastel")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            Slider(value: $paletteManager.vibrancy, in: 0.0...1.0)
+                                .tint(paletteManager.selectedPalette.primary)
+                            
+                            Text("Bright")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                
                 Section {
                     // Error/Success Messages
                     if let error = errorMessage {
@@ -81,6 +111,16 @@ struct ProfileEditView: View {
         }
     }
     
+    private var vibrancyLabel: String {
+        if paletteManager.vibrancy < 0.35 {
+            return "Pastel"
+        } else if paletteManager.vibrancy < 0.70 {
+            return "Balanced"
+        } else {
+            return "Bright"
+        }
+    }
+    
     private func loadUserData() {
         if let user = authViewModel.currentUser {
             email = user.email ?? ""
@@ -97,7 +137,8 @@ struct ProfileEditView: View {
             try await authViewModel.updateProfile(
                 email: email,
                 timezone: TimeZone.current.identifier,
-                visibility: visibility
+                visibility: visibility,
+                maxDailyReviews: authViewModel.currentUser?.maxDailyReviews
             )
             successMessage = "Profile updated successfully"
             

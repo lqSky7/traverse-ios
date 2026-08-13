@@ -982,18 +982,20 @@ struct ProfileAchievementRow: View {
     
     var categoryIcon: String {
         switch achievement.category.lowercased() {
-        case "solve": return "checkmark.circle.fill"
+        case "solve", "solves": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
         case "social": return "person.2.fill"
+        case "revision", "revisions", "ml": return "brain.head.profile"
         default: return "trophy.fill"
         }
     }
     
     var categoryColor: Color {
         switch achievement.category.lowercased() {
-        case "solve": return paletteManager.color(at: 1)
+        case "solve", "solves": return paletteManager.color(at: 1)
         case "streak": return paletteManager.color(at: 0)
         case "social": return paletteManager.color(at: 2)
+        case "revision", "revisions", "ml": return paletteManager.color(at: 4)
         default: return paletteManager.color(at: 3)
         }
     }
@@ -1082,18 +1084,20 @@ struct AchievementBadgeCard: View {
     
     var categoryIcon: String {
         switch achievement.category.lowercased() {
-        case "solve": return "checkmark.seal.fill"
+        case "solve", "solves": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
         case "social": return "person.2.fill"
+        case "revision", "revisions", "ml": return "brain.head.profile"
         default: return "trophy.fill"
         }
     }
     
     var categoryColor: Color {
         switch achievement.category.lowercased() {
-        case "solve": return paletteManager.color(at: 1)
+        case "solve", "solves": return paletteManager.color(at: 1)
         case "streak": return paletteManager.color(at: 0)
         case "social": return paletteManager.color(at: 2)
+        case "revision", "revisions", "ml": return paletteManager.color(at: 4)
         default: return paletteManager.color(at: 3)
         }
     }

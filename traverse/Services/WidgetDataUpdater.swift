@@ -2,14 +2,45 @@
 //  WidgetDataUpdater.swift
 //  traverse
 //
+//  Updates shared widget data in App Group UserDefaults (for iOS widgets)
+//  AND sends the same data to Apple Watch via WatchSyncManager.
+//
 
 import Foundation
 import WidgetKit
+import UIKit
 
 class WidgetDataUpdater {
     static let shared = WidgetDataUpdater()
     
     private init() {}
+    
+    /// Current username for QR code sync to Watch
+    var currentUsername: String?
+    
+    /// Cached QR code image data for Watch sync
+    private var cachedQRImageData: Data?
+    
+    /// Explicitly generate QR code image data ONLY when Friends page or QR sheet is opened
+    func prepareQRForFriendsPage(username: String) -> Data? {
+        if let cached = cachedQRImageData, currentUsername == username {
+            return cached
+        }
+        currentUsername = username
+        guard let qrImage = QRCodeGenerator.shared.generateFriendQR(for: username, size: 200) else {
+            print("[WidgetDataUpdater] Failed to generate QR image for \(username)")
+            return nil
+        }
+        let data = qrImage.pngData()
+        cachedQRImageData = data
+        print("[WidgetDataUpdater] Generated QR for \(username) on Friends page open, data size: \(data?.count ?? 0) bytes")
+        return data
+    }
+    
+    /// Generate QR code image data for a username if already cached
+    private func ensureQRGenerated() -> Data? {
+        return cachedQRImageData
+    }
     
     func updateWidgetData(
         userStats: UserStatsData?,
@@ -18,12 +49,17 @@ class WidgetDataUpdater {
         achievementStats: AchievementStatsData? = nil,
         solvedToday: Bool = false
     ) {
+        // Use cached QR data if available without generating on every widget update
+        let qrData = cachedQRImageData
+        
         var widgetData = WidgetData(
             streak: nil,
             recentSolve: nil,
             revisions: nil,
             revisionsDueCount: 0,
             achievements: nil,
+            username: currentUsername,
+            qrCodeImageData: qrData,
             lastUpdated: Date()
         )
         
@@ -40,6 +76,8 @@ class WidgetDataUpdater {
                 revisions: widgetData.revisions,
                 revisionsDueCount: widgetData.revisionsDueCount,
                 achievements: widgetData.achievements,
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -59,6 +97,8 @@ class WidgetDataUpdater {
                 revisions: widgetData.revisions,
                 revisionsDueCount: widgetData.revisionsDueCount,
                 achievements: widgetData.achievements,
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -69,11 +109,12 @@ class WidgetDataUpdater {
                 RevisionData(
                     id: revision.id,
                     problemTitle: revision.problem.title,
+                    slug: revision.problem.slug,
                     platform: revision.problem.platform,
                     difficulty: revision.problem.difficulty,
                     revisionNumber: revision.revisionNumber,
                     scheduledFor: revision.scheduledFor,
-                    isOverdue: revision.isOverdue
+                    isOverdue: false
                 )
             }
             
@@ -83,6 +124,8 @@ class WidgetDataUpdater {
                 revisions: revisionDataArray,
                 revisionsDueCount: revs.count,  // Simple count - no datetime parsing
                 achievements: widgetData.achievements,
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
@@ -98,18 +141,26 @@ class WidgetDataUpdater {
                     unlocked: achievements.unlocked,
                     total: achievements.total
                 ),
+                username: currentUsername,
+                qrCodeImageData: qrData,
                 lastUpdated: widgetData.lastUpdated
             )
         }
         
-        // Save to shared UserDefaults
+        // Save to shared UserDefaults (for iOS widgets)
         WidgetDataManager.shared.saveWidgetData(widgetData)
         
-        // Reload all widgets
+        // Reload all iOS widgets
         WidgetCenter.shared.reloadAllTimelines()
+        
+        // Sync to Apple Watch
+        WatchSyncManager.shared.syncWidgetData(widgetData)
     }
     
     func updateStreakStatus(solvedToday: Bool, currentStreak: Int, totalXp: Int, totalSolves: Int) {
+        // Ensure QR is generated
+        let qrData = ensureQRGenerated()
+        
         // Load existing data
         var widgetData = WidgetDataManager.shared.loadWidgetData() ?? WidgetData(
             streak: nil,
@@ -117,6 +168,8 @@ class WidgetDataUpdater {
             revisions: nil,
             revisionsDueCount: 0,
             achievements: nil,
+            username: currentUsername,
+            qrCodeImageData: qrData,
             lastUpdated: Date()
         )
         
@@ -132,6 +185,8 @@ class WidgetDataUpdater {
             revisions: widgetData.revisions,
             revisionsDueCount: widgetData.revisionsDueCount,
             achievements: widgetData.achievements,
+            username: currentUsername,
+            qrCodeImageData: qrData,
             lastUpdated: Date()
         )
         
@@ -139,5 +194,8 @@ class WidgetDataUpdater {
         WidgetCenter.shared.reloadTimelines(ofKind: "StreakWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "StreakLockScreenWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "MotivationalLockScreenWidget")
+        
+        // Sync to Apple Watch
+        WatchSyncManager.shared.syncWidgetData(widgetData)
     }
 }

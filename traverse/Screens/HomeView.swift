@@ -28,7 +28,7 @@ struct HomeView: View {
                     } else {
                         // Streak Card
                         if let userStats = viewModel.userStats {
-                            StreakCard(streak: userStats.stats.currentStreak, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves), paletteManager: paletteManager)
+                            StreakCard(streak: userStats.stats.currentStreak, maxStreak: userStats.stats.totalStreakDays)
                         }
                         
                         // Main Stats Cards
@@ -82,22 +82,6 @@ struct HomeView: View {
                                 
                                 TriesDistributionCard(solves: solves, paletteManager: paletteManager)
                             }
-                            
-                            // Intelligence Summary Card (iOS 18.2+)
-                            if #available(iOS 18.2, *) {
-                                if let userStats = viewModel.userStats,
-                                   let recentSolves = viewModel.recentSolves,
-                                   let solveStats = viewModel.solveStats {
-                                    IntelligenceSummaryCard(
-                                        streak: userStats.stats.currentStreak,
-                                        solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves),
-                                        totalSolves: userStats.stats.totalSolves,
-                                        recentSolves: recentSolves,
-                                        difficulty: solveStats.stats.byDifficulty,
-                                        paletteManager: paletteManager
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -117,15 +101,21 @@ struct HomeView: View {
         }
         .onAppear {
             if let username = authViewModel.currentUser?.username {
+                // Set username for Watch sync
+                WidgetDataUpdater.shared.currentUsername = username
                 Task {
                     await viewModel.loadData(username: username)
                 }
             }
         }
         .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
-            if let username = newUsername, viewModel.solveStats == nil {
-                Task {
-                    await viewModel.loadData(username: username)
+            if let username = newUsername {
+                // Update username for Watch sync
+                WidgetDataUpdater.shared.currentUsername = username
+                if viewModel.solveStats == nil {
+                    Task {
+                        await viewModel.loadData(username: username)
+                    }
                 }
             }
         }
@@ -170,150 +160,94 @@ struct HomeView: View {
 // MARK: - Streak Card
 struct StreakCard: View {
     let streak: Int
-    let solvedToday: Bool
-    @ObservedObject var paletteManager: ColorPaletteManager
-    
-    private var gradientColors: [Color] {
-        paletteManager.streakGradientColors(for: streak)
-    }
+    var maxStreak: Int? = nil
     
     private var displayNumber: String {
         streak == 0 ? "0" : "\(streak)"
     }
     
-    private var streakMessage: String {
-        if solvedToday {
-            return "Well done! Keep it up!"
-        } else if streak == 0 {
-            return "Start your streak!"
-        } else {
-            return "Get back to work!"
-        }
+    private var daysText: String {
+        streak == 1 ? "DAY" : "DAYS"
+    }
+    
+    private var maxStreakDisplay: Int {
+        max(streak, maxStreak ?? 0)
     }
     
     var body: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             Image(systemName: streak == 0 ? "flame" : "flame.fill")
-                .font(.system(size: 48))
+                .font(.system(size: 40, weight: .semibold))
                 .foregroundStyle(.white)
             
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(displayNumber)
-                        .font(.system(size: 56, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("DAYS")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-                Text(streakMessage)
-                    .font(.subheadline)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(displayNumber)
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(daysText)
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white.opacity(0.8))
             }
             
             Spacer()
             
-            if streak > 0 {
-                Image(systemName: "chevron.right")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.7))
+            if maxStreakDisplay > 0 {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("BEST")
+                        .font(.system(size: 10, weight: .bold))
+                        .textCase(.uppercase)
+                    Text("\(maxStreakDisplay) DAYS")
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .foregroundStyle(.white.opacity(0.4))
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 24)
+        .padding(.vertical, 20)
         .background(
-            ColorMorphBackground(colors: gradientColors)
+            LightingSunBackground(streak: streak)
         )
         .cornerRadius(16)
-        .shadow(color: gradientColors.first?.opacity(0.4) ?? .black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 }
 
-// MARK: - Color Morph Background (Professional Metal-style)
-struct ColorMorphBackground: View {
-    let colors: [Color]
+// MARK: - Lighting Sun Background (Lighting Simulation Shader from Settings > Demo)
+struct LightingSunBackground: View {
+    let streak: Int
     
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1/60)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            
-            GeometryReader { geometry in
-                Canvas { context, size in
-                    // Create smooth flowing color field
-                    let cycleSpeed = 0.15 // How fast colors change
-                    let t = time * cycleSpeed
-                    
-                    // Calculate color blend factor (0-1, smoothly oscillating)
-                    let blendFactor = (sin(t) + 1) / 2
-                    let secondaryFactor = (sin(t * 0.7 + 1.5) + 1) / 2
-                    
-                    // Get colors - use palette colors only, fallback to first color
-                    let color1 = colors.indices.contains(0) ? colors[0] : .clear
-                    let color2 = colors.indices.contains(1) ? colors[1] : color1
-                    let color3 = colors.indices.contains(2) ? colors[2] : color2
-                    
-                    // Create multiple gradient layers for depth
-                    let mainGradient = Gradient(colors: [
-                        interpolateColor(color1, color2, factor: blendFactor),
-                        interpolateColor(color2, color3, factor: secondaryFactor),
-                        interpolateColor(color3, color1, factor: (blendFactor + secondaryFactor) / 2)
-                    ])
-                    
-                    // Animated gradient positions
-                    let startX = 0.3 + sin(t * 0.5) * 0.2
-                    let startY = 0.2 + cos(t * 0.4) * 0.15
-                    let endX = 0.7 + cos(t * 0.6) * 0.2
-                    let endY = 0.8 + sin(t * 0.3) * 0.15
-                    
-                    // Draw the flowing gradient
-                    context.fill(
-                        Path(CGRect(origin: .zero, size: size)),
-                        with: .linearGradient(
-                            mainGradient,
-                            startPoint: CGPoint(x: size.width * startX, y: size.height * startY),
-                            endPoint: CGPoint(x: size.width * endX, y: size.height * endY)
-                        )
-                    )
-                    
-                    // Add subtle overlay for metallic depth
-                    let overlayGradient = Gradient(colors: [
-                        .white.opacity(0.1),
-                        .clear,
-                        .black.opacity(0.15)
-                    ])
-                    context.fill(
-                        Path(CGRect(origin: .zero, size: size)),
-                        with: .linearGradient(
-                            overlayGradient,
-                            startPoint: CGPoint(x: 0, y: 0),
-                            endPoint: CGPoint(x: 0, y: size.height)
-                        )
-                    )
-                }
-            }
-        }
+    private var progress: Float {
+        min(max(Float(streak), 0), 15.0) / 15.0
     }
     
-    // Smooth color interpolation
-    private func interpolateColor(_ c1: Color, _ c2: Color, factor: Double) -> Color {
-        let f = max(0, min(1, factor))
-        
-        // Get UIColor for component access
-        let uiColor1 = UIColor(c1)
-        let uiColor2 = UIColor(c2)
-        
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        
-        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        
-        return Color(
-            red: r1 + (r2 - r1) * f,
-            green: g1 + (g2 - g1) * f,
-            blue: b1 + (b2 - b1) * f
-        )
+    private var intensity: Float {
+        0.3 + progress * 2.2
+    }
+    
+    private var disperse: Float {
+        0.15 + progress * 0.60
+    }
+    
+    private var radius: Float {
+        10.0 + progress * 40.0
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let cardHeight = Float(geometry.size.height > 0 ? geometry.size.height : 90.0)
+            let targetY = cardHeight / 1.2
+            
+            Color.black
+                .layerEffect(
+                    ShaderLibrary.lightingSimulation(
+                        .float2(5.0, targetY),
+                        .float(intensity),
+                        .float(disperse),
+                        .float(-Float.pi / 2.0),
+                        .float(radius)
+                    ),
+                    maxSampleOffset: .zero
+                )
+        }
     }
 }
 
@@ -1147,7 +1081,6 @@ struct BestSolvingHoursCard: View {
 struct AllAchievementsView: View {
     @StateObject private var viewModel = AchievementsViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
-    @State private var expandedCategories: Set<String> = []
     @State private var filterMode: AchievementFilter = .all
     
     enum AchievementFilter: String, CaseIterable {
@@ -1191,7 +1124,7 @@ struct AllAchievementsView: View {
                             .frame(height: 130)
                         
                         // Categories with expandable achievements
-                        CategoriesSection(achievements: achievements, expandedCategories: $expandedCategories, paletteManager: paletteManager)
+                        CategoriesSection(achievements: achievements, paletteManager: paletteManager)
                             .padding(.horizontal)
                             .padding(.bottom)
                     }
@@ -1390,7 +1323,6 @@ struct MeshGradientBackground: View {
 // MARK: - Categories Section
 struct CategoriesSection: View {
     let achievements: [AchievementDetail]
-    @Binding var expandedCategories: Set<String>
     @ObservedObject var paletteManager: ColorPaletteManager
     
     private var groupedAchievements: [String: [AchievementDetail]] {
@@ -1406,17 +1338,7 @@ struct CategoriesSection: View {
                 AchievementCategoryCard(
                     category: category,
                     achievements: categoryAchievements,
-                    isExpanded: expandedCategories.contains(category),
-                    paletteManager: paletteManager,
-                    onToggle: {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                            if expandedCategories.contains(category) {
-                                expandedCategories.remove(category)
-                            } else {
-                                expandedCategories.insert(category)
-                            }
-                        }
-                    }
+                    paletteManager: paletteManager
                 )
             }
         }
@@ -1427,9 +1349,8 @@ struct CategoriesSection: View {
 struct AchievementCategoryCard: View {
     let category: String
     let achievements: [AchievementDetail]
-    let isExpanded: Bool
     @ObservedObject var paletteManager: ColorPaletteManager
-    let onToggle: () -> Void
+    @State private var isExpanded = false
     
     private var unlockedCount: Int {
         achievements.filter { $0.unlocked }.count
@@ -1437,39 +1358,50 @@ struct AchievementCategoryCard: View {
     
     private var categoryIcon: String {
         switch category.lowercased() {
-        case "solve": return "checkmark.seal.fill"
+        case "solve", "solves": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
         case "social": return "person.2.fill"
-        default: return "sparkles"
+        case "revision", "revisions", "ml": return "brain.head.profile"
+        default: return "trophy.fill"
         }
     }
     
     private var categoryColor: Color {
         switch category.lowercased() {
-        case "solve": return paletteManager.color(at: 0)
-        case "streak": return paletteManager.color(at: 1)
+        case "solve", "solves": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
         case "social": return paletteManager.color(at: 2)
+        case "revision", "revisions", "ml": return paletteManager.color(at: 4)
         default: return paletteManager.color(at: 3)
         }
     }
     
+    private var sortedAchievements: [AchievementDetail] {
+        achievements.sorted { ($0.unlocked && !$1.unlocked) || ($0.unlocked == $1.unlocked && $0.name < $1.name) }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            // Category Header
-            Button(action: onToggle) {
-                HStack {
+            // Category Header Button (matching SolveRow expansion toggle logic)
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(categoryColor.opacity(0.2))
-                            .frame(width: 50, height: 50)
+                            .fill(categoryColor.opacity(0.18))
+                            .frame(width: 44, height: 44)
                         Image(systemName: categoryIcon)
-                            .font(.title2)
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(categoryColor)
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(category.capitalized)
                             .font(.headline)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
                         Text("\(unlockedCount) of \(achievements.count) unlocked")
                             .font(.caption)
@@ -1478,11 +1410,12 @@ struct AchievementCategoryCard: View {
                     
                     Spacer()
                     
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .font(.title3)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .padding()
+                .padding(16)
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -1490,15 +1423,16 @@ struct AchievementCategoryCard: View {
             if isExpanded {
                 VStack(spacing: 0) {
                     Divider()
-                        .background(Color.gray.opacity(0.3))
+                        .background(Color.gray.opacity(0.25))
                     
-                    ForEach(achievements.sorted(by: { $0.unlocked && !$1.unlocked }), id: \.id) { achievement in
+                    let sorted = sortedAchievements
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { index, achievement in
                         AchievementRow(achievement: achievement, paletteManager: paletteManager)
                         
-                        if achievement.id != achievements.last?.id {
+                        if index < sorted.count - 1 {
                             Divider()
-                                .background(Color.gray.opacity(0.3))
-                                .padding(.leading, 70)
+                                .background(Color.gray.opacity(0.25))
+                                .padding(.leading, 68)
                         }
                     }
                 }
@@ -1514,29 +1448,99 @@ struct AchievementRow: View {
     let achievement: AchievementDetail
     @ObservedObject var paletteManager: ColorPaletteManager
     
+    private var categoryIcon: String {
+        if let icon = achievement.icon, !icon.isEmpty {
+            if UIImage(systemName: icon) != nil {
+                return icon
+            }
+            switch icon.lowercased() {
+            case "trophy": return "trophy.fill"
+            case "flame", "fire": return "flame.fill"
+            case "star": return "star.fill"
+            case "bolt", "zap": return "bolt.fill"
+            case "brain": return "brain.head.profile"
+            case "crown": return "crown.fill"
+            case "target": return "target"
+            case "seal", "badge": return "checkmark.seal.fill"
+            case "chart": return "chart.line.uptrend.xyaxis"
+            case "sparkles": return "sparkles"
+            case "award": return "award.fill"
+            default: break
+            }
+        }
+        switch achievement.category.lowercased() {
+        case "solve", "solves": return "checkmark.seal.fill"
+        case "streak": return "flame.fill"
+        case "social": return "person.2.fill"
+        case "revision", "revisions", "ml": return "brain.head.profile"
+        default: return "trophy.fill"
+        }
+    }
+    
+    private var categoryColor: Color {
+        guard achievement.unlocked else { return Color.gray }
+        switch achievement.category.lowercased() {
+        case "solve", "solves": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
+        case "social": return paletteManager.color(at: 2)
+        case "revision", "revisions", "ml": return paletteManager.color(at: 4)
+        default: return paletteManager.color(at: 3)
+        }
+    }
+    
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
+            // Glowing Achievement Badge Icon (matching Friends Page visual design)
             ZStack {
-                Circle()
-                    .fill(achievement.unlocked ? paletteManager.color(at: 3).opacity(0.2) : Color.gray.opacity(0.2))
-                    .frame(width: 40, height: 40)
-                
                 if achievement.unlocked {
-                    Image(systemName: "checkmark")
-                        .font(.title3)
-                        .foregroundStyle(paletteManager.color(at: 3))
+                    Circle()
+                        .stroke(categoryColor.opacity(0.35), lineWidth: 2)
+                        .frame(width: 48, height: 48)
+                        .blur(radius: 2)
+                    
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 24
+                            )
+                        )
+                        .frame(width: 42, height: 42)
+                    
+                    Image(systemName: categoryIcon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(categoryColor)
+                        .shadow(color: categoryColor.opacity(0.5), radius: 3)
                 } else {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1.5)
+                        .frame(width: 42, height: 42)
+                    
+                    Circle()
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: 42, height: 42)
+                    
                     Image(systemName: "lock.fill")
-                        .font(.title3)
-                        .foregroundStyle(.gray)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.gray.opacity(0.6))
                 }
             }
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(achievement.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(achievement.unlocked ? .white : .gray)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(achievement.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(achievement.unlocked ? .white : .gray)
+                    
+                    if achievement.unlocked {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    }
+                }
                 
                 Text(achievement.description)
                     .font(.caption)
@@ -1546,20 +1550,15 @@ struct AchievementRow: View {
                 if achievement.unlocked, let unlockedAt = achievement.unlockedAt {
                     Text("Unlocked \(formatDate(unlockedAt))")
                         .font(.caption2)
-                        .foregroundStyle(paletteManager.color(at: 3))
+                        .foregroundStyle(categoryColor.opacity(0.9))
                 }
             }
             
             Spacer()
-            
-            if let icon = achievement.icon {
-                Text(icon)
-                    .font(.title2)
-            }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .opacity(achievement.unlocked ? 1.0 : 0.6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .opacity(achievement.unlocked ? 1.0 : 0.65)
     }
     
     private func formatDate(_ dateString: String) -> String {
@@ -1599,6 +1598,7 @@ class AchievementsViewModel: ObservableObject {
             let response = try await NetworkService.shared.getAllAchievements()
             await MainActor.run {
                 self.achievements = response.achievements
+                AchievementToastManager.shared.checkNewAchievements(response.achievements)
             }
         } catch {
             await MainActor.run {
@@ -2199,19 +2199,121 @@ struct RecentSolvesCard: View {
 struct AllSolvesView: View {
     let solves: [Solve]
     @ObservedObject var paletteManager = ColorPaletteManager.shared
+    @State private var searchText = ""
+    @State private var selectedTopic: String? = nil
+    
+    var availableTopics: [String] {
+        let allTopics = solves.compactMap { $0.problem.topic }
+        return Array(Set(allTopics)).filter { !$0.isEmpty }.sorted()
+    }
+    
+    var filteredSolves: [Solve] {
+        solves.filter { solve in
+            let matchesSearch = searchText.isEmpty ||
+                solve.problem.title.localizedCaseInsensitiveContains(searchText) ||
+                solve.problem.slug.localizedCaseInsensitiveContains(searchText) ||
+                (solve.problem.topic ?? "").localizedCaseInsensitiveContains(searchText) ||
+                (solve.problem.subtopic ?? "").localizedCaseInsensitiveContains(searchText)
+            
+            let matchesTopic = selectedTopic == nil || solve.problem.topic == selectedTopic
+            
+            return matchesSearch && matchesTopic
+        }
+    }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                ForEach(solves) { solve in
-                    SolveRow(solve: solve, paletteManager: paletteManager)
+        VStack(spacing: 0) {
+            // Search Bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("Search problems, topics, subtopics...", text: $searchText)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .autocorrectionDisabled()
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
-            .padding()
+            .padding(10)
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(10)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            
+            // Topic Filter ScrollView
+            if !availableTopics.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            withAnimation {
+                                selectedTopic = nil
+                            }
+                        }) {
+                            Text("All Topics")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(selectedTopic == nil ? paletteManager.selectedPalette.primary : Color.white.opacity(0.1))
+                                .foregroundColor(selectedTopic == nil ? .black : .white)
+                                .cornerRadius(12)
+                        }
+                        
+                        ForEach(availableTopics, id: \.self) { topic in
+                            Button(action: {
+                                withAnimation {
+                                    if selectedTopic == topic {
+                                        selectedTopic = nil
+                                    } else {
+                                        selectedTopic = topic
+                                    }
+                                }
+                            }) {
+                                Text(topic)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(selectedTopic == topic ? paletteManager.selectedPalette.primary : Color.white.opacity(0.1))
+                                    .foregroundColor(selectedTopic == topic ? .black : .white)
+                                    .cornerRadius(12)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 12)
+                }
+            }
+            
+            // Solves List
+            ScrollView {
+                if filteredSolves.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "square.dashed")
+                            .font(.system(size: 40))
+                            .foregroundColor(.secondary)
+                        Text("No solves match your criteria")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 40)
+                    .frame(maxWidth: .infinity)
+                } else {
+                    LazyVStack(spacing: 12) {
+                        ForEach(filteredSolves) { solve in
+                            SolveRow(solve: solve, paletteManager: paletteManager)
+                        }
+                    }
+                    .padding()
+                }
+            }
         }
-        .background(Color.black)
+        .background(Color.black.ignoresSafeArea())
         .navigationTitle("All Solves")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -2255,6 +2357,29 @@ struct SolveRow: View {
                             Text(solve.problem.platform.capitalized)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                        
+                        if let topic = solve.problem.topic, !topic.isEmpty {
+                            HStack(spacing: 6) {
+                                Text(topic)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.white.opacity(0.12))
+                                    .cornerRadius(4)
+                                    .foregroundStyle(.secondary)
+                                
+                                if let subtopic = solve.problem.subtopic, !subtopic.isEmpty {
+                                    Text(subtopic)
+                                        .font(.system(size: 10, weight: .regular))
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.white.opacity(0.06))
+                                        .cornerRadius(4)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            .padding(.top, 2)
                         }
                     }
                     
@@ -2332,15 +2457,9 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            if let attributedAnalysis = try? AttributedString(markdown: analysis, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                                Text(attributedAnalysis)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(analysis)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text(analysis)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         .padding(.top, 4)
                     }
@@ -2799,7 +2918,7 @@ class HomeViewModel: ObservableObject {
             async let submissionStatsTask = NetworkService.shared.getSubmissionStats()
             async let solveStatsTask = NetworkService.shared.getSolveStats()
             async let achievementStatsTask = NetworkService.shared.getAchievementStats()
-            async let recentSolvesTask = NetworkService.shared.getSolves(limit: 10)
+            async let recentSolvesTask = NetworkService.shared.getSolves(limit: 200)
             // Fetch upcoming only - backend filters for incomplete revisions
             // Use revisionMode to fetch ML or normal revisions based on user setting
             let revisionType = DataManager.shared.revisionMode
@@ -2842,13 +2961,15 @@ class HomeViewModel: ObservableObject {
                     return date >= sevenDaysAgo
                 }
 
+            // Merge and persist solves inside DataManager, getting the merged array back
+            let mergedSolves = DataManager.shared.mergeAndPersistSolves(solvesResponse.solves)
 
             await MainActor.run {
                 self.userStats = userStats
                 self.submissionStats = submissionStats
                 self.solveStats = solveStats
                 self.achievementStats = achievementStats
-                self.recentSolves = solvesResponse.solves
+                self.recentSolves = mergedSolves
                 self.todayRevisions = todayAndOverdue
                 self.completedRevisions = recentCompletedRevisions
                 // frozenDates already set at start of loadData
@@ -2859,7 +2980,6 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.submissionStats = submissionStats
             DataManager.shared.solveStats = solveStats
             DataManager.shared.achievementStats = achievementStats
-            DataManager.shared.recentSolves = solvesResponse.solves
             
             // Update timestamp
             DataManager.shared.lastFetchTimestamp = Date()
@@ -2868,7 +2988,7 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.persistData()
             
             // Update widgets - send exactly what we want to display (today + overdue)
-            updateWidgets(userStats: userStats.stats, recentSolve: solvesResponse.solves.first, revisions: todayAndOverdue)
+            updateWidgets(userStats: userStats.stats, recentSolve: mergedSolves.first, revisions: todayAndOverdue)
 
             // Check if solved today and end live activity if needed
             DataManager.shared.checkSolvedTodayAndEndActivity()

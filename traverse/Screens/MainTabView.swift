@@ -35,6 +35,7 @@ struct MainTabView: View {
             }
             .tabBarMinimizeBehavior(.onScrollDown)
             .tint(paletteManager.selectedPalette.primary)
+            .overlay(AchievementToastOverlayContainer(), alignment: .top)
             .onAppear {
                 setupNotificationObserver()
             }
@@ -66,6 +67,7 @@ struct MainTabView: View {
                     .tag(3)
             }
             .tint(paletteManager.selectedPalette.primary)
+            .overlay(AchievementToastOverlayContainer(), alignment: .top)
             .onAppear {
                 setupNotificationObserver()
             }

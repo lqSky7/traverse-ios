@@ -32,6 +32,7 @@ public struct FormStep: Identifiable {
     var state: FieldState = .idle
 
     var answer: String = ""
+    var forgotPasswordAction: (() async throws -> [FormStep])? = nil
 }
 
 struct MultiStepForm: View {
@@ -63,10 +64,18 @@ struct MultiStepForm: View {
 
                             if currentStep > 0 {
                                 withAnimation(.smooth(duration: 0.5)) {
-                                    currentStep -= 1
+                                    let targetStep = currentStep - 1
+                                    
+                                    // If going back to the step that has forgotPasswordAction, discard any subsequent appended steps
+                                    if steps[targetStep].forgotPasswordAction != nil {
+                                        steps = Array(steps.prefix(targetStep + 1))
+                                    } else {
+                                        steps[currentStep].state = .idle
+                                        steps[currentStep].answer = ""
+                                    }
+                                    
+                                    currentStep = targetStep
                                     gradient = colorScheme == .dark ? steps[currentStep].darkGradient : steps[currentStep].lightGradient
-                                    steps[currentStep + 1].state = .idle
-                                    steps[currentStep + 1].answer = ""
                                     steps[currentStep].state = .idle
                                 }
                             } else {
@@ -130,14 +139,32 @@ struct MultiStepForm: View {
                         )
                         .animation(.none, value: currentStep)
                     case .inputField(let placeholder, let keyboardType):
-                        InputField(
-                            label: placeholder,
-                            value: $steps[currentStep].answer,
-                            keyboardType: keyboardType,
-                            state: steps[currentStep].state,
-                            action: submitCurrentStep,
-                            keyboardShown: $keyboardShown
-                        )
+                        VStack(alignment: .leading, spacing: 12) {
+                            InputField(
+                                label: placeholder,
+                                value: $steps[currentStep].answer,
+                                keyboardType: keyboardType,
+                                state: steps[currentStep].state,
+                                action: submitCurrentStep,
+                                keyboardShown: $keyboardShown
+                            )
+                            
+                            if let forgotAction = steps[currentStep].forgotPasswordAction {
+                                Button(action: {
+                                    Task {
+                                        await handleForgotPassword(action: forgotAction)
+                                    }
+                                }) {
+                                    Text("Forgot password?")
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(Color.primary.opacity(0.6))
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 8)
+                                }
+                                .padding(.leading, 24)
+                                .disabled(steps[currentStep].state == .loading)
+                            }
+                        }
                     case .huePicker:
                         VStack(spacing: 24) {
                             HuePicker()
@@ -154,6 +181,30 @@ struct MultiStepForm: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: hasFinishedForm ? .center : .bottomLeading)
             .padding(42)
+        }
+    }
+
+    private func handleForgotPassword(action: @escaping () async throws -> [FormStep]) async {
+        guard currentStep >= 0 && currentStep < steps.count else { return }
+        
+        steps[currentStep].state = .loading
+        keyboardShown = false
+        
+        do {
+            let newSteps = try await action()
+            steps[currentStep].state = .success
+            
+            withAnimation(.smooth(duration: 0.5)) {
+                steps.insert(contentsOf: newSteps, at: currentStep + 1)
+                currentStep += 1
+                gradient = colorScheme == .dark ? steps[currentStep].darkGradient : steps[currentStep].lightGradient
+            }
+        } catch {
+            steps[currentStep].state = .error
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            if currentStep < steps.count {
+                steps[currentStep].state = .idle
+            }
         }
     }
 

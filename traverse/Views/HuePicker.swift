@@ -10,6 +10,7 @@ struct DotView: View {
     let gridSize: CGSize
     let dotSize: CGFloat
     let isGuideDot: Bool
+    let vibrancy: Double
     
     private var distance: CGFloat {
         guard let location = dragLocation else { return .infinity }
@@ -36,11 +37,11 @@ struct DotView: View {
         let normalizedX = center.x / gridSize.width
         let normalizedY = center.y / gridSize.height
         
-        // X = Hue (0-1 maps to full color spectrum)
-        // Y = Saturation (top = very pastel/0.3, bottom = soft pastel/0.6)
         let hue = normalizedX
-        let saturation = 0.3 + (normalizedY * 0.3) // 0.3 to 0.6 (pastel only)
-        let brightness: CGFloat = 0.95
+        let minSat = 0.10 + (vibrancy * 0.35)
+        let maxSat = 0.30 + (vibrancy * 0.65)
+        let saturation = minSat + (normalizedY * (maxSat - minSat))
+        let brightness: CGFloat = 0.98 - (vibrancy * 0.08)
         
         return Color(hue: hue, saturation: saturation, brightness: brightness)
     }
@@ -63,12 +64,14 @@ struct HuePicker: View {
     @State private var dragLocation: CGPoint? = nil
     @State private var currentColor: Color = Color(hue: 0.4, saturation: 0.6, brightness: 0.9)
     
-    // Haptic tracking state
-    @State private var currentMoodIndex: Int = 0
+    // State variables
     @State private var hasStartedDragging: Bool = false
     @State private var lastCrossedHorizontalGuide: Bool = false
     @State private var lastCrossedVerticalGuide: Bool = false
     @State private var wasNearEdge: Bool = false
+    @State private var colorName: String = "Mint Split"
+    @State private var currentYFraction: Double = 0.5
+    @State private var currentGridSize: CGSize = CGSize(width: 300, height: 200)
     
     private let columns = 13
     private let rows = 10
@@ -83,25 +86,6 @@ struct HuePicker: View {
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
     private let notificationFeedback = UINotificationFeedbackGenerator()
     
-    // Mood names instead of jokes - matches expected design
-    private let moodNames = [
-        "Gloom",
-        "Serenity",
-        "Warmth",
-        "Joy",
-        "Wonder",
-        "Nostalgia",
-        "Peace",
-        "Energy",
-        "Mystery",
-        "Hope",
-        "Calm",
-        "Bliss",
-        "Delight",
-        "Whimsy",
-        "Clarity"
-    ]
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             sheetMoodTextView
@@ -112,28 +96,40 @@ struct HuePicker: View {
         .onAppear {
             lightFeedback.prepare()
             notificationFeedback.prepare()
+            
+            // Set initial color name based on the default currentColor (which is at center)
+            let name = getDynamicColorName(hue: 0.4)
+            let style = getDynamicStyleName(y: 0.5)
+            colorName = "\(name) \(style)"
         }
     }
     
     // MARK: - Extracted Sub-views
     
     private var sheetMoodTextView: some View {
-        HStack(spacing: 0) {
-            Text("Pick a hue, and we'll make\na ")
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundStyle(.primary)
-            + Text(moodNames[currentMoodIndex])
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundStyle(currentColor)
-            + Text(" palette for you")
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundStyle(.primary)
+        HStack(alignment: .top, spacing: 0) {
+            (
+                Text("Pick a hue, and we'll make\na ")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+                + Text(colorName)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(currentColor)
+                + Text(" palette for you")
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(.primary)
+            )
+            .lineLimit(2)
+            .minimumScaleFactor(0.75)
+            .contentTransition(.numericText(countsDown: false))
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: colorName)
+            
+            Spacer(minLength: 0)
         }
-        .contentTransition(.numericText(countsDown: false))
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: currentMoodIndex)
+        .frame(height: 60, alignment: .leading)
         .padding(.horizontal, 20)
         .padding(.top, 15)
     }
@@ -152,6 +148,12 @@ struct HuePicker: View {
             .contentShape(Rectangle())
             .gesture(sheetDragGesture(gridWidth: gridWidth, gridHeight: gridHeight, spacingX: spacingX, spacingY: spacingY, gridSize: geometry.size))
             .coordinateSpace(name: "sheetGrid")
+            .onAppear {
+                currentGridSize = geometry.size
+            }
+            .onChange(of: geometry.size) { newSize in
+                currentGridSize = newSize
+            }
         }
         .padding(6)
         .background { sheetGridBackground }
@@ -176,7 +178,8 @@ struct HuePicker: View {
                     influenceRadius: influenceRadius,
                     gridSize: geometry.size,
                     dotSize: dotSize,
-                    isGuideDot: isGuideDot
+                    isGuideDot: isGuideDot,
+                    vibrancy: paletteManager.vibrancy
                 )
                 .position(dotCenter)
             }
@@ -187,8 +190,9 @@ struct HuePicker: View {
     private var sheetCursorView: some View {
         if let location = dragLocation {
             Circle()
-                .fill(.ultraThinMaterial)
-                .frame(width: 40, height: 40)
+                .fill(currentColor.opacity(0.2))
+                .frame(width: 58, height: 58)
+                .glassEffect(.clear.interactive(), in: .circle)
                 .position(location)
                 .animation(.interactiveSpring(response: 0.08, dampingFraction: 0.9), value: location)
         }
@@ -198,7 +202,7 @@ struct HuePicker: View {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
                 // Inset by cursor radius so it stays visually within the grid
-                let cursorRadius: CGFloat = 22
+                let cursorRadius: CGFloat = 29
                 let clampedX = min(max(cursorRadius, value.location.x), gridWidth - cursorRadius)
                 let clampedY = min(max(cursorRadius, value.location.y), gridHeight - cursorRadius)
                 let newLocation = CGPoint(x: clampedX, y: clampedY)
@@ -218,11 +222,9 @@ struct HuePicker: View {
                 // Trigger haptic when crossing the guides
                 if isNearHorizontalGuide && !lastCrossedHorizontalGuide {
                     lightFeedback.impactOccurred(intensity: 0.4)
-                    currentMoodIndex = (currentMoodIndex + 1) % moodNames.count
                 }
                 if isNearVerticalGuide && !lastCrossedVerticalGuide {
                     lightFeedback.impactOccurred(intensity: 0.4)
-                    currentMoodIndex = (currentMoodIndex + 1) % moodNames.count
                 }
                 lastCrossedHorizontalGuide = isNearHorizontalGuide
                 lastCrossedVerticalGuide = isNearVerticalGuide
@@ -281,17 +283,59 @@ struct HuePicker: View {
     }
     
     private func saveSelection() {
-        let paletteColors = generatePalette(from: currentColor)
+        let paletteColors = generatePalette(from: currentColor, y: currentYFraction)
         let palette = ColorPalette(
             id: 1000,
-            name: moodNames[currentMoodIndex],
+            name: colorName,
             colors: paletteColors
         )
         paletteManager.customPalette = palette
         paletteManager.selectedPalette = palette
     }
     
-    private func generatePalette(from baseColor: Color) -> [String] {
+    private func getDynamicColorName(hue: Double) -> String {
+        switch hue {
+        case 0.0..<0.03: return "Scarlet"
+        case 0.03..<0.06: return "Coral"
+        case 0.06..<0.09: return "Orange"
+        case 0.09..<0.12: return "Peach"
+        case 0.12..<0.15: return "Amber"
+        case 0.15..<0.18: return "Gold"
+        case 0.18..<0.21: return "Yellow"
+        case 0.21..<0.25: return "Lime"
+        case 0.25..<0.29: return "Olive"
+        case 0.29..<0.34: return "Green"
+        case 0.34..<0.38: return "Emerald"
+        case 0.38..<0.42: return "Mint"
+        case 0.42..<0.46: return "Teal"
+        case 0.46..<0.50: return "Cyan"
+        case 0.50..<0.54: return "Turquoise"
+        case 0.54..<0.58: return "Sky Blue"
+        case 0.58..<0.62: return "Azure"
+        case 0.62..<0.66: return "Cobalt"
+        case 0.66..<0.70: return "Blue"
+        case 0.70..<0.74: return "Sapphire"
+        case 0.74..<0.78: return "Indigo"
+        case 0.78..<0.82: return "Lavender"
+        case 0.82..<0.86: return "Purple"
+        case 0.86..<0.90: return "Violet"
+        case 0.90..<0.94: return "Plum"
+        case 0.94..<0.97: return "Rose"
+        default: return "Crimson"
+        }
+    }
+    
+    private func getDynamicStyleName(y: Double) -> String {
+        switch y {
+        case 0.0..<0.20: return "Mono"
+        case 0.20..<0.40: return "Analog"
+        case 0.40..<0.60: return "Split"
+        case 0.60..<0.80: return "Triad"
+        default: return "Complement"
+        }
+    }
+    
+    private func generatePalette(from baseColor: Color, y: Double) -> [String] {
         let uiColor = UIColor(baseColor)
         var hue: CGFloat = 0
         var saturation: CGFloat = 0
@@ -300,19 +344,55 @@ struct HuePicker: View {
         
         uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
         
-        // Analogous color scheme with variations for better harmony
-        let colors: [UIColor] = [
-            // Base color
-            uiColor,
-            // Analogous +30° - slightly lighter
-            UIColor(hue: fmod(hue + 0.083, 1.0), saturation: saturation * 0.9, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
-            // Analogous -30° - slightly lighter
-            UIColor(hue: fmod(hue + 0.917, 1.0), saturation: saturation * 0.9, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
-            // Complementary with reduced saturation for balance
-            UIColor(hue: fmod(hue + 0.5, 1.0), saturation: saturation * 0.5, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
-            // Triadic accent - muted
-            UIColor(hue: fmod(hue + 0.333, 1.0), saturation: saturation * 0.6, brightness: brightness, alpha: alpha)
-        ]
+        var colors: [UIColor] = []
+        
+        switch y {
+        case 0.0..<0.20:
+            // Monochromatic
+            colors = [
+                uiColor,
+                UIColor(hue: hue, saturation: max(saturation - 0.15, 0.15), brightness: min(brightness + 0.05, 1.0), alpha: alpha),
+                UIColor(hue: hue, saturation: max(saturation - 0.3, 0.1), brightness: min(brightness + 0.1, 1.0), alpha: alpha),
+                UIColor(hue: hue, saturation: min(saturation + 0.15, 0.9), brightness: max(brightness - 0.1, 0.4), alpha: alpha),
+                UIColor(hue: hue, saturation: min(saturation + 0.3, 1.0), brightness: max(brightness - 0.2, 0.3), alpha: alpha)
+            ]
+        case 0.20..<0.40:
+            // Analogous
+            colors = [
+                uiColor,
+                UIColor(hue: fmod(hue + 0.083, 1.0), saturation: saturation * 0.9, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.917, 1.0), saturation: saturation * 0.9, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.041, 1.0), saturation: saturation * 0.95, brightness: min(brightness * 1.05, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.959, 1.0), saturation: saturation * 0.95, brightness: min(brightness * 1.05, 1.0), alpha: alpha)
+            ]
+        case 0.40..<0.60:
+            // Split Complementary
+            colors = [
+                uiColor,
+                UIColor(hue: fmod(hue + 0.083, 1.0), saturation: saturation, brightness: brightness, alpha: alpha),
+                UIColor(hue: fmod(hue + 0.416, 1.0), saturation: saturation * 0.8, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.583, 1.0), saturation: saturation * 0.8, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue - 0.083 + 1.0, 1.0), saturation: saturation, brightness: brightness, alpha: alpha)
+            ]
+        case 0.60..<0.80:
+            // Triadic
+            colors = [
+                uiColor,
+                UIColor(hue: fmod(hue + 0.333, 1.0), saturation: saturation * 0.9, brightness: brightness, alpha: alpha),
+                UIColor(hue: fmod(hue + 0.667, 1.0), saturation: saturation * 0.9, brightness: brightness, alpha: alpha),
+                UIColor(hue: hue, saturation: saturation * 0.6, brightness: min(brightness * 1.15, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.333, 1.0), saturation: saturation * 1.1, brightness: max(brightness * 0.85, 0.4), alpha: alpha)
+            ]
+        default:
+            // Complementary
+            colors = [
+                uiColor,
+                UIColor(hue: hue, saturation: saturation * 0.7, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.5, 1.0), saturation: saturation, brightness: brightness, alpha: alpha),
+                UIColor(hue: fmod(hue + 0.5, 1.0), saturation: saturation * 0.7, brightness: min(brightness * 1.1, 1.0), alpha: alpha),
+                UIColor(hue: fmod(hue + 0.5, 1.0), saturation: min(saturation * 1.2, 1.0), brightness: max(brightness * 0.8, 0.4), alpha: alpha)
+            ]
+        }
         
         return colors.map { Color($0).toHex() }
     }
@@ -320,17 +400,27 @@ struct HuePicker: View {
     private func updateColor(at location: CGPoint, gridSize: CGSize) {
         let normalizedX = location.x / gridSize.width
         let normalizedY = location.y / gridSize.height
+        currentYFraction = normalizedY
         
         let interpolatedColor = interpolateColor(x: normalizedX, y: normalizedY)
         currentColor = interpolatedColor
+        
+        let newColorName = getDynamicColorName(hue: normalizedX)
+        let newStyleName = getDynamicStyleName(y: normalizedY)
+        let combined = "\(newColorName) \(newStyleName)"
+        
+        if combined != colorName {
+            lightFeedback.impactOccurred(intensity: 0.35)
+            colorName = combined
+        }
     }
     
     private func interpolateColor(x: Double, y: Double) -> Color {
-        // X = Hue (0-1 maps to full 360° color spectrum)
-        // Y = Saturation (top = very pastel/0.3, bottom = soft pastel/0.6)
         let hue = x
-        let saturation = 0.3 + (y * 0.3) // 0.3 to 0.6 (pastel only)
-        let brightness: CGFloat = 0.95
+        let minSat = 0.10 + (paletteManager.vibrancy * 0.35)
+        let maxSat = 0.30 + (paletteManager.vibrancy * 0.65)
+        let saturation = minSat + (y * (maxSat - minSat))
+        let brightness: CGFloat = 0.98 - (paletteManager.vibrancy * 0.08)
         
         return Color(hue: hue, saturation: saturation, brightness: brightness)
     }

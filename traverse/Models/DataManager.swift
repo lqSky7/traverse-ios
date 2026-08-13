@@ -184,6 +184,33 @@ class DataManager: ObservableObject {
         saveData(revisionMode, filename: "revisionMode.json")
     }
     
+    func mergeAndPersistSolves(_ fetchedSolves: [Solve]) -> [Solve] {
+        var solvesDict = [String: Solve]()
+        
+        // 1. Load existing ones into dict
+        if let current = recentSolves {
+            for solve in current {
+                let key = "\(solve.problem.platform):\(solve.problem.slug)"
+                solvesDict[key] = solve
+            }
+        }
+        
+        // 2. Merge new ones (overwriting or adding)
+        for solve in fetchedSolves {
+            let key = "\(solve.problem.platform):\(solve.problem.slug)"
+            solvesDict[key] = solve
+        }
+        
+        // 3. Convert back to array sorted by solvedAt descending
+        let merged = solvesDict.values.sorted { s1, s2 in
+            s1.solvedAt > s2.solvedAt
+        }
+        
+        self.recentSolves = merged
+        saveData(merged, filename: "recentSolves.json")
+        return merged
+    }
+    
     func fetchAllData(username: String) async throws {
         // Fetch all required data in parallel
         async let friendsTask = NetworkService.shared.getFriends()
@@ -193,7 +220,7 @@ class DataManager: ObservableObject {
         async let submissionStatsTask = NetworkService.shared.getSubmissionStats()
         async let solveStatsTask = NetworkService.shared.getSolveStats()
         async let achievementStatsTask = NetworkService.shared.getAchievementStats()
-        async let recentSolvesTask = NetworkService.shared.getSolves(limit: 10)
+        async let recentSolvesTask = NetworkService.shared.getSolves(limit: 200)
         
         // Wait for all data to be fetched
         let results = try await (
@@ -215,18 +242,27 @@ class DataManager: ObservableObject {
         self.submissionStats = results.4
         self.solveStats = results.5
         self.achievementStats = results.6
-        self.recentSolves = results.7.solves
+        
+        // Merge and persist solves to the local cache
+        _ = mergeAndPersistSolves(results.7.solves)
         
         hasFetchedInitialData = true
         
         // Update timestamp
         self.lastFetchTimestamp = Date()
         
-        // Persist the data
+        // Persist the data (recentSolves already saved in mergeAndPersistSolves)
         persistData()
         
         // Check if user has solved today and end Live Activity if active
         checkSolvedTodayAndEndActivity()
+        
+        // Asynchronously check for newly unlocked achievements
+        Task {
+            if let response = try? await NetworkService.shared.getAllAchievements() {
+                AchievementToastManager.shared.checkNewAchievements(response.achievements)
+            }
+        }
     }
     
     func checkSolvedTodayAndEndActivity() {
@@ -252,13 +288,6 @@ class DataManager: ObservableObject {
                 }
                 return false
             }
-            
-            // If solved today, end the Live Activity
-            if solvedToday {
-                if #available(iOS 16.1, *) {
-                    LiveActivityManager.shared.endActivity()
-                }
-            }
         }
     }
     
@@ -280,60 +309,8 @@ class DataManager: ObservableObject {
         hasFetchedInitialData = false
     }
     
+    
     var hasData: Bool {
         hasFetchedInitialData
-    }
-    
-    // MARK: - Streak Reminder Management
-    func checkAndScheduleStreakReminder() async {
-        // Check if user has solved today based on recent solves
-        let calendar = Calendar.current
-        let now = Date()
-        let hour = calendar.component(.hour, from: now)
-        
-        // Create ISO8601 formatter that handles optional fractional seconds
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        // Check if solved today from cached data
-        let solvedToday: Bool
-        if let recentSolves = self.recentSolves {
-            solvedToday = recentSolves.contains { solve in
-                // Try with fractional seconds first, then without
-                var date = formatter.date(from: solve.solvedAt)
-                if date == nil {
-                    formatter.formatOptions = [.withInternetDateTime]
-                    date = formatter.date(from: solve.solvedAt)
-                }
-                
-                if let solveDate = date {
-                    return calendar.isDate(solveDate, inSameDayAs: now)
-                }
-                return false
-            }
-        } else {
-            solvedToday = false
-        }
-        
-        // If user hasn't solved today and it's after 6 PM
-        if !solvedToday && hour >= 18 {
-            // Calculate hours remaining until midnight
-            var tomorrow = calendar.startOfDay(for: now)
-            tomorrow = calendar.date(byAdding: .day, value: 1, to: tomorrow)!
-            
-            let msRemaining = tomorrow.timeIntervalSince(now)
-            let hoursRemaining = Int(msRemaining / 3600)
-            
-            let currentStreak = self.userStats?.stats.currentStreak ?? 0
-            
-            // Start Live Activity
-            if #available(iOS 16.1, *) {
-                LiveActivityManager.shared.startStreakReminder(
-                    hoursRemaining: hoursRemaining,
-                    currentStreak: currentStreak,
-                    streakEndsAt: tomorrow
-                )
-            }
-        }
     }
 }

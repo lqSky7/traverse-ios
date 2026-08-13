@@ -8,6 +8,7 @@ import SwiftUI
 // MARK: - Bento Settings Grid
 struct BentoSettingsGrid: View {
     @ObservedObject var paletteManager: ColorPaletteManager
+    @EnvironmentObject var authViewModel: AuthViewModel
     
     // Sheet bindings
     @Binding var showingEditProfile: Bool
@@ -17,6 +18,7 @@ struct BentoSettingsGrid: View {
     @Binding var showingImportPalette: Bool
     @Binding var showingDreamPicker: Bool
     @Binding var showingFreezeShop: Bool
+    @Binding var showingShaderDemos: Bool
     
     // Haptic generators
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -226,7 +228,7 @@ struct BentoSettingsGrid: View {
                 HStack {
                     Image(systemName: "snowflake")
                         .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(paletteManager.color(at: 0))
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Freeze Shop")
@@ -241,7 +243,77 @@ struct BentoSettingsGrid: View {
                     
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.cyan.opacity(0.6))
+                        .foregroundStyle(paletteManager.color(at: 0).opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
+            
+            // Horizontal Divider
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+            
+            // Row 4.5: Calendar Subscription (full width)
+            Button {
+                mediumFeedback.impactOccurred()
+                subscribeToCalendar()
+            } label: {
+                HStack {
+                    Image(systemName: "calendar.badge.plus")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(paletteManager.color(at: 1))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Calendar Subscription")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Sync revisions to your Calendar app")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(paletteManager.color(at: 1).opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
+            
+            // Horizontal Divider
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+            
+            // Row 4.6: Shader & Glass Demos (full width)
+            Button {
+                mediumFeedback.impactOccurred()
+                showingShaderDemos = true
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles.tv.fill")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(paletteManager.color(at: 2))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Shader & Glass Demos")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("16 Metal & UI Demos from @radiofun")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(paletteManager.color(at: 2).opacity(0.6))
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -296,6 +368,14 @@ struct BentoSettingsGrid: View {
             mediumFeedback.prepare()
         }
     }
+    
+    private func subscribeToCalendar() {
+        guard let user = authViewModel.currentUser else { return }
+        let username = user.username
+        let token = user.calendarToken ?? ""
+        guard let url = NetworkService.shared.calendarFeedURL(username: username, token: token) else { return }
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    }
 }
 
 // MARK: - Bento Cell Component
@@ -338,9 +418,11 @@ struct BentoCellButtonStyle: ButtonStyle {
             showingLogoutConfirmation: .constant(false),
             showingImportPalette: .constant(false),
             showingDreamPicker: .constant(false),
-            showingFreezeShop: .constant(false)
+            showingFreezeShop: .constant(false),
+            showingShaderDemos: .constant(false)
         )
         .padding(.vertical)
     }
     .background(Color(.systemBackground))
+    .environmentObject(AuthViewModel())
 }

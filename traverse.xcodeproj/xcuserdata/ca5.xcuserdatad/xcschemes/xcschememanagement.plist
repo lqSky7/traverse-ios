@@ -4,8 +4,29 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>TraverseWidgetExtension.xcscheme_^#shared#^_</key>
+		<key>Traverse Watch App.xcscheme</key>
 		<dict>
+			<key>isShown</key>
+			<false/>
+			<key>orderHint</key>
+			<integer>2</integer>
+		</dict>
+		<key>TraverseWatchWidgetExtension.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+			<key>orderHint</key>
+			<integer>3</integer>
+		</dict>
+		<key>TraverseWidgetExtension copy.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>5</integer>
+		</dict>
+		<key>TraverseWidgetExtension.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
 			<key>orderHint</key>
 			<integer>1</integer>
 		</dict>
@@ -18,6 +39,16 @@
 	<key>SuppressBuildableAutocreation</key>
 	<dict>
 		<key>6A07DEA02F0165C2009A4EB8</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>6A8B31272F7EC7C70050A4FB</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>6A8B31432F7F00000050A4FB</key>
 		<dict>
 			<key>primary</key>
 			<true/>

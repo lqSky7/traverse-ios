@@ -1,0 +1,218 @@
+import SwiftUI
+import Charts
+
+struct RevisionsView: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var paletteManager: ColorPaletteManager
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                stats
+                mlSummary
+                revisionList
+            }
+            .padding(24)
+        }
+        .navigationTitle("ML Revisions")
+        .task { await appState.refreshRevisions() }
+    }
+
+    private var header: some View {
+        ThemedCard {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ML Revision Queue")
+                        .font(.largeTitle.weight(.bold))
+                    Text("Paid accounts use the ML schedule only. Swipe a row left to delete it.")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private var stats: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 14)], spacing: 14) {
+            MetricCard(title: "Total", value: appState.revisionStats?.total ?? 0, symbol: "tray.full", color: paletteManager.color(at: 0))
+            MetricCard(title: "Due Today", value: appState.revisionStats?.dueToday ?? 0, symbol: "calendar.badge.clock", color: paletteManager.color(at: 1))
+            MetricCard(title: "Overdue", value: appState.revisionStats?.overdue ?? 0, symbol: "exclamationmark.triangle", color: .orange)
+            MetricCard(title: "Completed", value: appState.revisionStats?.completed ?? 0, symbol: "checkmark.circle", color: paletteManager.color(at: 2))
+        }
+    }
+
+    private var mlSummary: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let today = appState.todayRevisions {
+                ThemedCard {
+                    HStack {
+                        Label("\(today.total) due today", systemImage: "brain")
+                        Spacer()
+                        Text("Daily cap \(today.maxDaily)")
+                            .foregroundStyle(.secondary)
+                        if today.overflow > 0 {
+                            Text("\(today.overflow) overflow")
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .font(.headline)
+                }
+            }
+            if let analytics = appState.revisionAnalytics {
+                HStack(alignment: .top, spacing: 14) {
+                    AccuracyTrendChart(points: analytics.accuracyTrend)
+                    ProjectedLoadChart(points: analytics.projectedLoad)
+                }
+                RetentionRiskTable(items: analytics.retentionHeatmap)
+            }
+        }
+    }
+
+    private var revisionList: some View {
+        ThemedCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Scheduled Reviews")
+                    .font(.title3.weight(.bold))
+                if appState.revisionGroups.isEmpty {
+                    PanelFeedback(status: appState.panelStatus(.revisions), isEmpty: true, emptyTitle: "No ML revisions due", emptySystemImage: "clock.badge.checkmark", emptyDescription: "Your ML schedule will appear here.")
+                } else {
+                    ForEach(appState.revisionGroups) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(group.displayDate.formatted(date: .abbreviated, time: .omitted))
+                                .font(.headline)
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                            ForEach(group.revisions) { revision in
+                                NavigationLink {
+                                    RevisionDetailView(revision: revision)
+                                } label: {
+                                    RevisionRow(revision: revision)
+                                }
+                                .buttonStyle(.plain)
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        Task { await appState.deleteRevision(revision) }
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                                .contextMenu {
+                                    Button("Delete Revision", role: .destructive) {
+                                        Task { await appState.deleteRevision(revision) }
+                                    }
+                                }
+                                if revision.id != group.revisions.last?.id { Divider() }
+                            }
+                        }
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct RevisionRow: View {
+    @EnvironmentObject private var paletteManager: ColorPaletteManager
+    let revision: Revision
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(revision.problem.title)
+                        .font(.headline)
+                    Text("#\(revision.revisionNumber)")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
+                }
+                Text("\(revision.problem.platform) • \(revision.problem.difficulty.capitalized)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if revision.isOverdue {
+                Label("Overdue", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.caption.weight(.semibold))
+            }
+            Image(systemName: "chevron.right")
+                .foregroundStyle(.tertiary)
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+struct AccuracyTrendChart: View {
+    @EnvironmentObject private var paletteManager: ColorPaletteManager
+    let points: [RevisionAccuracyPoint]
+
+    var body: some View {
+        ThemedCard {
+            VStack(alignment: .leading) {
+                Text("Accuracy Trend").font(.headline)
+                PanelFeedback(status: .loaded(.now), isEmpty: points.isEmpty, emptyTitle: "No accuracy trend", emptySystemImage: "chart.xyaxis.line", emptyDescription: "ML attempt history will appear here.")
+                Chart(points) { point in
+                    LineMark(x: .value("Date", point.date), y: .value("Success", point.successRate))
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    PointMark(x: .value("Date", point.date), y: .value("Success", point.successRate))
+                        .foregroundStyle(paletteManager.color(at: 1))
+                }
+                .frame(height: 190)
+            }
+        }
+    }
+}
+
+struct ProjectedLoadChart: View {
+    @EnvironmentObject private var paletteManager: ColorPaletteManager
+    let points: [RevisionProjectedLoad]
+
+    var body: some View {
+        ThemedCard {
+            VStack(alignment: .leading) {
+                Text("Projected Load").font(.headline)
+                PanelFeedback(status: .loaded(.now), isEmpty: points.isEmpty, emptyTitle: "No projected load", emptySystemImage: "calendar", emptyDescription: "Projected ML review load will appear here.")
+                Chart(points) { point in
+                    BarMark(x: .value("Date", point.date), y: .value("Due", point.dueCount))
+                        .foregroundStyle(paletteManager.color(at: 0))
+                    BarMark(x: .value("Date", point.date), y: .value("Overdue", point.overdueCount))
+                        .foregroundStyle(.orange)
+                }
+                .frame(height: 190)
+            }
+        }
+    }
+}
+
+struct RetentionRiskTable: View {
+    @EnvironmentObject private var paletteManager: ColorPaletteManager
+    let items: [RevisionRetentionItem]
+
+    var body: some View {
+        ThemedCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Retention Risk").font(.headline)
+                if items.isEmpty {
+                    PanelFeedback(status: .loaded(.now), isEmpty: true, emptyTitle: "No retention risk", emptySystemImage: "brain", emptyDescription: "Risk scores will appear when ML analytics are available.")
+                } else {
+                    ForEach(items.sorted { $0.retrievability < $1.retrievability }.prefix(8)) { item in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(item.problemTitle).font(.subheadline.weight(.semibold))
+                                Text("\(item.platform) • \(item.difficulty.capitalized)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text("\(Int(item.retrievability * 100))%")
+                                .font(.headline.monospacedDigit())
+                                .foregroundStyle(item.isLeech ? .orange : paletteManager.selectedPalette.primary)
+                        }
+                        if item.id != items.prefix(8).last?.id { Divider() }
+                    }
+                }
+            }
+        }
+    }
+}

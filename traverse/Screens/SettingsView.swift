@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var isLoading = false
     @State private var showingDreamPicker = false
     @State private var showingFreezeShop = false
+    @State private var showingShaderDemos = false
 
     var body: some View {
         NavigationStack {
@@ -120,7 +121,8 @@ struct SettingsView: View {
                         showingLogoutConfirmation: $showingLogoutConfirmation,
                         showingImportPalette: $showingImportPalette,
                         showingDreamPicker: $showingDreamPicker,
-                        showingFreezeShop: $showingFreezeShop
+                        showingFreezeShop: $showingFreezeShop,
+                        showingShaderDemos: $showingShaderDemos
                     )
                 }
                 .padding(.vertical)
@@ -151,13 +153,16 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingDreamPicker) {
                 HuePicker()
-                    .presentationDetents([.fraction(0.48)])
+                    .presentationDetents([.fraction(0.72)])
                     .presentationBackground(.background)
             }
             .sheet(isPresented: $showingFreezeShop) {
                 FreezeShopSheet()
                     .environmentObject(authViewModel)
                     .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showingShaderDemos) {
+                ShaderDemosView()
             }
             .alert("Logout", isPresented: $showingLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }

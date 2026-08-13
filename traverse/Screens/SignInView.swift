@@ -32,8 +32,9 @@ struct SignInView: View {
                     lightGradient: (.purple, .purple, .purple),
                     darkGradient: (.pink, .pink, .pink),
                     onSubmit: { answer in
-                        authViewModel.username = answer
-                        try await Task.sleep(nanoseconds: 100_000_000)
+                        await MainActor.run {
+                            authViewModel.username = answer
+                        }
                     }
                 ),
                 FormStep(
@@ -44,8 +45,56 @@ struct SignInView: View {
                     lightGradient: (.blue, .blue, .blue),
                     darkGradient: (.indigo, .indigo, .indigo),
                     onSubmit: { answer in
-                        authViewModel.password = answer
-                        try await Task.sleep(nanoseconds: 100_000_000)
+                        await MainActor.run {
+                            authViewModel.password = answer
+                        }
+                    },
+                    forgotPasswordAction: {
+                        let username = authViewModel.username
+                        Task {
+                            do {
+                                _ = try await NetworkService.shared.requestPasswordReset(username: username)
+                            } catch {
+                                print("Forgot password API request failed: \(error)")
+                            }
+                        }
+                        
+                        return [
+                            FormStep(
+                                icon: "envelope.badge.shield.half.filled",
+                                title: "Reset Code",
+                                description: "We have sent a verification code to your email associated with this username.",
+                                type: .inputField(placeholder: "6-digit code", keyboardType: .numberPad),
+                                lightGradient: (.orange, .orange, .orange),
+                                darkGradient: (.orange, .orange, .orange),
+                                onSubmit: { otp in
+                                    await MainActor.run {
+                                        authViewModel.otpCode = otp
+                                    }
+                                }
+                            ),
+                            FormStep(
+                                icon: "key.fill",
+                                title: "New Password",
+                                description: "Enter your new password (minimum 8 characters).",
+                                type: .inputField(placeholder: "New Password", keyboardType: .default),
+                                lightGradient: (.green, .green, .green),
+                                darkGradient: (.green, .green, .green),
+                                onSubmit: { newPassword in
+                                    guard newPassword.count >= 8 else {
+                                        throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Password must be at least 8 characters"])
+                                    }
+                                    try await NetworkService.shared.confirmPasswordReset(
+                                        username: username,
+                                        code: authViewModel.otpCode,
+                                        newPassword: newPassword
+                                    )
+                                    await MainActor.run {
+                                        authViewModel.password = newPassword
+                                    }
+                                }
+                            )
+                        ]
                     }
                 )
             ],

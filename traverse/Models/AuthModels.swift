@@ -22,10 +22,21 @@ struct UpdateProfileRequest: Codable {
     let email: String?
     let timezone: String?
     let visibility: String?
+    let maxDailyReviews: Int?
 }
 
 struct ChangePasswordRequest: Codable {
     let currentPassword: String
+    let newPassword: String
+}
+
+struct PasswordResetRequest: Codable {
+    let username: String
+}
+
+struct PasswordResetConfirmRequest: Codable {
+    let username: String
+    let code: String
     let newPassword: String
 }
 
@@ -47,8 +58,10 @@ struct User: Codable {
     let visibility: String
     let currentStreak: Int
     let totalXp: Int
+    let maxDailyReviews: Int?
     let createdAt: String?
     var profileImageURL: String?
+    var calendarToken: String?
 }
 
 struct AuthResponse: Codable {
@@ -69,6 +82,12 @@ struct UserResponse: Codable {
 
 struct MessageResponse: Codable {
     let message: String
+}
+
+struct PasswordResetRequestResponse: Codable {
+    let status: String
+    let message: String
+    let expiresInMinutes: Int?
 }
 
 struct RecoveryResponse: Codable {

@@ -16,7 +16,7 @@ struct Revision: Codable, Identifiable {
     let completedAt: String?
     let createdAt: String
     let problem: RevisionProblem
-    let solve: RevisionSolve
+    let solve: RevisionSolve?
     
     var scheduledDate: Date {
         // Try multiple date formats since backend may return different formats
@@ -72,11 +72,6 @@ struct Revision: Codable, Identifiable {
     var isCompleted: Bool {
         completedAt != nil
     }
-    
-    var isOverdue: Bool {
-        guard !isCompleted else { return false }
-        return scheduledDate < Date()
-    }
 }
 
 struct RevisionProblem: Codable {
@@ -85,12 +80,22 @@ struct RevisionProblem: Codable {
     let slug: String
     let title: String
     let difficulty: String
+    let category: Int?
+    let topic: String?
+    let subtopic: String?
 }
 
 struct RevisionSolve: Codable {
     let id: Int
     let xpAwarded: Int
     let solvedAt: String
+    let aiAnalysis: String?
+    let mistakeTags: [String]?
+    let attempts: [CodeAttempt]?
+}
+
+struct RevisionDetailsResponse: Codable {
+    let revision: Revision
 }
 
 // MARK: - Revision Response
@@ -122,7 +127,6 @@ struct RevisionGroup: Codable, Identifiable {
 struct RevisionStatsResponse: Codable {
     let total: Int
     let completed: Int
-    let overdue: Int
     let dueToday: Int
     let completionRate: Int
 }
@@ -169,3 +173,106 @@ struct MLPrediction: Codable {
         case confidence
     }
 }
+
+// MARK: - ML Revision Daily Load
+struct RevisionTodayResponse: Codable {
+    let revisions: [Revision]
+    let total: Int
+    let maxDaily: Int
+    let overflow: Int
+    let isPaused: Bool?
+    let pausedUntil: String?
+}
+
+// MARK: - Pause / Resume Models
+struct PauseRevisionsRequest: Codable {
+    let pauseDays: Int
+}
+
+struct PauseRevisionsResponse: Codable {
+    let message: String
+    let pausedUntil: String
+    let isPaused: Bool
+}
+
+struct ResumeRevisionsRequest: Codable {
+    let backlogDays: Int
+}
+
+struct ResumeRevisionsResponse: Codable {
+    let message: String
+    let rescheduled: Int
+    let backlogDays: Int
+    let isPaused: Bool
+}
+
+
+// MARK: - Revision Analytics
+struct RevisionAnalyticsResponse: Codable {
+    let overview: RevisionAnalyticsOverview
+    let stabilityDistribution: RevisionStabilityDistribution
+    let accuracyTrend: [RevisionAccuracyPoint]
+    let projectedLoad: [RevisionProjectedLoad]
+    let averageIntervalGrowth: [RevisionIntervalGrowth]
+    let retentionHeatmap: [RevisionRetentionItem]
+    let streaks: RevisionAnalyticsStreaks
+}
+
+struct RevisionAnalyticsOverview: Codable {
+    let totalProblemsTracked: Int
+    let masteredProblems: Int
+    let leechProblems: Int
+    let averageStability: Double
+    let averageRetrievability: Double
+}
+
+struct RevisionStabilityDistribution: Codable {
+    let critical: Int
+    let weak: Int
+    let developing: Int
+    let strong: Int
+    let mastered: Int
+}
+
+struct RevisionAccuracyPoint: Codable, Identifiable {
+    var id: String { date }
+    let date: String
+    let successRate: Double
+    let totalAttempts: Int
+}
+
+struct RevisionProjectedLoad: Codable, Identifiable {
+    var id: String { date }
+    let date: String
+    let dueCount: Int
+    let overdueCount: Int
+}
+
+struct RevisionIntervalGrowth: Codable, Identifiable {
+    var id: String { month }
+    let month: String
+    let avgInterval: Double
+    let count: Int
+}
+
+struct RevisionRetentionItem: Codable, Identifiable {
+    var id: Int { problemId }
+    let problemId: Int
+    let problemTitle: String
+    let problemSlug: String
+    let platform: String
+    let difficulty: String
+    let retrievability: Double
+    let stability: Double
+    let difficulty_D: Double
+    let lapses: Int
+    let lastReviewAt: String?
+    let isLeech: Bool
+}
+
+struct RevisionAnalyticsStreaks: Codable {
+    let totalRevisionsCompleted: Int
+    let totalAttempts: Int
+    let overallSuccessRate: Double
+}
+
