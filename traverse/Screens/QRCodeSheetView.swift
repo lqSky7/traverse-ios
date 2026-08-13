@@ -37,6 +37,7 @@ struct QRCodeSheetView: View {
                         StylishQRCodeView(username: username, size: 220)
                             .onAppear {
                                 qrImage = QRCodeGenerator.shared.generateFriendQR(for: username, size: 400)
+                                _ = WidgetDataUpdater.shared.prepareQRForFriendsPage(username: username)
                             }
                     } else {
                         VStack(spacing: 12) {

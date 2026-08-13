@@ -80,12 +80,22 @@ struct RevisionProblem: Codable {
     let slug: String
     let title: String
     let difficulty: String
+    let category: Int?
+    let topic: String?
+    let subtopic: String?
 }
 
 struct RevisionSolve: Codable {
     let id: Int
     let xpAwarded: Int
     let solvedAt: String
+    let aiAnalysis: String?
+    let mistakeTags: [String]?
+    let attempts: [CodeAttempt]?
+}
+
+struct RevisionDetailsResponse: Codable {
+    let revision: Revision
 }
 
 // MARK: - Revision Response
@@ -266,32 +276,3 @@ struct RevisionAnalyticsStreaks: Codable {
     let overallSuccessRate: Double
 }
 
-// MARK: - ML Recalibration
-struct RevisionRecalibrationResponse: Codable {
-    let message: String
-    let rescheduled: Int
-    let totalPending: Int
-    let maxDaily: Int
-    let dailyBreakdown: [RecalibrationDailyBreakdown]
-    let recommendations: [RecalibrationRecommendation]
-}
-
-struct RecalibrationDailyBreakdown: Codable, Identifiable {
-    var id: String { date }
-    let date: String
-    let count: Int
-}
-
-struct RecalibrationRecommendation: Codable, Identifiable {
-    var id: Int { revisionId }
-    let revisionId: Int
-    let problemId: Int
-    let title: String
-    let platform: String
-    let slug: String
-    let difficulty: String
-    let scheduledFor: String
-    let currentRetrievability: Double
-    let stability: Double?
-    let isLeech: Bool
-}

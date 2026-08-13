@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Charts
+import CoreMotion
 
 struct RevisionsView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -21,7 +22,9 @@ struct RevisionsView: View {
     @State private var notificationsEnabled = false
     @State private var useMLRevision = false
     @State private var selectedRevision: Revision?
-    @State private var showMLAttemptSheet = false
+    @State private var selectedRevisionForCoach: Revision? = nil
+    @State private var showMLInfoSheet = false
+    @State private var showDailyLimitSheet = false
     @State private var dailyCapDraft: Int = 20
     @State private var isSavingDailyCap = false
     @State private var dailyCapMessage: String?
@@ -30,13 +33,14 @@ struct RevisionsView: View {
     @State private var isSubscribed = false
     @State private var showProUpgradeSheet = false
     @State private var mlTab: MLTab = .upcoming
-    @State private var isRecalibrating = false
-    @State private var showRecalibrateConfirm = false
     @State private var showPauseConfirm = false
     @State private var showResumeConfirm = false
     @State private var pauseDaysInput: Int = 7
     @State private var backlogDaysInput: Int = 3
     @State private var isPausingOrResuming = false
+
+    // Exam mode caching to prevent flicker on load
+    @AppStorage("cachedExamModeActive") private var isExamModeActive: Bool = false
 
     // Subscription caching - only check once per day at 00:01
     @AppStorage("cachedSubscriptionStatus") private var cachedSubscriptionStatus: Bool = false
@@ -54,202 +58,123 @@ struct RevisionsView: View {
             ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 20) {
-                        if useMLRevision {
-                            if isSubscribed {
-                                Picker("ML View", selection: $mlTab) {
-                                    ForEach(MLTab.allCases) { tab in
-                                        Text(tab.rawValue).tag(tab)
+                if isExamModeActive {
+                    ExamModeActiveView(
+                        isResuming: isPausingOrResuming,
+                        onResume: {
+                            Task { await resumeRevisions(backlogDays: 3) }
+                        }
+                    )
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            if useMLRevision {
+                                if isSubscribed {
+                                    Picker("ML View", selection: $mlTab) {
+                                        ForEach(MLTab.allCases) { tab in
+                                            Text(tab.rawValue).tag(tab)
+                                        }
                                     }
+                                    .pickerStyle(.segmented)
                                 }
-                                .pickerStyle(.segmented)
-                            }
 
-                            if mlTab == .upcoming {
-                                if todaySummary?.isPaused == true {
-                                    VStack(alignment: .leading, spacing: 16) {
-                                        HStack(spacing: 14) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(paletteManager.selectedPalette.primary.opacity(0.2))
-                                                    .frame(width: 48, height: 48)
-                                                Image(systemName: "graduationcap.fill")
-                                                    .font(.title2)
-                                                    .foregroundStyle(paletteManager.selectedPalette.primary)
-                                            }
-                                            
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                Text("Exam Mode Active")
-                                                    .font(.headline)
-                                                    .fontWeight(.bold)
-                                                    .foregroundStyle(.white)
-                                                
-                                                if let pausedUntil = todaySummary?.pausedUntil {
-                                                    Text("Paused until \(formattedPausedDate(pausedUntil))")
-                                                        .font(.subheadline)
-                                                        .foregroundStyle(.secondary)
-                                                } else {
-                                                    Text("Revisions are currently paused")
-                                                        .font(.subheadline)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                            }
-                                            Spacer()
-                                        }
-                                        
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "sparkles")
-                                                .font(.caption)
-                                                .foregroundStyle(paletteManager.color(at: 2))
-                                            Text("Calendar feed is serving motivational quotes & easter eggs.")
-                                                .font(.caption)
-                                                .fontWeight(.medium)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .padding(.vertical, 6)
-                                        .padding(.horizontal, 10)
-                                        .background(paletteManager.color(at: 2).opacity(0.12), in: Capsule())
-
-                                        Button(action: { showResumeConfirm = true }) {
-                                            HStack {
-                                                Spacer()
-                                                Label("Resume Revisions Now", systemImage: "play.fill")
-                                                    .font(.subheadline)
-                                                    .fontWeight(.semibold)
-                                                Spacer()
-                                            }
-                                            .padding(.vertical, 12)
-                                            .foregroundStyle(.black)
-                                            .background(paletteManager.selectedPalette.primary, in: Capsule())
-                                            .shadow(color: paletteManager.selectedPalette.primary.opacity(0.4), radius: 8, x: 0, y: 4)
-                                        }
+                                if mlTab == .analytics {
+                                    if isAnalyticsLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
+                                            .padding(.top, 8)
+                                    } else if let analytics = analytics {
+                                        RevisionAnalyticsSection(analytics: analytics)
+                                    } else if let analyticsError = analyticsError {
+                                        Text(analyticsError)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
                                     }
-                                    .padding(18)
-                                    .modifier(LiquidGlassCardModifier())
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(
-                                                LinearGradient(
-                                                    colors: [
-                                                        paletteManager.selectedPalette.primary.opacity(0.5),
-                                                        paletteManager.color(at: 2).opacity(0.2)
-                                                    ],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                ),
-                                                lineWidth: 1
-                                            )
-                                    )
-                                } else {
-                                    DailyReviewLimitCard(
-                                        currentCap: authViewModel.currentUser?.maxDailyReviews ?? 20,
-                                        draftCap: $dailyCapDraft,
-                                        isSaving: isSavingDailyCap,
-                                        message: dailyCapMessage,
-                                        summary: todaySummary,
-                                        onSave: { Task { await saveDailyCap() } }
-                                    )
                                 }
                             }
 
-                            if mlTab == .analytics {
-                                if isAnalyticsLoading {
+                            if !useMLRevision || mlTab == .upcoming {
+                                if isLoading && revisionGroups.isEmpty {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
-                                        .padding(.top, 8)
-                                } else if let analytics = analytics {
-                                    RevisionAnalyticsSection(analytics: analytics)
-                                } else if let analyticsError = analyticsError {
-                                    Text(analyticsError)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-
-                        if !useMLRevision || mlTab == .upcoming {
-                            if isLoading && revisionGroups.isEmpty {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
+                                        .padding(.top, 100)
+                                } else if let errorMessage = errorMessage {
+                                    VStack(spacing: 16) {
+                                        Image(systemName: "exclamationmark.triangle")
+                                            .font(.system(size: 60))
+                                            .foregroundStyle(.red)
+                                        Text(errorMessage)
+                                            .foregroundStyle(.red)
+                                    }
                                     .padding(.top, 100)
-                            } else if let errorMessage = errorMessage {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .font(.system(size: 60))
-                                        .foregroundStyle(.red)
-                                    Text(errorMessage)
-                                        .foregroundStyle(.red)
-                                }
-                                .padding(.top, 100)
-                            } else if revisionGroups.isEmpty {
-                                VStack(spacing: 16) {
-                                    Image(systemName: "calendar.badge.clock")
-                                        .font(.system(size: 60))
-                                        .foregroundStyle(.secondary)
-                                    Text("No Revisions Scheduled")
-                                        .font(.title2)
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(.white)
-                                    Text("Complete problems to schedule revisions")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.top, 100)
-                            } else {
-                                ForEach(revisionGroups) { group in
-                                    RevisionGroupCard(
-                                        group: group,
-                                        useMLMode: useMLRevision,
-                                        onComplete: { revision in
-                                            await completeRevision(revision)
-                                        },
-                                        onMLAttempt: { revision in
-                                            selectedRevision = revision
-                                            showMLAttemptSheet = true
-                                        },
-                                        onDelete: { revision in
-                                            await deleteRevision(revision)
-                                        },
-                                        onReschedule: { revision, days in
-                                            await rescheduleRevision(revision, days: days)
-                                        },
-                                        onDeleteProblem: { revision in
-                                            await deleteProblemFromRevisionList(revision)
-                                        }
-                                    )
+                                } else if revisionGroups.isEmpty {
+                                    VStack(spacing: 16) {
+                                        Image(systemName: "calendar.badge.clock")
+                                            .font(.system(size: 60))
+                                            .foregroundStyle(.secondary)
+                                        Text("No Revisions Scheduled")
+                                            .font(.title2)
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(.white)
+                                        Text("Complete problems to schedule revisions")
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.top, 100)
+                                } else {
+                                    ForEach(revisionGroups) { group in
+                                        RevisionGroupCard(
+                                            group: group,
+                                            useMLMode: useMLRevision,
+                                            onComplete: { revision in
+                                                await completeRevision(revision)
+                                            },
+                                            onOpenCoach: { revision in
+                                                selectedRevisionForCoach = revision
+                                            },
+                                            onDelete: { revision in
+                                                await deleteRevision(revision)
+                                            },
+                                            onReschedule: { revision, days in
+                                                await rescheduleRevision(revision, days: days)
+                                            },
+                                            onDeleteProblem: { revision in
+                                                await deleteProblemFromRevisionList(revision)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
+                        .padding()
+                        .padding(.top, 80) // Space for floating toolbar
                     }
-                    .padding()
-                    .padding(.top, 80) // Space for floating toolbar
-                }
-                
-                // Floating Liquid Glass Stats Toolbar + ML toggle
-                if let stats = stats {
-                    VStack(spacing: 10) {
-                        if #available(iOS 26.0, *) {
-                            HStack(spacing: 16) {
-                                StatBadge(title: "Tracked", value: "\(stats.total)", color: paletteManager.color(at: 4))
-                                StatBadge(title: "Due Today", value: "\(stats.dueToday)", color: paletteManager.color(at: 2))
-                                StatBadge(title: "Done", value: "\(stats.completionRate)%", color: paletteManager.color(at: 1))
+                    
+                    // Floating Liquid Glass Stats Toolbar + ML toggle
+                    if let stats = stats {
+                        VStack(spacing: 10) {
+                            if #available(iOS 26.0, *) {
+                                HStack(spacing: 16) {
+                                    StatBadge(title: "Tracked", value: "\(stats.total)", color: paletteManager.color(at: 4))
+                                    StatBadge(title: "Due Today", value: "\(stats.dueToday)", color: paletteManager.color(at: 2))
+                                    StatBadge(title: "Done", value: "\(stats.completionRate)%", color: paletteManager.color(at: 1))
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .glassEffect(.regular.interactive(), in: .capsule)
+                                .padding(.horizontal)
+                                .padding(.top, 10)
+                            } else {
+                                HStack(spacing: 16) {
+                                    StatBadge(title: "Tracked", value: "\(stats.total)", color: paletteManager.color(at: 4))
+                                    StatBadge(title: "Due Today", value: "\(stats.dueToday)", color: paletteManager.color(at: 2))
+                                    StatBadge(title: "Done", value: "\(stats.completionRate)%", color: paletteManager.color(at: 1))
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(.ultraThinMaterial, in: .capsule)
+                                .padding(.horizontal)
+                                .padding(.top, 10)
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .glassEffect(.regular.interactive(), in: .capsule)
-                            .padding(.horizontal)
-                            .padding(.top, 10)
-                        } else {
-                            HStack(spacing: 16) {
-                                StatBadge(title: "Tracked", value: "\(stats.total)", color: paletteManager.color(at: 4))
-                                StatBadge(title: "Due Today", value: "\(stats.dueToday)", color: paletteManager.color(at: 2))
-                                StatBadge(title: "Done", value: "\(stats.completionRate)%", color: paletteManager.color(at: 1))
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(.ultraThinMaterial, in: .capsule)
-                            .padding(.horizontal)
-                            .padding(.top, 10)
                         }
                     }
                 }
@@ -259,6 +184,14 @@ struct RevisionsView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        Button(action: { showMLInfoSheet = true }) {
+                            Label("How ML Scheduling Works", systemImage: "brain.head.profile")
+                        }
+
+                        Button(action: { showDailyLimitSheet = true }) {
+                            Label("Daily Revision Limit", systemImage: "slider.horizontal.3")
+                        }
+
                         if !useMLRevision {
                             Toggle(isOn: $showCompletedRevisions) {
                                 Label("Show Completed", systemImage: showCompletedRevisions ? "checkmark.circle.fill" : "circle")
@@ -312,21 +245,14 @@ struct RevisionsView: View {
                             Label("Reschedule All Notifications", systemImage: "arrow.clockwise")
                         }
 
-                        if useMLRevision {
-                            if todaySummary?.isPaused == true {
-                                Button(action: { showResumeConfirm = true }) {
-                                    Label("Resume Revisions", systemImage: "play.circle.fill")
-                                }
-                            } else {
-                                Button(action: { showPauseConfirm = true }) {
-                                    Label("Stop Revisions (Exam Mode)", systemImage: "graduationcap.fill")
-                                }
+                        if isExamModeActive {
+                            Button(action: { Task { await resumeRevisions(backlogDays: 3) } }) {
+                                Label("Stop Exam Mode", systemImage: "play.circle.fill")
                             }
-
-                            Button(action: { showRecalibrateConfirm = true }) {
-                                Label("Recalibrate Schedule", systemImage: "arrow.triangle.2.circlepath")
+                        } else {
+                            Button(action: { Task { await pauseRevisions(days: 365) } }) {
+                                Label("Exam Mode", systemImage: "graduationcap.fill")
                             }
-                            .disabled(isRecalibrating)
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -336,22 +262,28 @@ struct RevisionsView: View {
             .refreshable { await loadData() }
         }
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showMLAttemptSheet) {
-            if let revision = selectedRevision {
-                MLAttemptSheet(revision: revision)
-            }
+        .sheet(isPresented: $showMLInfoSheet) {
+            MLSchedulingInfoSheet()
+        }
+        .sheet(isPresented: $showDailyLimitSheet) {
+            DailyReviewLimitSheet(
+                currentCap: authViewModel.currentUser?.maxDailyReviews ?? 20,
+                draftCap: $dailyCapDraft,
+                isSaving: isSavingDailyCap,
+                message: dailyCapMessage,
+                summary: todaySummary,
+                onSave: { Task { await saveDailyCap() } }
+            )
+        }
+        .sheet(item: $selectedRevisionForCoach) { revision in
+            RevisionCoachSheet(
+                revision: revision,
+                solve: findSolveForRevision(revision),
+                todaySolve: findTodaySolveForRevision(revision)
+            )
         }
         .sheet(isPresented: $showProUpgradeSheet) {
             ProUpgradeSheet()
-        }
-        .sheet(isPresented: $showPauseConfirm) {
-            PauseExamModeSheet(
-                pauseDays: $pauseDaysInput,
-                isSubmitting: isPausingOrResuming,
-                onConfirm: { days in
-                    Task { await pauseRevisions(days: days) }
-                }
-            )
         }
         .sheet(isPresented: $showResumeConfirm) {
             ResumeRevisionsSheet(
@@ -362,14 +294,7 @@ struct RevisionsView: View {
                 }
             )
         }
-        .confirmationDialog("Recalibrate ML schedule?", isPresented: $showRecalibrateConfirm, titleVisibility: .visible) {
-            Button("Recalibrate Now", role: .destructive) {
-                Task { await recalibrateRevisions() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("This will reschedule all pending ML revisions starting today based on your daily cap.")
-        }
+
         .onAppear {
             useMLRevision = revisionMode == "ml"
             if cachedSubscriptionStatus {
@@ -419,9 +344,16 @@ struct RevisionsView: View {
                 await loadAnalytics()
             } else {
                 analytics = nil
-                todaySummary = nil
                 analyticsError = nil
                 isAnalyticsLoading = false
+                do {
+                    todaySummary = try await NetworkService.shared.getTodayRevisions()
+                    if let isPaused = todaySummary?.isPaused {
+                        isExamModeActive = isPaused
+                    }
+                } catch {
+                    print("Failed to check today summary: \(error.localizedDescription)")
+                }
             }
         }
         
@@ -444,6 +376,9 @@ struct RevisionsView: View {
             if type == "ml" {
                 let response = try await NetworkService.shared.getTodayRevisions()
                 todaySummary = response
+                if let isPaused = response.isPaused {
+                    isExamModeActive = isPaused
+                }
                 revisionGroups = groupRevisionsByDate(response.revisions)
 
                 if notificationsEnabled {
@@ -666,8 +601,9 @@ struct RevisionsView: View {
         }
     }
 
-    private func pauseRevisions(days: Int) async {
+    private func pauseRevisions(days: Int = 365) async {
         isPausingOrResuming = true
+        isExamModeActive = true
         do {
             _ = try await NetworkService.shared.pauseMLRevisions(pauseDays: days)
             HapticManager.shared.success()
@@ -675,6 +611,7 @@ struct RevisionsView: View {
             await loadData(forceType: "ml")
         } catch {
             print("Failed to pause revisions: \(error.localizedDescription)")
+            isExamModeActive = false
             HapticManager.shared.error()
         }
         isPausingOrResuming = false
@@ -682,6 +619,7 @@ struct RevisionsView: View {
 
     private func resumeRevisions(backlogDays: Int) async {
         isPausingOrResuming = true
+        isExamModeActive = false
         do {
             _ = try await NetworkService.shared.resumeMLRevisions(backlogDays: backlogDays)
             HapticManager.shared.success()
@@ -689,6 +627,7 @@ struct RevisionsView: View {
             await loadData(forceType: "ml")
         } catch {
             print("Failed to resume revisions: \(error.localizedDescription)")
+            isExamModeActive = true
             HapticManager.shared.error()
         }
         isPausingOrResuming = false
@@ -727,17 +666,62 @@ struct RevisionsView: View {
         isSavingDailyCap = false
     }
 
-    private func recalibrateRevisions() async {
-        guard !isRecalibrating else { return }
-        isRecalibrating = true
-        do {
-            _ = try await NetworkService.shared.recalibrateMLRevisions()
-            await loadData(forceType: "ml")
-            if notificationsEnabled {
-                await scheduleAllNotifications()
+
+
+    private func findSolveForRevision(_ revision: Revision) -> Solve? {
+        if let revSolve = revision.solve {
+            let problem = Problem(
+                platform: revision.problem.platform,
+                slug: revision.problem.slug,
+                title: revision.problem.title,
+                difficulty: revision.problem.difficulty,
+                category: revision.problem.category,
+                topic: revision.problem.topic,
+                subtopic: revision.problem.subtopic
+            )
+            let submission = Submission(
+                language: "unknown",
+                happenedAt: revSolve.solvedAt,
+                aiAnalysis: revSolve.aiAnalysis,
+                mistakeTags: revSolve.mistakeTags,
+                numberOfTries: nil,
+                timeTaken: nil,
+                attempts: revSolve.attempts
+            )
+            return Solve(
+                id: revSolve.id,
+                xpAwarded: revSolve.xpAwarded,
+                solvedAt: revSolve.solvedAt,
+                aiAnalysis: revSolve.aiAnalysis,
+                mistakeTags: revSolve.mistakeTags,
+                attempts: revSolve.attempts,
+                problem: problem,
+                submission: submission,
+                highlight: nil
+            )
+        }
+        let solves = DataManager.shared.recentSolves ?? []
+        return solves.first { $0.problem.slug == revision.problem.slug }
+    }
+
+    private func findTodaySolveForRevision(_ revision: Revision) -> Solve? {
+        let solves = DataManager.shared.recentSolves ?? []
+        let calendar = Calendar.current
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        return solves.first { solve in
+            guard solve.problem.slug == revision.problem.slug else { return false }
+            var date = formatter.date(from: solve.solvedAt)
+            if date == nil {
+                formatter.formatOptions = [.withInternetDateTime]
+                date = formatter.date(from: solve.solvedAt)
             }
-        } catch { }
-        isRecalibrating = false
+            if let solveDate = date {
+                return calendar.isDateInToday(solveDate)
+            }
+            return false
+        }
     }
 
     private func groupRevisionsByDate(_ revisions: [Revision]) -> [RevisionGroup] {
@@ -764,7 +748,7 @@ struct RevisionGroupCard: View {
     let group: RevisionGroup
     let useMLMode: Bool
     let onComplete: (Revision) async -> Void
-    let onMLAttempt: (Revision) -> Void
+    let onOpenCoach: (Revision) -> Void
     let onDelete: (Revision) async -> Void
     let onReschedule: (Revision, Int) async -> Void
     let onDeleteProblem: (Revision) async -> Void
@@ -795,13 +779,13 @@ struct RevisionGroupCard: View {
             VStack(spacing: 0) {
                 ForEach(Array(group.revisions.enumerated()), id: \.element.id) { index, revision in
                     RevisionCard(
-                        revision: revision,
-                        useMLMode: useMLMode,
-                        onComplete: onComplete,
-                        onMLAttempt: onMLAttempt,
-                        onDelete: onDelete,
-                        onReschedule: onReschedule,
-                        onDeleteProblem: onDeleteProblem
+                         revision: revision,
+                         useMLMode: useMLMode,
+                         onComplete: onComplete,
+                         onOpenCoach: onOpenCoach,
+                         onDelete: onDelete,
+                         onReschedule: onReschedule,
+                         onDeleteProblem: onDeleteProblem
                     )
                     
                     // Add inset divider between items (not after last)
@@ -849,13 +833,22 @@ struct RevisionCard: View {
     let revision: Revision
     let useMLMode: Bool
     let onComplete: (Revision) async -> Void
-    let onMLAttempt: (Revision) -> Void
+    let onOpenCoach: (Revision) -> Void
     let onDelete: (Revision) async -> Void
     let onReschedule: (Revision, Int) async -> Void
     let onDeleteProblem: (Revision) async -> Void
     @State private var isCompleting = false
     @State private var isDeleting = false
     @StateObject private var paletteManager = ColorPaletteManager.shared
+    
+    private var difficultyColor: Color {
+        switch revision.problem.difficulty.lowercased() {
+        case "easy": return paletteManager.color(at: 0)
+        case "medium": return paletteManager.color(at: 1)
+        case "hard": return paletteManager.color(at: 2)
+        default: return .gray
+        }
+    }
     
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -864,63 +857,78 @@ struct RevisionCard: View {
                 .frame(width: 4)
                 .cornerRadius(4)
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(revision.problem.title)
-                    .font(.body)
-                    .fontWeight(.medium)
-                    .foregroundStyle(.white)
-                    .lineLimit(2)
-                
-                HStack(spacing: 8) {
-                    Text(revision.problem.platform.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            Button(action: { onOpenCoach(revision) }) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(revision.problem.title)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
                     
-                    Text("•")
-                        .foregroundStyle(.secondary)
-                    
-                    Text("Revision #\(revision.revisionNumber)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Text(revision.problem.platform.capitalized)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Text("•")
+                            .foregroundStyle(.secondary)
+                        
+                        Text("Revision #\(revision.revisionNumber)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            .buttonStyle(PlainButtonStyle())
             
             Spacer()
             
-            if revision.isCompleted {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(paletteManager.color(at: 1))
-                    .font(.title2)
-            } else if useMLMode {
-                Button(action: { onMLAttempt(revision) }) {
-                    Image(systemName: "brain.head.profile")
-                        .foregroundStyle(paletteManager.selectedPalette.primary)
+            // AI Coach Button
+            Button(action: { onOpenCoach(revision) }) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(paletteManager.color(at: 3))
+                    .font(.system(size: 16, weight: .semibold))
+                    .padding(6)
+                    .background(paletteManager.color(at: 3).opacity(0.15))
+                    .cornerRadius(8)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            if !useMLMode {
+                if revision.isCompleted {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(paletteManager.color(at: 1))
                         .font(.title2)
-                }
-            } else {
-                Button(action: {
-                    Task {
-                        isCompleting = true
-                        await onComplete(revision)
-                        isCompleting = false
+                } else {
+                    Button(action: {
+                        Task {
+                            isCompleting = true
+                            await onComplete(revision)
+                            isCompleting = false
+                        }
+                    }) {
+                        if isCompleting {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
+                        } else {
+                            Image(systemName: "circle")
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                                .font(.title2)
+                        }
                     }
-                }) {
-                    if isCompleting {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
-                    } else {
-                        Image(systemName: "circle")
-                            .foregroundStyle(paletteManager.selectedPalette.primary)
-                            .font(.title2)
-                    }
+                    .disabled(isCompleting)
                 }
-                .disabled(isCompleting)
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
         .opacity(revision.isCompleted ? 0.6 : 1.0)
         .contextMenu {
+            Button {
+                onOpenCoach(revision)
+            } label: {
+                Label("AI Revision Coach & Hints", systemImage: "sparkles")
+            }
             if !revision.isCompleted {
                 Button {
                     Task {
@@ -959,19 +967,6 @@ struct RevisionCard: View {
                     }
                 }
             }
-        }
-    }
-    
-    private var difficultyColor: Color {
-        switch revision.problem.difficulty.lowercased() {
-        case "easy":
-            return paletteManager.color(at: 1)
-        case "medium":
-            return paletteManager.color(at: 2)
-        case "hard":
-            return paletteManager.color(at: 0)
-        default:
-            return .gray
         }
     }
 }
@@ -1099,6 +1094,46 @@ struct DailyReviewLimitCard: View {
     }
 }
 
+// MARK: - Daily Review Limit Sheet
+struct DailyReviewLimitSheet: View {
+    let currentCap: Int
+    @Binding var draftCap: Int
+    let isSaving: Bool
+    let message: String?
+    let summary: RevisionTodayResponse?
+    let onSave: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                ScrollView {
+                    DailyReviewLimitCard(
+                        currentCap: currentCap,
+                        draftCap: $draftCap,
+                        isSaving: isSaving,
+                        message: message,
+                        summary: summary,
+                        onSave: onSave
+                    )
+                    .padding(20)
+                }
+            }
+            .navigationTitle("Daily Revision Limit")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.height(420), .medium])
+    }
+}
 
 // MARK: - Revision Analytics Section
 struct RevisionAnalyticsSection: View {
@@ -1745,12 +1780,10 @@ struct RevisionRetentionRiskCard: View {
     }
 }
 
-// MARK: - ML Attempt Sheet
-struct MLAttemptSheet: View {
-    let revision: Revision
+// MARK: - ML Scheduling Info Sheet
+struct MLSchedulingInfoSheet: View {
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     @State private var showTechnicalDetails = false
     
     var body: some View {
@@ -1763,11 +1796,11 @@ struct MLAttemptSheet: View {
                             .font(.system(size: 44))
                             .foregroundStyle(paletteManager.selectedPalette.primary)
                         
-                        Text("LSTM Spaced Repetition")
+                        Text("FSRS-5 Spaced Repetition")
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        Text("Predicting your optimal review intervals")
+                        Text("Power-Law Forgetting Curve Scheduling")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -1778,18 +1811,18 @@ struct MLAttemptSheet: View {
                 
                 // What is this section
                 Section {
-                    Text("This is an ML-powered spaced repetition system. Instead of fixed review schedules (1 day, 3 days, 7 days...), our LSTM neural network learns YOUR learning patterns and predicts the perfect time for your next review.")
+                    Text("This is an ML-powered spaced repetition system based on FSRS-5 (Free Spaced Repetition Scheduler). Instead of static intervals (1d, 3d, 7d...), the algorithm tracks item-level Memory Stability (S) and Difficulty (D) to schedule reviews right when your retrievability reaches 90%.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                             .foregroundStyle(.green)
-                        Text("MAE: 1.78 days")
+                        Text("Target Recall: 90% (R = 0.9)")
                             .font(.footnote)
                             .fontWeight(.semibold)
                             .foregroundStyle(.green)
-                        Text("— within ~2 days of optimal")
+                        Text("— optimal spacing window")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -1799,36 +1832,35 @@ struct MLAttemptSheet: View {
                 
                 // Features Section
                 Section {
-                    FeatureListRow(icon: "gauge.medium", text: "Problem difficulty", detail: "Easy / Medium / Hard", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "folder", text: "Category", detail: "Arrays, Trees, DP, Graphs...", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "number", text: "Attempt number", detail: "1st, 2nd, 3rd review...", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "calendar", text: "Days since last", detail: "Time gap between reviews", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "checkmark.circle", text: "Outcome", detail: "Success or failure — critical!", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "arrow.counterclockwise", text: "Number of tries", detail: "Submit attempts this session", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "clock", text: "Time spent", detail: "Minutes solving the problem", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "clock", text: "Time Spent Ratio (28%)", detail: "Ratio vs your personal median time per difficulty", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "gauge.medium", text: "Problem Difficulty (18%)", detail: "Intrinsic problem baseline (Easy / Medium / Hard)", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "exclamationmark.triangle", text: "Mistake Tags (18%)", detail: "Penalties for approach, TLE, syntax, or DS errors", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "arrow.counterclockwise", text: "Number of Retries (15%)", detail: "Softly scaled runs (typos & code runs non-punitive)", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "calendar.badge.clock", text: "Spacing Bonus (13%)", detail: "Logarithmic reward for long-gap successful recall", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "number", text: "Attempt Number (8%)", detail: "Review iteration expectation adjustment", iconColor: paletteManager.selectedPalette.primary)
                 } header: {
-                    Label("7 Features We Track", systemImage: "chart.line.uptrend.xyaxis")
+                    Label("6 Quality Signals We Track", systemImage: "chart.line.uptrend.xyaxis")
                 } footer: {
-                    Text("Every submission feeds into the model to improve predictions.")
+                    Text("Signals compute a Quality Score (q ∈ [0, 1]) mapped to FSRS grades (Again, Hard, Good, Easy) to scale stability.")
                 }
                 
                 // Technical Details Section
                 Section {
                     DisclosureGroup(isExpanded: $showTechnicalDetails) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            TechRow(label: "Architecture", value: "2-layer LSTM + BatchNorm")
-                            TechRow(label: "Hidden size", value: "128 units")
-                            TechRow(label: "Loss function", value: "Huber Loss")
-                            TechRow(label: "Training data", value: "15,321 records")
-                            TechRow(label: "Clusters", value: "5 learner patterns")
+                        VStack(alignment: .leading, spacing: 10) {
+                            TechRow(label: "Algorithm", value: "FSRS-5 (Free Spaced Repetition)")
+                            TechRow(label: "Curve Model", value: "Power-Law Forgetting")
+                            TechRow(label: "Key States", value: "Stability (S) & Difficulty (D)")
+                            TechRow(label: "Target Recall", value: "90% Retrievability (R = 0.9)")
+                            TechRow(label: "Clustering Prevention", value: "±10% Dynamic Interval Fuzzing")
                             
                             Divider()
                             
-                            Text("Exponential Decay Model")
+                            Text("Power-Law Forgetting Curve")
                                 .font(.caption)
                                 .fontWeight(.semibold)
                             
-                            Text("interval = -log(0.9) / exp(LSTM_output)")
+                            Text("R(t, S) = (1 + 19/81 * (t / S))^(-0.5)")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(paletteManager.selectedPalette.primary)
                                 .padding(8)
@@ -1836,7 +1868,43 @@ struct MLAttemptSheet: View {
                                 .background(Color.primary.opacity(0.05))
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                             
-                            Text("Recall probability decays exponentially. The LSTM learns your personal forgetting curve.")
+                            Text("Retrievability R(t, S) represents recall probability after t days. At t = S, recall probability is exactly 90%.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            Divider()
+                            
+                            Text("Stability Recall Growth")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            
+                            Text("S' = S * e^(w8) * (11 - D) * S^(-w9) * (e^(w10*(1-R)) - 1)")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                                .padding(8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            
+                            Text("Successful recall expands stability S according to the spacing effect, while lapse/failure resets stability.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            Divider()
+                            
+                            Text("Next Review Interval")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            
+                            Text("I = (S / (19/81)) * (0.9^(-2) - 1) ≈ S")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                                .padding(8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.primary.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            
+                            Text("Reviews are scheduled right before memory retrievability drops below 90%, preventing item decay.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -1846,33 +1914,17 @@ struct MLAttemptSheet: View {
                     }
                 }
                 
-                // Buttons Section (not sticky, scrolls with content)
+                // Got it Button
                 Section {
-                    VStack(spacing: 10) {
-                        // Open Problem Button
-                        Button(action: openProblem) {
-                            Text("Solve: \(revision.problem.title)")
-                                .font(.headline)
-                                .lineLimit(1)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                        }
-                        .tint(paletteManager.selectedPalette.primary)
-                        .buttonStyle(.borderedProminent)
-                        .modifier(LiquidGlassCapsuleButton())
-                        
-                        // Got it Button
-                        Button(action: { dismiss() }) {
-                            Text("Got it")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                        }
-                        .tint(paletteManager.color(at: 2))
-                        .buttonStyle(.borderedProminent)
-                        .modifier(LiquidGlassCapsuleButton())
+                    Button(action: { dismiss() }) {
+                        Text("Got it")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
                     }
-                    .padding(.vertical, 8)
+                    .tint(paletteManager.color(at: 2))
+                    .buttonStyle(.borderedProminent)
+                    .modifier(LiquidGlassCapsuleButton())
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
@@ -1884,20 +1936,6 @@ struct MLAttemptSheet: View {
                     Button("Close") { dismiss() }
                 }
             }
-        }
-    }
-    
-    private func openProblem() {
-        let baseURLs: [String: String] = [
-            "leetcode": "https://leetcode.com/problems/",
-            "codeforces": "https://codeforces.com/problemset/problem/",
-            "hackerrank": "https://www.hackerrank.com/challenges/",
-            "takeuforward": "https://takeuforward.org/practice/"
-        ]
-        
-        if let baseURL = baseURLs[revision.problem.platform.lowercased()],
-           let url = URL(string: "\(baseURL)\(revision.problem.slug)") {
-            openURL(url)
         }
     }
 }
@@ -1963,8 +2001,158 @@ struct InfoRow: View {
     }
 }
 
+// MARK: - Easter Egg Helper
+struct EasterEggHelper {
+    static let quotes = [
+        "Resting today makes memory stronger tomorrow. Go conquer those exams! 🎓✨",
+        "Sharpening the sword before battle! Revisions will be waiting for your victorious return. ⚔️🧠",
+        "Brains need off-time too. Good luck with your study grind! 📚🔥",
+        "System offline for high-priority exam prep! Battery charging... ⚡️🔋",
+        "Knowledge is consolidating in long-term memory storage... 💾💭",
+        "Take a breather! Algorithms can wait, your exams come first! 🏆🚀",
+        "Future coding grandmaster in exam mode! 🌟💻"
+    ]
+
+    static let patterns = [
+        "(⌐■_■)  [ EXAM MODE ACTIVE ]",
+        "🧠 ⚡️ 📚  [ BRAIN CHARGING ]",
+        "🏖️ 🌴 ☕️  [ REVISIONS PAUSED ]",
+        "✨ 🎓 🏆  [ CONQUER YOUR EXAMS ]"
+    ]
+
+    static func getTodayEasterEggMessage(date: Date = Date()) -> (pattern: String, quote: String) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: date)
+
+        var hash: Int32 = 0
+        for char in dateStr.unicodeScalars {
+            hash = (hash &<< 5) &- hash &+ Int32(char.value)
+        }
+        let index = Int(abs(hash))
+
+        let quote = quotes[index % quotes.count]
+        let pattern = patterns[index % patterns.count]
+
+        return (pattern, quote)
+    }
+}
+
+// MARK: - Exam Mode Active View
+struct ExamModeActiveView: View {
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
+    let isResuming: Bool
+    let onResume: () -> Void
+
+    @State private var dragPosition: CGPoint = CGPoint(x: 170, y: 140)
+    @State private var tiltPosition: CGPoint = CGPoint(x: 170, y: 140)
+    private let motionManager = CMMotionManager()
+
+    var body: some View {
+        VStack {
+            Spacer()
+
+            // Light & Tilt Shader Surface with Glass Container on Top
+            ZStack {
+                // Background Light & Tilt Shader Layer
+                RoundedRectangle(cornerRadius: 32)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                paletteManager.selectedPalette.primary.opacity(0.8),
+                                paletteManager.color(at: 2).opacity(0.6),
+                                paletteManager.color(at: 1).opacity(0.4)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .layerEffect(
+                        ShaderLibrary.shine(
+                            .boundingRect,
+                            .float2(tiltPosition),
+                            .float(0.57),
+                            .float(3.8)
+                        ),
+                        maxSampleOffset: .zero
+                    )
+                    .blur(radius: 8)
+                    .cornerRadius(32)
+                    .shadow(color: paletteManager.selectedPalette.primary.opacity(0.35), radius: 24, x: 0, y: 12)
+
+                // Glass Container on top of Shader Layer
+                VStack(spacing: 20) {
+                    Image(systemName: "graduationcap.fill")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Text("Exam Mode")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Button(action: onResume) {
+                        HStack(spacing: 8) {
+                            if isResuming {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("Stop Exam Mode")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(.white.opacity(0.2), in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(.white.opacity(0.35), lineWidth: 1)
+                        )
+                    }
+                    .disabled(isResuming)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 48)
+                .modifier(LiquidGlassCardModifier())
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(.white.opacity(0.25), lineWidth: 1)
+                )
+                .padding(12)
+            }
+            .frame(maxWidth: 360)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        dragPosition = value.location
+                        tiltPosition = value.location
+                    }
+            )
+            .padding(.horizontal, 24)
+
+            Spacer()
+        }
+        .onAppear {
+            if motionManager.isDeviceMotionAvailable {
+                motionManager.startDeviceMotionUpdates(to: .main) { motion, error in
+                    guard let motion = motion else { return }
+                    let x = motion.attitude.roll
+                    let y = motion.attitude.pitch
+                    tiltPosition = CGPoint(x: 180 + CGFloat(x) * 350, y: 140 + CGFloat(y) * 350)
+                }
+            }
+        }
+        .onDisappear {
+            motionManager.stopDeviceMotionUpdates()
+        }
+    }
+}
+
 // MARK: - Pause Exam Mode Sheet
 struct PauseExamModeSheet: View {
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     @Environment(\.dismiss) private var dismiss
     @Binding var pauseDays: Int
     let isSubmitting: Bool
@@ -1972,61 +2160,94 @@ struct PauseExamModeSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                VStack(spacing: 12) {
-                    Image(systemName: "graduationcap.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.purple)
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-                    Text("Pause Revisions")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(paletteManager.selectedPalette.primary.opacity(0.12))
+                                .frame(width: 64, height: 64)
 
-                    Text("Stop all revisions while preparing for exams. Your calendar feed will display motivational quotes & easter eggs.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .padding(.top, 20)
+                            Image(systemName: "graduationcap.fill")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                        }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Pause Duration")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
+                        Text("Pause Revisions")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
 
-                    Stepper("\(pauseDays) Days", value: $pauseDays, in: 1...30)
-                        .padding()
-                        .background(Color(UIColor.systemGray6))
-                        .cornerRadius(12)
-                }
-                .padding(.horizontal)
-
-                Spacer()
-
-                Button(action: { onConfirm(pauseDays) }) {
-                    if isSubmitting {
-                        ProgressView()
-                    } else {
-                        Text("Confirm Pause")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.purple)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                        Text("Pause scheduled revisions while preparing for exams. Your calendar feed will display daily quotes.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
+                    .padding(.top, 20)
+
+                    // Glass Stepper Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("PAUSE DURATION")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+
+                        HStack {
+                            Text("\(pauseDays) Days")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+
+                            Spacer()
+
+                            Stepper("", value: $pauseDays, in: 1...30)
+                                .labelsHidden()
+                        }
+                        .padding()
+                        .modifier(LiquidGlassCardModifier())
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.white.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal)
+
+                    Spacer()
+
+                    Button(action: { onConfirm(pauseDays) }) {
+                        if isSubmitting {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Confirm Pause")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .foregroundStyle(.white)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 24)
+                                        .fill(paletteManager.selectedPalette.primary.opacity(0.3))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 24)
+                                                .stroke(paletteManager.selectedPalette.primary.opacity(0.5), lineWidth: 1)
+                                        )
+                                )
+                        }
+                    }
+                    .disabled(isSubmitting)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
                 }
-                .disabled(isSubmitting)
-                .padding(.horizontal)
-                .padding(.bottom, 20)
             }
             .navigationTitle("Exam Mode")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(.white)
                 }
             }
         }
@@ -2036,6 +2257,7 @@ struct PauseExamModeSheet: View {
 
 // MARK: - Resume Revisions Sheet
 struct ResumeRevisionsSheet: View {
+    @ObservedObject var paletteManager = ColorPaletteManager.shared
     @Environment(\.dismiss) private var dismiss
     @Binding var backlogDays: Int
     let isSubmitting: Bool
@@ -2043,61 +2265,94 @@ struct ResumeRevisionsSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 24) {
-                VStack(spacing: 12) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.green)
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-                    Text("Resume Revisions")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(paletteManager.selectedPalette.primary.opacity(0.12))
+                                .frame(width: 64, height: 64)
 
-                    Text("Choose how many days you want to spread your accumulated backlog over.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .padding(.top, 20)
+                            Image(systemName: "play.circle.fill")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(paletteManager.selectedPalette.primary)
+                        }
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Spread Backlog Over")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.secondary)
+                        Text("Resume Revisions")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.white)
 
-                    Stepper("\(backlogDays) Days", value: $backlogDays, in: 1...14)
-                        .padding()
-                        .background(Color(UIColor.systemGray6))
-                        .cornerRadius(12)
-                }
-                .padding(.horizontal)
-
-                Spacer()
-
-                Button(action: { onConfirm(backlogDays) }) {
-                    if isSubmitting {
-                        ProgressView()
-                    } else {
-                        Text("Resume Schedule")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.green)
-                            .foregroundColor(.black)
-                            .cornerRadius(12)
+                        Text("Spread accumulated backlog over a period of days.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
+                    .padding(.top, 20)
+
+                    // Glass Stepper Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("SPREAD BACKLOG OVER")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+
+                        HStack {
+                            Text("\(backlogDays) Days")
+                                .font(.headline)
+                                .foregroundStyle(.white)
+
+                            Spacer()
+
+                            Stepper("", value: $backlogDays, in: 1...14)
+                                .labelsHidden()
+                        }
+                        .padding()
+                        .modifier(LiquidGlassCardModifier())
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(.white.opacity(0.1), lineWidth: 1)
+                        )
+                    }
+                    .padding(.horizontal)
+
+                    Spacer()
+
+                    Button(action: { onConfirm(backlogDays) }) {
+                        if isSubmitting {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Text("Resume Schedule")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .foregroundStyle(.white)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 24)
+                                        .fill(paletteManager.selectedPalette.primary.opacity(0.3))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 24)
+                                                .stroke(paletteManager.selectedPalette.primary.opacity(0.5), lineWidth: 1)
+                                        )
+                                )
+                        }
+                    }
+                    .disabled(isSubmitting)
+                    .padding(.horizontal)
+                    .padding(.bottom, 20)
                 }
-                .disabled(isSubmitting)
-                .padding(.horizontal)
-                .padding(.bottom, 20)
             }
             .navigationTitle("Catch Up")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .foregroundStyle(.white)
                 }
             }
         }

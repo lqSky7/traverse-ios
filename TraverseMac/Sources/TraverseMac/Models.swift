@@ -548,12 +548,6 @@ struct RevisionAnalyticsStreaks: Codable {
     let overallSuccessRate: Double
 }
 
-struct RevisionRecalibrationResponse: Codable {
-    let message: String
-    let rescheduled: Int
-    let totalPending: Int
-    let maxDaily: Int
-}
 
 struct SubscriptionStatusResponse: Codable {
     let isSubscriptionActive: Bool

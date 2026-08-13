@@ -268,13 +268,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    func recalibrateRevisions() async {
-        await run {
-            let response = try await api.recalibrateMLRevisions()
-            statusMessage = "\(response.rescheduled) revisions rescheduled"
-            await refreshRevisions()
-        }
-    }
 
     func panelStatus(_ panel: PanelKey) -> PanelLoadStatus {
         panelStatuses[panel] ?? .idle

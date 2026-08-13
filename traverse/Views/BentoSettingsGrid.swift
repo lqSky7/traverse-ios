@@ -18,6 +18,7 @@ struct BentoSettingsGrid: View {
     @Binding var showingImportPalette: Bool
     @Binding var showingDreamPicker: Bool
     @Binding var showingFreezeShop: Bool
+    @Binding var showingShaderDemos: Bool
     
     // Haptic generators
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -227,7 +228,7 @@ struct BentoSettingsGrid: View {
                 HStack {
                     Image(systemName: "snowflake")
                         .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(paletteManager.color(at: 0))
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Freeze Shop")
@@ -242,7 +243,7 @@ struct BentoSettingsGrid: View {
                     
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.cyan.opacity(0.6))
+                        .foregroundStyle(paletteManager.color(at: 0).opacity(0.6))
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -262,7 +263,7 @@ struct BentoSettingsGrid: View {
                 HStack {
                     Image(systemName: "calendar.badge.plus")
                         .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(.green)
+                        .foregroundStyle(paletteManager.color(at: 1))
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Calendar Subscription")
@@ -277,7 +278,42 @@ struct BentoSettingsGrid: View {
                     
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundStyle(.green.opacity(0.6))
+                        .foregroundStyle(paletteManager.color(at: 1).opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
+            
+            // Horizontal Divider
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+            
+            // Row 4.6: Shader & Glass Demos (full width)
+            Button {
+                mediumFeedback.impactOccurred()
+                showingShaderDemos = true
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles.tv.fill")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(paletteManager.color(at: 2))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Shader & Glass Demos")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("16 Metal & UI Demos from @radiofun")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(paletteManager.color(at: 2).opacity(0.6))
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -337,8 +373,7 @@ struct BentoSettingsGrid: View {
         guard let user = authViewModel.currentUser else { return }
         let username = user.username
         let token = user.calendarToken ?? ""
-        let webcalUrlString = "webcal://155-248-241-153.sslip.io/api/revisions/calendar/\(username)?token=\(token)"
-        guard let url = URL(string: webcalUrlString) else { return }
+        guard let url = NetworkService.shared.calendarFeedURL(username: username, token: token) else { return }
         UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 }
@@ -383,7 +418,8 @@ struct BentoCellButtonStyle: ButtonStyle {
             showingLogoutConfirmation: .constant(false),
             showingImportPalette: .constant(false),
             showingDreamPicker: .constant(false),
-            showingFreezeShop: .constant(false)
+            showingFreezeShop: .constant(false),
+            showingShaderDemos: .constant(false)
         )
         .padding(.vertical)
     }

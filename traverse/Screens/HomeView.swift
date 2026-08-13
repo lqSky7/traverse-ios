@@ -28,7 +28,7 @@ struct HomeView: View {
                     } else {
                         // Streak Card
                         if let userStats = viewModel.userStats {
-                            StreakCard(streak: userStats.stats.currentStreak, solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves), paletteManager: paletteManager)
+                            StreakCard(streak: userStats.stats.currentStreak, maxStreak: userStats.stats.totalStreakDays)
                         }
                         
                         // Main Stats Cards
@@ -81,22 +81,6 @@ struct HomeView: View {
                                 PerformanceMetricsCard(solves: solves, paletteManager: paletteManager)
                                 
                                 TriesDistributionCard(solves: solves, paletteManager: paletteManager)
-                            }
-                            
-                            // Intelligence Summary Card (iOS 18.2+)
-                            if #available(iOS 18.2, *) {
-                                if let userStats = viewModel.userStats,
-                                   let recentSolves = viewModel.recentSolves,
-                                   let solveStats = viewModel.solveStats {
-                                    IntelligenceSummaryCard(
-                                        streak: userStats.stats.currentStreak,
-                                        solvedToday: hasSolvedToday(recentSolves: viewModel.recentSolves),
-                                        totalSolves: userStats.stats.totalSolves,
-                                        recentSolves: recentSolves,
-                                        difficulty: solveStats.stats.byDifficulty,
-                                        paletteManager: paletteManager
-                                    )
-                                }
                             }
                         }
                     }
@@ -176,150 +160,94 @@ struct HomeView: View {
 // MARK: - Streak Card
 struct StreakCard: View {
     let streak: Int
-    let solvedToday: Bool
-    @ObservedObject var paletteManager: ColorPaletteManager
-    
-    private var gradientColors: [Color] {
-        paletteManager.streakGradientColors(for: streak)
-    }
+    var maxStreak: Int? = nil
     
     private var displayNumber: String {
         streak == 0 ? "0" : "\(streak)"
     }
     
-    private var streakMessage: String {
-        if solvedToday {
-            return "Well done! Keep it up!"
-        } else if streak == 0 {
-            return "Start your streak!"
-        } else {
-            return "Get back to work!"
-        }
+    private var daysText: String {
+        streak == 1 ? "DAY" : "DAYS"
+    }
+    
+    private var maxStreakDisplay: Int {
+        max(streak, maxStreak ?? 0)
     }
     
     var body: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             Image(systemName: streak == 0 ? "flame" : "flame.fill")
-                .font(.system(size: 48))
+                .font(.system(size: 40, weight: .semibold))
                 .foregroundStyle(.white)
             
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(displayNumber)
-                        .font(.system(size: 56, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("DAYS")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-                Text(streakMessage)
-                    .font(.subheadline)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(displayNumber)
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundStyle(.white)
+                Text(daysText)
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(.white.opacity(0.8))
             }
             
             Spacer()
             
-            if streak > 0 {
-                Image(systemName: "chevron.right")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.7))
+            if maxStreakDisplay > 0 {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("BEST")
+                        .font(.system(size: 10, weight: .bold))
+                        .textCase(.uppercase)
+                    Text("\(maxStreakDisplay) DAYS")
+                        .font(.system(size: 13, weight: .bold))
+                }
+                .foregroundStyle(.white.opacity(0.4))
             }
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 24)
+        .padding(.vertical, 20)
         .background(
-            ColorMorphBackground(colors: gradientColors)
+            LightingSunBackground(streak: streak)
         )
         .cornerRadius(16)
-        .shadow(color: gradientColors.first?.opacity(0.4) ?? .black.opacity(0.2), radius: 16, x: 0, y: 8)
     }
 }
 
-// MARK: - Color Morph Background (Professional Metal-style)
-struct ColorMorphBackground: View {
-    let colors: [Color]
+// MARK: - Lighting Sun Background (Lighting Simulation Shader from Settings > Demo)
+struct LightingSunBackground: View {
+    let streak: Int
     
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1/60)) { timeline in
-            let time = timeline.date.timeIntervalSinceReferenceDate
-            
-            GeometryReader { geometry in
-                Canvas { context, size in
-                    // Create smooth flowing color field
-                    let cycleSpeed = 0.15 // How fast colors change
-                    let t = time * cycleSpeed
-                    
-                    // Calculate color blend factor (0-1, smoothly oscillating)
-                    let blendFactor = (sin(t) + 1) / 2
-                    let secondaryFactor = (sin(t * 0.7 + 1.5) + 1) / 2
-                    
-                    // Get colors - use palette colors only, fallback to first color
-                    let color1 = colors.indices.contains(0) ? colors[0] : .clear
-                    let color2 = colors.indices.contains(1) ? colors[1] : color1
-                    let color3 = colors.indices.contains(2) ? colors[2] : color2
-                    
-                    // Create multiple gradient layers for depth
-                    let mainGradient = Gradient(colors: [
-                        interpolateColor(color1, color2, factor: blendFactor),
-                        interpolateColor(color2, color3, factor: secondaryFactor),
-                        interpolateColor(color3, color1, factor: (blendFactor + secondaryFactor) / 2)
-                    ])
-                    
-                    // Animated gradient positions
-                    let startX = 0.3 + sin(t * 0.5) * 0.2
-                    let startY = 0.2 + cos(t * 0.4) * 0.15
-                    let endX = 0.7 + cos(t * 0.6) * 0.2
-                    let endY = 0.8 + sin(t * 0.3) * 0.15
-                    
-                    // Draw the flowing gradient
-                    context.fill(
-                        Path(CGRect(origin: .zero, size: size)),
-                        with: .linearGradient(
-                            mainGradient,
-                            startPoint: CGPoint(x: size.width * startX, y: size.height * startY),
-                            endPoint: CGPoint(x: size.width * endX, y: size.height * endY)
-                        )
-                    )
-                    
-                    // Add subtle overlay for metallic depth
-                    let overlayGradient = Gradient(colors: [
-                        .white.opacity(0.1),
-                        .clear,
-                        .black.opacity(0.15)
-                    ])
-                    context.fill(
-                        Path(CGRect(origin: .zero, size: size)),
-                        with: .linearGradient(
-                            overlayGradient,
-                            startPoint: CGPoint(x: 0, y: 0),
-                            endPoint: CGPoint(x: 0, y: size.height)
-                        )
-                    )
-                }
-            }
-        }
+    private var progress: Float {
+        min(max(Float(streak), 0), 15.0) / 15.0
     }
     
-    // Smooth color interpolation
-    private func interpolateColor(_ c1: Color, _ c2: Color, factor: Double) -> Color {
-        let f = max(0, min(1, factor))
-        
-        // Get UIColor for component access
-        let uiColor1 = UIColor(c1)
-        let uiColor2 = UIColor(c2)
-        
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        
-        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        
-        return Color(
-            red: r1 + (r2 - r1) * f,
-            green: g1 + (g2 - g1) * f,
-            blue: b1 + (b2 - b1) * f
-        )
+    private var intensity: Float {
+        0.3 + progress * 2.2
+    }
+    
+    private var disperse: Float {
+        0.15 + progress * 0.60
+    }
+    
+    private var radius: Float {
+        10.0 + progress * 40.0
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let cardHeight = Float(geometry.size.height > 0 ? geometry.size.height : 90.0)
+            let targetY = cardHeight / 1.2
+            
+            Color.black
+                .layerEffect(
+                    ShaderLibrary.lightingSimulation(
+                        .float2(5.0, targetY),
+                        .float(intensity),
+                        .float(disperse),
+                        .float(-Float.pi / 2.0),
+                        .float(radius)
+                    ),
+                    maxSampleOffset: .zero
+                )
+        }
     }
 }
 
@@ -2463,15 +2391,9 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            if let attributedAnalysis = try? AttributedString(markdown: analysis, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
-                                Text(attributedAnalysis)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(analysis)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text(analysis)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         .padding(.top, 4)
                     }

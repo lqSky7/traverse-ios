@@ -73,15 +73,34 @@ struct SolvesResponse: Codable {
     let pagination: Pagination
 }
 
+struct CodeAttempt: Codable, Identifiable {
+    var id: String { timestamp }
+    let code: String?
+    let language: String?
+    let timestamp: String
+    let type: String?
+    let successful: Bool?
+    let runNumber: Int?
+    let submissionNumber: Int?
+}
+
 struct Solve: Codable, Identifiable {
     let id: Int
     let xpAwarded: Int
     let solvedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let attempts: [CodeAttempt]?
     let problem: Problem
     let submission: Submission
     let highlight: Highlight?
+    
+    var allAttempts: [CodeAttempt] {
+        if let attempts = attempts, !attempts.isEmpty {
+            return attempts
+        }
+        return submission.attempts ?? []
+    }
 }
 
 struct Problem: Codable {
@@ -101,6 +120,7 @@ struct Submission: Codable {
     let mistakeTags: [String]?
     let numberOfTries: Int?
     let timeTaken: Int?
+    let attempts: [CodeAttempt]?
 }
 
 struct Highlight: Codable {

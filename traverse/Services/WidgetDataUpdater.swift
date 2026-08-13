@@ -16,35 +16,29 @@ class WidgetDataUpdater {
     private init() {}
     
     /// Current username for QR code sync to Watch
-    var currentUsername: String? {
-        didSet {
-            // Regenerate QR when username changes
-            if let username = currentUsername {
-                cachedQRImageData = generateQRImageData(for: username)
-                print("[WidgetDataUpdater] Generated QR for \(username), data size: \(cachedQRImageData?.count ?? 0) bytes")
-            } else {
-                cachedQRImageData = nil
-            }
-        }
-    }
+    var currentUsername: String?
     
     /// Cached QR code image data for Watch sync
     private var cachedQRImageData: Data?
     
-    /// Generate QR code image data for a username
-    private func generateQRImageData(for username: String) -> Data? {
+    /// Explicitly generate QR code image data ONLY when Friends page or QR sheet is opened
+    func prepareQRForFriendsPage(username: String) -> Data? {
+        if let cached = cachedQRImageData, currentUsername == username {
+            return cached
+        }
+        currentUsername = username
         guard let qrImage = QRCodeGenerator.shared.generateFriendQR(for: username, size: 200) else {
             print("[WidgetDataUpdater] Failed to generate QR image for \(username)")
             return nil
         }
-        return qrImage.pngData()
+        let data = qrImage.pngData()
+        cachedQRImageData = data
+        print("[WidgetDataUpdater] Generated QR for \(username) on Friends page open, data size: \(data?.count ?? 0) bytes")
+        return data
     }
     
-    /// Ensure QR is generated for current username
+    /// Generate QR code image data for a username if already cached
     private func ensureQRGenerated() -> Data? {
-        if cachedQRImageData == nil, let username = currentUsername {
-            cachedQRImageData = generateQRImageData(for: username)
-        }
         return cachedQRImageData
     }
     
@@ -55,8 +49,8 @@ class WidgetDataUpdater {
         achievementStats: AchievementStatsData? = nil,
         solvedToday: Bool = false
     ) {
-        // Ensure QR is generated before syncing
-        let qrData = ensureQRGenerated()
+        // Use cached QR data if available without generating on every widget update
+        let qrData = cachedQRImageData
         
         var widgetData = WidgetData(
             streak: nil,

@@ -287,9 +287,6 @@ final class APIClient {
         try await send("/revisions/today", authorized: true)
     }
 
-    func recalibrateMLRevisions() async throws -> RevisionRecalibrationResponse {
-        try await send("/revisions/recalibrate", method: "POST", body: EmptyBody(), authorized: true)
-    }
 
     func completeRevision(id: Int) async throws -> CompleteRevisionResponse {
         try await send("/revisions/\(id)/complete", method: "POST", body: EmptyBody(), authorized: true)

@@ -29,9 +29,6 @@ struct RevisionsView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Recalibrate") {
-                    Task { await appState.recalibrateRevisions() }
-                }
             }
         }
     }

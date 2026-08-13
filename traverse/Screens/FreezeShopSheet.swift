@@ -124,7 +124,7 @@ struct FreezeShopSheet: View {
             HStack {
                 Image(systemName: "snowflake")
                     .font(.system(size: 36))
-                    .foregroundStyle(.cyan)
+                    .foregroundStyle(paletteManager.selectedPalette.primary)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(viewModel.freezeInfo?.availableFreezes ?? 0)")
@@ -166,7 +166,7 @@ struct FreezeShopSheet: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(.white.opacity(0.15), lineWidth: 1)
         )
-        .shadow(color: .cyan.opacity(0.1), radius: 10, x: 0, y: 5)
+        .shadow(color: paletteManager.selectedPalette.primary.opacity(0.1), radius: 10, x: 0, y: 5)
     }
     
     // MARK: - Purchase Section
@@ -187,7 +187,7 @@ struct FreezeShopSheet: View {
                 } label: {
                     Image(systemName: showingInfo ? "info.circle.fill" : "info.circle")
                         .font(.title3)
-                        .foregroundStyle(.cyan)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
                 }
             }
             
@@ -274,7 +274,7 @@ private struct FreezeInfoRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundStyle(.cyan)
+                .foregroundStyle(ColorPaletteManager.shared.selectedPalette.primary)
                 .frame(width: 24)
             
             Text(text)
