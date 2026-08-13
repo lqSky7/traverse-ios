@@ -1081,7 +1081,6 @@ struct BestSolvingHoursCard: View {
 struct AllAchievementsView: View {
     @StateObject private var viewModel = AchievementsViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
-    @State private var expandedCategories: Set<String> = []
     @State private var filterMode: AchievementFilter = .all
     
     enum AchievementFilter: String, CaseIterable {
@@ -1125,7 +1124,7 @@ struct AllAchievementsView: View {
                             .frame(height: 130)
                         
                         // Categories with expandable achievements
-                        CategoriesSection(achievements: achievements, expandedCategories: $expandedCategories, paletteManager: paletteManager)
+                        CategoriesSection(achievements: achievements, paletteManager: paletteManager)
                             .padding(.horizontal)
                             .padding(.bottom)
                     }
@@ -1324,7 +1323,6 @@ struct MeshGradientBackground: View {
 // MARK: - Categories Section
 struct CategoriesSection: View {
     let achievements: [AchievementDetail]
-    @Binding var expandedCategories: Set<String>
     @ObservedObject var paletteManager: ColorPaletteManager
     
     private var groupedAchievements: [String: [AchievementDetail]] {
@@ -1340,17 +1338,7 @@ struct CategoriesSection: View {
                 AchievementCategoryCard(
                     category: category,
                     achievements: categoryAchievements,
-                    isExpanded: expandedCategories.contains(category),
-                    paletteManager: paletteManager,
-                    onToggle: {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) {
-                            if expandedCategories.contains(category) {
-                                expandedCategories.remove(category)
-                            } else {
-                                expandedCategories.insert(category)
-                            }
-                        }
-                    }
+                    paletteManager: paletteManager
                 )
             }
         }
@@ -1361,9 +1349,8 @@ struct CategoriesSection: View {
 struct AchievementCategoryCard: View {
     let category: String
     let achievements: [AchievementDetail]
-    let isExpanded: Bool
     @ObservedObject var paletteManager: ColorPaletteManager
-    let onToggle: () -> Void
+    @State private var isExpanded = false
     
     private var unlockedCount: Int {
         achievements.filter { $0.unlocked }.count
@@ -1389,23 +1376,32 @@ struct AchievementCategoryCard: View {
         }
     }
     
+    private var sortedAchievements: [AchievementDetail] {
+        achievements.sorted { ($0.unlocked && !$1.unlocked) || ($0.unlocked == $1.unlocked && $0.name < $1.name) }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            // Category Header
-            Button(action: onToggle) {
-                HStack {
+            // Category Header Button (matching SolveRow expansion toggle logic)
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
                     ZStack {
                         Circle()
-                            .fill(categoryColor.opacity(0.2))
-                            .frame(width: 50, height: 50)
+                            .fill(categoryColor.opacity(0.18))
+                            .frame(width: 44, height: 44)
                         Image(systemName: categoryIcon)
-                            .font(.title2)
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(categoryColor)
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         Text(category.capitalized)
                             .font(.headline)
+                            .fontWeight(.bold)
                             .foregroundStyle(.white)
                         Text("\(unlockedCount) of \(achievements.count) unlocked")
                             .font(.caption)
@@ -1414,11 +1410,12 @@ struct AchievementCategoryCard: View {
                     
                     Spacer()
                     
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                        .font(.title3)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .padding()
+                .padding(16)
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -1426,15 +1423,16 @@ struct AchievementCategoryCard: View {
             if isExpanded {
                 VStack(spacing: 0) {
                     Divider()
-                        .background(Color.gray.opacity(0.3))
+                        .background(Color.gray.opacity(0.25))
                     
-                    ForEach(achievements.sorted(by: { $0.unlocked && !$1.unlocked }), id: \.id) { achievement in
+                    let sorted = sortedAchievements
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { index, achievement in
                         AchievementRow(achievement: achievement, paletteManager: paletteManager)
                         
-                        if achievement.id != achievements.last?.id {
+                        if index < sorted.count - 1 {
                             Divider()
-                                .background(Color.gray.opacity(0.3))
-                                .padding(.leading, 70)
+                                .background(Color.gray.opacity(0.25))
+                                .padding(.leading, 68)
                         }
                     }
                 }
