@@ -262,8 +262,8 @@ class DataManager: ObservableObject {
             AchievementToastManager.shared.checkFriendRequests(results.1)
             
             if let streakRequests = try? await NetworkService.shared.getReceivedFriendStreakRequests() {
-                self.receivedStreakRequests = streakRequests.requests
-                AchievementToastManager.shared.checkStreakRequests(streakRequests.requests)
+                self.receivedStreakRequests = streakRequests
+                AchievementToastManager.shared.checkStreakRequests(streakRequests)
             }
             
             if let freezeInfo = try? await NetworkService.shared.getFreezeInfo() {
