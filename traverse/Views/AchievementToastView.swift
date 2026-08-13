@@ -33,6 +33,9 @@ struct AchievementToastView: View {
         }
         
         switch toast.category.lowercased() {
+        case "friend_request": return "person.badge.plus.fill"
+        case "streak_request": return "flame.circle.fill"
+        case "gift_freeze", "freeze": return "snowflake"
         case "solve", "solves": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
         case "xp": return "star.fill"
@@ -49,6 +52,9 @@ struct AchievementToastView: View {
             return paletteManager.selectedPalette.primary
         }
         switch toast.category.lowercased() {
+        case "friend_request": return paletteManager.color(at: 2)
+        case "streak_request": return paletteManager.color(at: 0)
+        case "gift_freeze", "freeze": return paletteManager.color(at: 1)
         case "solve", "solves": return paletteManager.color(at: 1)
         case "streak": return paletteManager.color(at: 0)
         case "xp": return paletteManager.color(at: 3)

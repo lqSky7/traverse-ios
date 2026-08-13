@@ -485,6 +485,7 @@ struct UserProfileView: View {
                             let success = await viewModel.giftFreeze()
                             if success {
                                 giftSuccessMessage = "Freeze gifted to \(username)!"
+                                AchievementToastManager.shared.showToast(name: "Freeze gifted to \(username)!", category: "gift_freeze", icon: "snowflake")
                             }
                             isGifting = false
                         }

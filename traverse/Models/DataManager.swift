@@ -257,8 +257,19 @@ class DataManager: ObservableObject {
         // Check if user has solved today and end Live Activity if active
         checkSolvedTodayAndEndActivity()
         
-        // Asynchronously check for newly unlocked achievements
+        // Asynchronously check for newly unlocked achievements, friend requests, streak requests & gifted freezes
         Task {
+            AchievementToastManager.shared.checkFriendRequests(results.1)
+            
+            if let streakRequests = try? await NetworkService.shared.getReceivedFriendStreakRequests() {
+                self.receivedStreakRequests = streakRequests.requests
+                AchievementToastManager.shared.checkStreakRequests(streakRequests.requests)
+            }
+            
+            if let freezeInfo = try? await NetworkService.shared.getFreezeInfo() {
+                AchievementToastManager.shared.checkFreezeInfo(availableFreezes: freezeInfo.availableFreezes)
+            }
+            
             if let response = try? await NetworkService.shared.getAllAchievements() {
                 AchievementToastManager.shared.checkNewAchievements(response.achievements)
             }

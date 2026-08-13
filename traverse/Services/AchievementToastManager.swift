@@ -21,14 +21,23 @@ class AchievementToastManager: ObservableObject {
     private var dismissWorkItem: DispatchWorkItem?
     
     @AppStorage("seenUnlockedAchievementKeys") private var seenUnlockedKeysData: String = ""
+    @AppStorage("seenFriendRequestKeys") private var seenFriendRequestKeysData: String = ""
+    @AppStorage("seenStreakRequestKeys") private var seenStreakRequestKeysData: String = ""
+    @AppStorage("lastAvailableFreezesCount") private var lastAvailableFreezesCount: Int = -1
     
     private var seenUnlockedKeys: Set<String> {
-        get {
-            Set(seenUnlockedKeysData.split(separator: ",").map(String.init))
-        }
-        set {
-            seenUnlockedKeysData = newValue.joined(separator: ",")
-        }
+        get { Set(seenUnlockedKeysData.split(separator: ",").map(String.init)) }
+        set { seenUnlockedKeysData = newValue.joined(separator: ",") }
+    }
+    
+    private var seenFriendRequestKeys: Set<String> {
+        get { Set(seenFriendRequestKeysData.split(separator: ",").map(String.init)) }
+        set { seenFriendRequestKeysData = newValue.joined(separator: ",") }
+    }
+    
+    private var seenStreakRequestKeys: Set<String> {
+        get { Set(seenStreakRequestKeysData.split(separator: ",").map(String.init)) }
+        set { seenStreakRequestKeysData = newValue.joined(separator: ",") }
     }
     
     private init() {}
@@ -51,7 +60,6 @@ class AchievementToastManager: ObservableObject {
             seenUnlockedKeys = localSeen
             DispatchQueue.main.async {
                 if newItems.count > 1 {
-                    // Multiple achievements unlocked -> single summary toast
                     let multiToast = AchievementToastItem(
                         id: UUID().uuidString,
                         name: "\(newItems.count) achievements unlocked",
@@ -61,7 +69,6 @@ class AchievementToastManager: ObservableObject {
                     )
                     self.enqueueToast(multiToast)
                 } else if let single = newItems.first {
-                    // Single achievement unlocked -> show icon & title
                     let singleToast = AchievementToastItem(
                         id: "\(single.id)",
                         name: single.name,
@@ -75,7 +82,128 @@ class AchievementToastManager: ObservableObject {
         }
     }
     
-    /// Manually show a toast for an achievement
+    /// Check list of received friend requests for newly received requests
+    func checkFriendRequests(_ requests: [FriendRequest]) {
+        var localSeen = seenFriendRequestKeys
+        var newRequesters: [String] = []
+        
+        for req in requests {
+            let key = "\(req.id)"
+            if !localSeen.contains(key) {
+                localSeen.insert(key)
+                if let username = req.requester?.username, !username.isEmpty {
+                    newRequesters.append(username)
+                }
+            }
+        }
+        
+        if !newRequesters.isEmpty {
+            seenFriendRequestKeys = localSeen
+            DispatchQueue.main.async {
+                if newRequesters.count > 1 {
+                    self.showToast(
+                        name: "\(newRequesters.count) friend requests received",
+                        category: "friend_request",
+                        icon: "person.badge.plus.fill",
+                        count: newRequesters.count
+                    )
+                } else if let requester = newRequesters.first {
+                    self.showToast(
+                        name: "\(requester) sent a friend request",
+                        category: "friend_request",
+                        icon: "person.badge.plus.fill"
+                    )
+                }
+            }
+        }
+    }
+    
+    /// Check list of received streak requests for newly received requests
+    func checkStreakRequests(_ requests: [FriendStreakRequest]) {
+        var localSeen = seenStreakRequestKeys
+        var newRequesters: [String] = []
+        
+        for req in requests {
+            let key = "\(req.id)"
+            if !localSeen.contains(key) {
+                localSeen.insert(key)
+                if let username = req.requester?.username, !username.isEmpty {
+                    newRequesters.append(username)
+                }
+            }
+        }
+        
+        if !newRequesters.isEmpty {
+            seenStreakRequestKeys = localSeen
+            DispatchQueue.main.async {
+                if newRequesters.count > 1 {
+                    self.showToast(
+                        name: "\(newRequesters.count) streak requests received",
+                        category: "streak_request",
+                        icon: "flame.circle.fill",
+                        count: newRequesters.count
+                    )
+                } else if let requester = newRequesters.first {
+                    self.showToast(
+                        name: "\(requester) sent a streak request",
+                        category: "streak_request",
+                        icon: "flame.circle.fill"
+                    )
+                }
+            }
+        }
+    }
+    
+    /// Check freeze info to detect gifted freezes
+    func checkFreezeInfo(availableFreezes: Int, isUserPurchase: Bool = false) {
+        if lastAvailableFreezesCount >= 0 {
+            let diff = availableFreezes - lastAvailableFreezesCount
+            if diff > 0 && !isUserPurchase {
+                DispatchQueue.main.async {
+                    self.showGiftedFreezeToast(count: diff)
+                }
+            }
+        }
+        lastAvailableFreezesCount = availableFreezes
+    }
+    
+    /// Show a toast for a gifted freeze
+    func showGiftedFreezeToast(from username: String? = nil, count: Int = 1) {
+        let nameText: String
+        if let username = username, !username.isEmpty {
+            nameText = "\(username) gifted you a freeze!"
+        } else if count > 1 {
+            nameText = "Received \(count) gifted streak freezes!"
+        } else {
+            nameText = "Received a gifted streak freeze!"
+        }
+        
+        showToast(
+            name: nameText,
+            category: "gift_freeze",
+            icon: "snowflake"
+        )
+    }
+    
+    /// Show a friend request toast directly
+    func showFriendRequestToast(from username: String) {
+        showToast(
+            name: "\(username) sent a friend request",
+            category: "friend_request",
+            icon: "person.badge.plus.fill"
+        )
+    }
+    
+    /// Show a streak request toast directly
+    func showStreakRequestToast(from username: String) {
+        showToast(
+            name: "\(username) sent a streak request",
+            category: "streak_request",
+            icon: "flame.circle.fill"
+        )
+    }
+    
+    /// Generic toast presenter
     func showToast(name: String, category: String, icon: String? = nil, count: Int = 1) {
         let toast = AchievementToastItem(
             id: UUID().uuidString,
