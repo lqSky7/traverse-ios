@@ -21,6 +21,9 @@ class FreezeShopViewModel: ObservableObject {
         
         do {
             freezeInfo = try await NetworkService.shared.getFreezeInfo()
+            if let info = freezeInfo {
+                AchievementToastManager.shared.checkFreezeInfo(info, isUserPurchase: isPurchasing)
+            }
             // Also get user XP from current user
             let user = try await NetworkService.shared.getCurrentUser()
             userXp = user.totalXp

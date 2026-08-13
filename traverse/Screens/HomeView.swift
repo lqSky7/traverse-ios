@@ -1416,6 +1416,7 @@ struct AchievementCategoryCard: View {
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
                 .padding(16)
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -1490,40 +1491,23 @@ struct AchievementRow: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            // Glowing Achievement Badge Icon (matching Friends Page visual design)
+            // Clean Achievement Badge Icon (no blur or glow)
             ZStack {
                 if achievement.unlocked {
                     Circle()
-                        .stroke(categoryColor.opacity(0.35), lineWidth: 2)
-                        .frame(width: 48, height: 48)
-                        .blur(radius: 2)
-                    
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 24
-                            )
-                        )
-                        .frame(width: 42, height: 42)
+                        .fill(categoryColor.opacity(0.18))
+                        .frame(width: 40, height: 40)
                     
                     Image(systemName: categoryIcon)
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(categoryColor)
-                        .shadow(color: categoryColor.opacity(0.5), radius: 3)
                 } else {
                     Circle()
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 1.5)
-                        .frame(width: 42, height: 42)
-                    
-                    Circle()
                         .fill(Color.gray.opacity(0.1))
-                        .frame(width: 42, height: 42)
+                        .frame(width: 40, height: 40)
                     
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color.gray.opacity(0.6))
                 }
             }
@@ -2407,6 +2391,7 @@ struct SolveRow: View {
                         .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
                 .padding(16)
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
             
