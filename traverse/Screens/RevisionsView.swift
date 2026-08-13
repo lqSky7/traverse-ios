@@ -2044,7 +2044,6 @@ struct ExamModeActiveView: View {
     let isResuming: Bool
     let onResume: () -> Void
 
-    @State private var dragPosition: CGPoint = CGPoint(x: 170, y: 140)
     @State private var tiltPosition: CGPoint = CGPoint(x: 170, y: 140)
     private let motionManager = CMMotionManager()
 
@@ -2076,6 +2075,7 @@ struct ExamModeActiveView: View {
                         ),
                         maxSampleOffset: .zero
                     )
+                    .blur(radius: 4)
                     .cornerRadius(32)
                     .shadow(color: paletteManager.selectedPalette.primary.opacity(0.35), radius: 24, x: 0, y: 12)
 
@@ -2122,13 +2122,6 @@ struct ExamModeActiveView: View {
                 .padding(12)
             }
             .frame(maxWidth: 360)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        dragPosition = value.location
-                        tiltPosition = value.location
-                    }
-            )
             .padding(.horizontal, 24)
 
             Spacer()
