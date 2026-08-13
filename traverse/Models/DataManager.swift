@@ -256,6 +256,13 @@ class DataManager: ObservableObject {
         
         // Check if user has solved today and end Live Activity if active
         checkSolvedTodayAndEndActivity()
+        
+        // Asynchronously check for newly unlocked achievements
+        Task {
+            if let response = try? await NetworkService.shared.getAllAchievements() {
+                AchievementToastManager.shared.checkNewAchievements(response.achievements)
+            }
+        }
     }
     
     func checkSolvedTodayAndEndActivity() {

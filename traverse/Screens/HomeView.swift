@@ -1598,6 +1598,7 @@ class AchievementsViewModel: ObservableObject {
             let response = try await NetworkService.shared.getAllAchievements()
             await MainActor.run {
                 self.achievements = response.achievements
+                AchievementToastManager.shared.checkNewAchievements(response.achievements)
             }
         } catch {
             await MainActor.run {
