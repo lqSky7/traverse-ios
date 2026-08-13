@@ -1109,42 +1109,15 @@ struct AchievementBadgeCard: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // Circular Badge with Glow
+            // Clean Achievement Badge Icon (no blur or glow)
             ZStack {
-                // Outer glow ring
                 Circle()
-                    .stroke(categoryColor.opacity(glowOpacity), lineWidth: 3)
-                    .frame(width: 76, height: 76)
-                    .blur(radius: 4)
-                
-                // Background ring
-                Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [categoryColor, categoryColor.opacity(0.6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 4
-                    )
-                    .frame(width: 72, height: 72)
-                
-                // Inner circle with icon
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 35
-                        )
-                    )
+                    .fill(categoryColor.opacity(0.18))
                     .frame(width: 64, height: 64)
                 
                 Image(systemName: categoryIcon)
-                    .font(.system(size: 28, weight: .semibold))
+                    .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(categoryColor)
-                    .shadow(color: categoryColor.opacity(0.5), radius: 4)
             }
             
             // Achievement Name
