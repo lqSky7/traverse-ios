@@ -154,17 +154,31 @@ class AchievementToastManager: ObservableObject {
         }
     }
     
-    /// Check freeze info to detect gifted freezes
-    func checkFreezeInfo(availableFreezes: Int, isUserPurchase: Bool = false) {
+    @AppStorage("lastSeenGiftedFreezeID") private var lastSeenGiftedFreezeID: Int = -1
+    
+    /// Check freeze info to detect gifted freezes with sender details
+    func checkFreezeInfo(_ freezeInfo: FreezeInfoResponse, isUserPurchase: Bool = false) {
+        if let latestGift = freezeInfo.latestGift, !isUserPurchase {
+            if latestGift.id != lastSeenGiftedFreezeID {
+                lastSeenGiftedFreezeID = latestGift.id
+                let sender = latestGift.giftedBy
+                DispatchQueue.main.async {
+                    self.showGiftedFreezeToast(from: sender)
+                }
+                lastAvailableFreezesCount = freezeInfo.availableFreezes
+                return
+            }
+        }
+        
         if lastAvailableFreezesCount >= 0 {
-            let diff = availableFreezes - lastAvailableFreezesCount
+            let diff = freezeInfo.availableFreezes - lastAvailableFreezesCount
             if diff > 0 && !isUserPurchase {
                 DispatchQueue.main.async {
                     self.showGiftedFreezeToast(count: diff)
                 }
             }
         }
-        lastAvailableFreezesCount = availableFreezes
+        lastAvailableFreezesCount = freezeInfo.availableFreezes
     }
     
     /// Show a toast for a gifted freeze

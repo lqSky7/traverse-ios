@@ -267,7 +267,7 @@ class DataManager: ObservableObject {
             }
             
             if let freezeInfo = try? await NetworkService.shared.getFreezeInfo() {
-                AchievementToastManager.shared.checkFreezeInfo(availableFreezes: freezeInfo.availableFreezes)
+                AchievementToastManager.shared.checkFreezeInfo(freezeInfo)
             }
             
             if let response = try? await NetworkService.shared.getAllAchievements() {

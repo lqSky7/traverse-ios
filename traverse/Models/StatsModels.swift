@@ -174,7 +174,14 @@ struct FreezeInfoResponse: Codable {
     let availableFreezes: Int
     let usedFreezes: Int
     let totalFreezes: Int
+    let latestGift: FreezeGiftInfo?
     let costs: FreezeCosts
+}
+
+struct FreezeGiftInfo: Codable {
+    let id: Int
+    let giftedBy: String?
+    let createdAt: String
 }
 
 struct FreezeCosts: Codable {
