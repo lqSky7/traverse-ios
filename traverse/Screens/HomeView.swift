@@ -1371,18 +1371,20 @@ struct AchievementCategoryCard: View {
     
     private var categoryIcon: String {
         switch category.lowercased() {
-        case "solve": return "checkmark.seal.fill"
+        case "solve", "solves": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
         case "social": return "person.2.fill"
-        default: return "sparkles"
+        case "revision", "revisions", "ml": return "brain.head.profile"
+        default: return "trophy.fill"
         }
     }
     
     private var categoryColor: Color {
         switch category.lowercased() {
-        case "solve": return paletteManager.color(at: 0)
-        case "streak": return paletteManager.color(at: 1)
+        case "solve", "solves": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
         case "social": return paletteManager.color(at: 2)
+        case "revision", "revisions", "ml": return paletteManager.color(at: 4)
         default: return paletteManager.color(at: 3)
         }
     }
@@ -1448,29 +1450,99 @@ struct AchievementRow: View {
     let achievement: AchievementDetail
     @ObservedObject var paletteManager: ColorPaletteManager
     
+    private var categoryIcon: String {
+        if let icon = achievement.icon, !icon.isEmpty {
+            if UIImage(systemName: icon) != nil {
+                return icon
+            }
+            switch icon.lowercased() {
+            case "trophy": return "trophy.fill"
+            case "flame", "fire": return "flame.fill"
+            case "star": return "star.fill"
+            case "bolt", "zap": return "bolt.fill"
+            case "brain": return "brain.head.profile"
+            case "crown": return "crown.fill"
+            case "target": return "target"
+            case "seal", "badge": return "checkmark.seal.fill"
+            case "chart": return "chart.line.uptrend.xyaxis"
+            case "sparkles": return "sparkles"
+            case "award": return "award.fill"
+            default: break
+            }
+        }
+        switch achievement.category.lowercased() {
+        case "solve", "solves": return "checkmark.seal.fill"
+        case "streak": return "flame.fill"
+        case "social": return "person.2.fill"
+        case "revision", "revisions", "ml": return "brain.head.profile"
+        default: return "trophy.fill"
+        }
+    }
+    
+    private var categoryColor: Color {
+        guard achievement.unlocked else { return Color.gray }
+        switch achievement.category.lowercased() {
+        case "solve", "solves": return paletteManager.color(at: 1)
+        case "streak": return paletteManager.color(at: 0)
+        case "social": return paletteManager.color(at: 2)
+        case "revision", "revisions", "ml": return paletteManager.color(at: 4)
+        default: return paletteManager.color(at: 3)
+        }
+    }
+    
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
+            // Glowing Achievement Badge Icon (matching Friends Page visual design)
             ZStack {
-                Circle()
-                    .fill(achievement.unlocked ? paletteManager.color(at: 3).opacity(0.2) : Color.gray.opacity(0.2))
-                    .frame(width: 40, height: 40)
-                
                 if achievement.unlocked {
-                    Image(systemName: "checkmark")
-                        .font(.title3)
-                        .foregroundStyle(paletteManager.color(at: 3))
+                    Circle()
+                        .stroke(categoryColor.opacity(0.35), lineWidth: 2)
+                        .frame(width: 48, height: 48)
+                        .blur(radius: 2)
+                    
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [categoryColor.opacity(0.3), categoryColor.opacity(0.1)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 24
+                            )
+                        )
+                        .frame(width: 42, height: 42)
+                    
+                    Image(systemName: categoryIcon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(categoryColor)
+                        .shadow(color: categoryColor.opacity(0.5), radius: 3)
                 } else {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 1.5)
+                        .frame(width: 42, height: 42)
+                    
+                    Circle()
+                        .fill(Color.gray.opacity(0.1))
+                        .frame(width: 42, height: 42)
+                    
                     Image(systemName: "lock.fill")
-                        .font(.title3)
-                        .foregroundStyle(.gray)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.gray.opacity(0.6))
                 }
             }
             
-            VStack(alignment: .leading, spacing: 4) {
-                Text(achievement.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(achievement.unlocked ? .white : .gray)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(achievement.name)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(achievement.unlocked ? .white : .gray)
+                    
+                    if achievement.unlocked {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                    }
+                }
                 
                 Text(achievement.description)
                     .font(.caption)
@@ -1480,20 +1552,15 @@ struct AchievementRow: View {
                 if achievement.unlocked, let unlockedAt = achievement.unlockedAt {
                     Text("Unlocked \(formatDate(unlockedAt))")
                         .font(.caption2)
-                        .foregroundStyle(paletteManager.color(at: 3))
+                        .foregroundStyle(categoryColor.opacity(0.9))
                 }
             }
             
             Spacer()
-            
-            if let icon = achievement.icon {
-                Text(icon)
-                    .font(.title2)
-            }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .opacity(achievement.unlocked ? 1.0 : 0.6)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .opacity(achievement.unlocked ? 1.0 : 0.65)
     }
     
     private func formatDate(_ dateString: String) -> String {
