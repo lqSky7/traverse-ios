@@ -4,9 +4,9 @@ import Combine
 struct AchievementToastItem: Identifiable, Equatable {
     let id: String
     let name: String
-    let description: String
     let category: String
     let icon: String?
+    let count: Int
     
     static func == (lhs: AchievementToastItem, rhs: AchievementToastItem) -> Bool {
         lhs.id == rhs.id
@@ -33,44 +33,56 @@ class AchievementToastManager: ObservableObject {
     
     private init() {}
     
-    /// Check list of achievements from backend response and queue toasts for any newly unlocked ones
+    /// Check list of achievements from backend response
+    /// If >1 unlocked at once, show a single summary toast ("x achievements unlocked")
     func checkNewAchievements(_ achievements: [AchievementDetail]) {
         var localSeen = seenUnlockedKeys
-        var newToasts: [AchievementToastItem] = []
+        var newItems: [AchievementDetail] = []
         
         for item in achievements where item.unlocked {
             let key = "\(item.id)"
             if !localSeen.contains(key) {
                 localSeen.insert(key)
-                let toast = AchievementToastItem(
-                    id: key,
-                    name: item.name,
-                    description: item.description,
-                    category: item.category,
-                    icon: item.icon
-                )
-                newToasts.append(toast)
+                newItems.append(item)
             }
         }
         
-        if !newToasts.isEmpty {
+        if !newItems.isEmpty {
             seenUnlockedKeys = localSeen
             DispatchQueue.main.async {
-                for toast in newToasts {
-                    self.enqueueToast(toast)
+                if newItems.count > 1 {
+                    // Multiple achievements unlocked -> single summary toast
+                    let multiToast = AchievementToastItem(
+                        id: UUID().uuidString,
+                        name: "\(newItems.count) achievements unlocked",
+                        category: "multi",
+                        icon: "sparkles",
+                        count: newItems.count
+                    )
+                    self.enqueueToast(multiToast)
+                } else if let single = newItems.first {
+                    // Single achievement unlocked -> show icon & title
+                    let singleToast = AchievementToastItem(
+                        id: "\(single.id)",
+                        name: single.name,
+                        category: single.category,
+                        icon: single.icon,
+                        count: 1
+                    )
+                    self.enqueueToast(singleToast)
                 }
             }
         }
     }
     
     /// Manually show a toast for an achievement
-    func showToast(name: String, description: String, category: String, icon: String? = nil) {
+    func showToast(name: String, category: String, icon: String? = nil, count: Int = 1) {
         let toast = AchievementToastItem(
             id: UUID().uuidString,
             name: name,
-            description: description,
             category: category,
-            icon: icon
+            icon: icon,
+            count: count
         )
         DispatchQueue.main.async {
             self.enqueueToast(toast)
@@ -97,25 +109,25 @@ class AchievementToastManager: ObservableObject {
             self.currentToast = nextToast
         }
         
-        // Auto dismiss after 5 seconds
+        // Auto dismiss after 4 seconds
         dismissWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             self?.dismissCurrentToast()
         }
         dismissWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0, execute: workItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0, execute: workItem)
     }
     
     func dismissCurrentToast() {
         dismissWorkItem?.cancel()
         dismissWorkItem = nil
         
-        withAnimation(.easeOut(duration: 0.3)) {
+        withAnimation(.easeOut(duration: 0.25)) {
             self.currentToast = nil
         }
         
         // Process next toast after current transition finishes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             self?.processQueue()
         }
     }

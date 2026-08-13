@@ -22,99 +22,85 @@ struct AchievementToastView: View {
             case "chart": return "chart.line.uptrend.xyaxis"
             case "sparkles": return "sparkles"
             case "award": return "award.fill"
+            case "globe": return "globe"
+            case "code", "curlybraces": return "curlybraces"
             default: break
             }
         }
+        
+        if toast.count > 1 || toast.category.lowercased() == "multi" {
+            return "sparkles"
+        }
+        
         switch toast.category.lowercased() {
         case "solve", "solves": return "checkmark.seal.fill"
         case "streak": return "flame.fill"
+        case "xp": return "star.fill"
         case "social": return "person.2.fill"
+        case "language": return "curlybraces"
         case "revision", "revisions", "ml": return "brain.head.profile"
+        case "fun": return "party.popper.fill"
         default: return "trophy.fill"
         }
     }
     
     private var categoryColor: Color {
+        if toast.count > 1 || toast.category.lowercased() == "multi" {
+            return paletteManager.selectedPalette.primary
+        }
         switch toast.category.lowercased() {
         case "solve", "solves": return paletteManager.color(at: 1)
         case "streak": return paletteManager.color(at: 0)
+        case "xp": return paletteManager.color(at: 3)
         case "social": return paletteManager.color(at: 2)
+        case "language": return paletteManager.color(at: 1)
         case "revision", "revisions", "ml": return paletteManager.color(at: 4)
+        case "fun": return paletteManager.color(at: 0)
         default: return paletteManager.color(at: 3)
         }
     }
     
     var body: some View {
-        HStack(spacing: 14) {
-            // Glowing Achievement Badge Icon
+        HStack(spacing: 12) {
+            // Clean Icon inside flat circular background (NO blur or glow around icon)
             ZStack {
                 Circle()
-                    .stroke(categoryColor.opacity(0.4), lineWidth: 2)
-                    .frame(width: 44, height: 44)
-                    .blur(radius: 2)
-                
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [categoryColor.opacity(0.35), categoryColor.opacity(0.12)],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 22
-                        )
-                    )
-                    .frame(width: 40, height: 40)
+                    .fill(categoryColor.opacity(0.18))
+                    .frame(width: 36, height: 36)
                 
                 Image(systemName: categoryIcon)
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(categoryColor)
-                    .shadow(color: categoryColor.opacity(0.6), radius: 3)
             }
             
-            // Text Content (Achievement Name & Description)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text("ACHIEVEMENT UNLOCKED")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1)
-                        .foregroundStyle(categoryColor)
-                    
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(categoryColor)
-                }
-                
-                Text(toast.name)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
-                
-                Text(toast.description)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            // Title text ONLY (e.g. "3 achievements unlocked" or "Hello, World!")
+            Text(toast.name)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+                .lineLimit(1)
             
             Spacer(minLength: 4)
             
             // Dismiss Button
             Button(action: onDismiss) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20, weight: .medium))
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.6))
+                    .padding(6)
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity)
+        .padding(.leading, 10)
+        .padding(.trailing, 8)
+        .padding(.vertical, 7)
         .modifier(LiquidGlassToastModifier())
         .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(categoryColor.opacity(0.35), lineWidth: 1)
+            Capsule()
+                .stroke(categoryColor.opacity(0.3), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.4), radius: 16, x: 0, y: 8)
-        .padding(.horizontal, 16)
+        .shadow(color: Color.black.opacity(0.3), radius: 12, x: 0, y: 6)
+        .padding(.horizontal, 20)
     }
 }
 
@@ -123,10 +109,10 @@ struct LiquidGlassToastModifier: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
             content
-                .glassEffect(.clear.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .glassEffect(.clear.interactive(), in: Capsule())
         } else {
             content
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .background(.ultraThinMaterial, in: Capsule())
         }
     }
 }
