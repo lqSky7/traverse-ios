@@ -68,7 +68,10 @@ struct HomeView: View {
                                 }
                                 
                                 // Mistake Tags Analysis full width
-                                MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                NavigationLink(destination: MistakeTagsDetailView(solves: solves, paletteManager: paletteManager)) {
+                                    MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                                 
                                 // Best Solving Hours (replaces Submission Breakdown)
                                 BestSolvingHoursCard(solves: solves, paletteManager: paletteManager)
@@ -644,11 +647,17 @@ struct MistakeTagsAnalysisCard: View {
                         .foregroundStyle(paletteManager.color(at: 5))
                     Text("Mistake Analysis")
                         .font(.headline)
+                        .foregroundStyle(.white)
                 }
                 Spacer()
-                Text("\(tagCounts.count)")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(paletteManager.color(at: 5))
+                HStack(spacing: 6) {
+                    Text("\(tagCounts.count)")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 5))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal)
             .padding(.top)
@@ -670,9 +679,9 @@ struct MistakeTagsAnalysisCard: View {
                 .padding(.top, 12)
                 .padding(.bottom, 16)
                 
-                // Horizontal bars for each tag
+                // Horizontal bars for TOP 3 tags
                 VStack(spacing: 12) {
-                    ForEach(Array(tagCounts.prefix(6).enumerated()), id: \.element.0) { index, item in
+                    ForEach(Array(tagCounts.prefix(3).enumerated()), id: \.element.0) { index, item in
                         MistakeTagProgressRow(
                             label: item.0,
                             count: item.1,
@@ -682,7 +691,23 @@ struct MistakeTagsAnalysisCard: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom)
+                .padding(.bottom, tagCounts.count > 3 ? 12 : 16)
+                
+                if tagCounts.count > 3 {
+                    Divider()
+                        .background(Color.gray.opacity(0.2))
+                    
+                    HStack {
+                        Text("View all \(tagCounts.count) mistake categories")
+                            .font(.caption.weight(.medium))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(paletteManager.selectedPalette.primary)
+                    .padding(.horizontal)
+                    .padding(.vertical, 10)
+                }
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
@@ -752,6 +777,377 @@ struct MistakeTagProgressRow: View {
         }
     }
 }
+
+// MARK: - Mistake Tags Detail View
+struct MistakeTagsDetailView: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    @State private var searchText = ""
+    @State private var selectedDifficulty: String = "All"
+    @State private var sortOption: MistakeSortOption = .mostFrequent
+    @State private var expandedTags: Set<String> = []
+    
+    enum MistakeSortOption: String, CaseIterable {
+        case mostFrequent = "Most Frequent"
+        case leastFrequent = "Least Frequent"
+        case alphabetical = "Alphabetical"
+    }
+    
+    struct TagAnalysisItem: Identifiable {
+        let id: String
+        let tag: String
+        let count: Int
+        let matchingSolves: [Solve]
+    }
+    
+    private var filteredSolvesByDifficulty: [Solve] {
+        if selectedDifficulty == "All" {
+            return solves
+        }
+        return solves.filter { $0.problem.difficulty.lowercased() == selectedDifficulty.lowercased() }
+    }
+    
+    private var allTagItems: [TagAnalysisItem] {
+        var tagMap: [String: (count: Int, solves: [Solve])] = [:]
+        
+        for solve in filteredSolvesByDifficulty {
+            if let tags = solve.mistakeTags ?? solve.submission.mistakeTags {
+                for tag in tags {
+                    let current = tagMap[tag] ?? (count: 0, solves: [])
+                    tagMap[tag] = (count: current.count + 1, solves: current.solves + [solve])
+                }
+            }
+        }
+        
+        return tagMap.map { TagAnalysisItem(id: $0.key, tag: $0.key, count: $0.value.count, matchingSolves: $0.value.solves) }
+    }
+    
+    private var displayedTags: [TagAnalysisItem] {
+        let list = searchText.isEmpty
+            ? allTagItems
+            : allTagItems.filter { item in
+                item.tag.localizedCaseInsensitiveContains(searchText) ||
+                item.matchingSolves.contains { $0.problem.title.localizedCaseInsensitiveContains(searchText) }
+            }
+        
+        switch sortOption {
+        case .mostFrequent:
+            return list.sorted { $0.count > $1.count }
+        case .leastFrequent:
+            return list.sorted { $0.count < $1.count }
+        case .alphabetical:
+            return list.sorted { $0.tag.localizedCompare($1.tag) == .orderedAscending }
+        }
+    }
+    
+    private var totalMistakesCount: Int {
+        allTagItems.reduce(0) { $0 + $1.count }
+    }
+    
+    private var maxTagCount: Int {
+        allTagItems.map { $0.count }.max() ?? 1
+    }
+    
+    private var solvesWithMistakesCount: Int {
+        filteredSolvesByDifficulty.filter { solve in
+            if let tags = solve.mistakeTags ?? solve.submission.mistakeTags, !tags.isEmpty {
+                return true
+            }
+            return false
+        }.count
+    }
+    
+    private var cleanSolvesPercentage: Int {
+        guard !filteredSolvesByDifficulty.isEmpty else { return 100 }
+        let clean = filteredSolvesByDifficulty.count - solvesWithMistakesCount
+        return Int((Double(clean) / Double(filteredSolvesByDifficulty.count)) * 100)
+    }
+    
+    private func iconForTag(_ tag: String) -> String {
+        let lower = tag.lowercased()
+        if lower.contains("time") || lower.contains("tle") {
+            return "clock.badge.exclamationmark"
+        } else if lower.contains("memory") || lower.contains("mle") || lower.contains("space") {
+            return "memorychip"
+        } else if lower.contains("edge") || lower.contains("corner") || lower.contains("bound") {
+            return "exclamationmark.triangle.fill"
+        } else if lower.contains("approach") || lower.contains("logic") || lower.contains("algo") {
+            return "brain.head.profile"
+        } else if lower.contains("base") || lower.contains("recursion") {
+            return "arrow.triangle.2.circlepath"
+        } else if lower.contains("null") || lower.contains("nil") || lower.contains("pointer") {
+            return "questionmark.diamond.fill"
+        } else if lower.contains("syntax") || lower.contains("type") {
+            return "curlybraces"
+        } else if lower.contains("overflow") {
+            return "arrow.up.right.and.arrow.down.left.rectangle"
+        } else if lower.contains("off-by-one") || lower.contains("index") {
+            return "arrow.left.and.right"
+        } else {
+            return "tag.fill"
+        }
+    }
+    
+    private func formattedTagName(_ tag: String) -> String {
+        tag.replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+    }
+    
+    private func difficultyColor(_ difficulty: String) -> Color {
+        switch difficulty.lowercased() {
+        case "easy": return .green
+        case "medium": return .orange
+        case "hard": return .red
+        default: return .blue
+        }
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = formatter.date(from: dateString)
+        if date == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            date = formatter.date(from: dateString)
+        }
+        guard let d = date else { return dateString }
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "MMM d"
+        return displayFormatter.string(from: d)
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Summary Metrics Row
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(totalMistakesCount)")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(paletteManager.selectedPalette.primary)
+                        Text("Total Mistakes")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(12)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(allTagItems.count)")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 2))
+                        Text("Mistake Types")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(12)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(cleanSolvesPercentage)%")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 1))
+                        Text("Clean Solves")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                // Difficulty Segmented Picker
+                Picker("Difficulty", selection: $selectedDifficulty) {
+                    Text("All").tag("All")
+                    Text("Easy").tag("Easy")
+                    Text("Medium").tag("Medium")
+                    Text("Hard").tag("Hard")
+                }
+                .pickerStyle(.segmented)
+                
+                // Search Bar & Sort Menu
+                HStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search tags or problems...", text: $searchText)
+                            .font(.subheadline)
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(10)
+                    
+                    Menu {
+                        Picker("Sort by", selection: $sortOption) {
+                            ForEach(MistakeSortOption.allCases, id: \.self) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.arrow.down")
+                            Text(sortOption.rawValue)
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(10)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
+                    }
+                }
+                
+                // Tags List
+                if displayedTags.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text(searchText.isEmpty ? "No mistake tags found" : "No results for \"\(searchText)\"")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(Array(displayedTags.enumerated()), id: \.element.id) { index, item in
+                            let isExpanded = expandedTags.contains(item.id)
+                            let tagColor = paletteManager.color(at: index % 10)
+                            let percentage = totalMistakesCount > 0 ? Int((Double(item.count) / Double(totalMistakesCount)) * 100) : 0
+                            
+                            VStack(alignment: .leading, spacing: 10) {
+                                // Header row (tappable to expand)
+                                Button {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        if isExpanded {
+                                            expandedTags.remove(item.id)
+                                        } else {
+                                            expandedTags.insert(item.id)
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(tagColor.opacity(0.18))
+                                                .frame(width: 36, height: 36)
+                                            Image(systemName: iconForTag(item.tag))
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundStyle(tagColor)
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(formattedTagName(item.tag))
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(.primary)
+                                            
+                                            Text("\(percentage)% of all mistakes • \(item.matchingSolves.count) \(item.matchingSolves.count == 1 ? "problem" : "problems")")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(item.count)")
+                                            .font(.headline)
+                                            .bold()
+                                            .foregroundStyle(tagColor)
+                                        
+                                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                // Progress Bar
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(height: 8)
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [tagColor, tagColor.opacity(0.7)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: max(geo.size.width * CGFloat(item.count) / CGFloat(maxTagCount), 8), height: 8)
+                                    }
+                                }
+                                .frame(height: 8)
+                                
+                                // Expanded Problem List
+                                if isExpanded {
+                                    Divider()
+                                        .background(Color.gray.opacity(0.2))
+                                        .padding(.vertical, 2)
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Recent Problems")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                        
+                                        ForEach(item.matchingSolves) { solve in
+                                            HStack(spacing: 8) {
+                                                Text(solve.problem.title)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                
+                                                Spacer()
+                                                
+                                                Text(solve.problem.difficulty.capitalized)
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(difficultyColor(solve.problem.difficulty).opacity(0.15))
+                                                    .foregroundStyle(difficultyColor(solve.problem.difficulty))
+                                                    .cornerRadius(4)
+                                                
+                                                Text(formatDate(solve.solvedAt))
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            .padding(.vertical, 3)
+                                        }
+                                    }
+                                    .padding(.top, 4)
+                                }
+                            }
+                            .padding()
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(14)
+                        }
+                    }
+                }
+            }
+            .padding()
+        }
+        .background(Color.black)
+        .navigationTitle("Mistake Analysis")
+        .navigationBarTitleDisplayMode(.large)
+    }
+}
+
 
 // MARK: - Achievement Stats Card (Compact Half-Width)
 struct AchievementStatsCard: View {
