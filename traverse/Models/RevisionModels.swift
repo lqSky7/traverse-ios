@@ -211,7 +211,7 @@ struct ResumeRevisionsResponse: Codable {
 struct RevisionAnalyticsResponse: Codable {
     let overview: RevisionAnalyticsOverview
     let stabilityDistribution: RevisionStabilityDistribution
-    let projectedLoad: [RevisionProjectedLoad]
+    let topicBreakdown: [RevisionTopicMetric]
     let weeklyCompletion: [WeeklyCompletion]
     let retentionHeatmap: [RevisionRetentionItem]
     let streaks: RevisionAnalyticsStreaks
@@ -219,7 +219,7 @@ struct RevisionAnalyticsResponse: Codable {
     enum CodingKeys: String, CodingKey {
         case overview
         case stabilityDistribution
-        case projectedLoad
+        case topicBreakdown
         case weeklyCompletion
         case retentionHeatmap
         case streaks
@@ -228,14 +228,14 @@ struct RevisionAnalyticsResponse: Codable {
     init(
         overview: RevisionAnalyticsOverview,
         stabilityDistribution: RevisionStabilityDistribution,
-        projectedLoad: [RevisionProjectedLoad],
+        topicBreakdown: [RevisionTopicMetric],
         weeklyCompletion: [WeeklyCompletion],
         retentionHeatmap: [RevisionRetentionItem],
         streaks: RevisionAnalyticsStreaks
     ) {
         self.overview = overview
         self.stabilityDistribution = stabilityDistribution
-        self.projectedLoad = projectedLoad
+        self.topicBreakdown = topicBreakdown
         self.weeklyCompletion = weeklyCompletion
         self.retentionHeatmap = retentionHeatmap
         self.streaks = streaks
@@ -245,7 +245,7 @@ struct RevisionAnalyticsResponse: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.overview = try container.decode(RevisionAnalyticsOverview.self, forKey: .overview)
         self.stabilityDistribution = try container.decode(RevisionStabilityDistribution.self, forKey: .stabilityDistribution)
-        self.projectedLoad = try container.decodeIfPresent([RevisionProjectedLoad].self, forKey: .projectedLoad) ?? []
+        self.topicBreakdown = try container.decodeIfPresent([RevisionTopicMetric].self, forKey: .topicBreakdown) ?? []
         self.weeklyCompletion = try container.decodeIfPresent([WeeklyCompletion].self, forKey: .weeklyCompletion) ?? []
         self.retentionHeatmap = try container.decodeIfPresent([RevisionRetentionItem].self, forKey: .retentionHeatmap) ?? []
         self.streaks = try container.decode(RevisionAnalyticsStreaks.self, forKey: .streaks)
@@ -268,11 +268,13 @@ struct RevisionStabilityDistribution: Codable {
     let mastered: Int
 }
 
-struct RevisionProjectedLoad: Codable, Identifiable {
-    var id: String { date }
-    let date: String
-    let dueCount: Int
-    let overdueCount: Int
+struct RevisionTopicMetric: Codable, Identifiable {
+    var id: String { topic }
+    let topic: String
+    let problemCount: Int
+    let averageRetention: Double
+    let averageStability: Double
+    let averageTimeMinutes: Double
 }
 
 struct WeeklyCompletion: Codable, Identifiable {

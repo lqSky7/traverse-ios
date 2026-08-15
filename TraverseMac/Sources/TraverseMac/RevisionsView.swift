@@ -62,7 +62,7 @@ struct RevisionsView: View {
             if let analytics = appState.revisionAnalytics {
                 HStack(alignment: .top, spacing: 14) {
                     WeeklyCompletionChart(points: analytics.weeklyCompletion)
-                    ProjectedLoadChart(points: analytics.projectedLoad)
+                    TopicBreakdownChart(points: analytics.topicBreakdown)
                 }
                 RetentionRiskTable(items: analytics.retentionHeatmap)
             }
@@ -162,20 +162,21 @@ struct WeeklyCompletionChart: View {
     }
 }
 
-struct ProjectedLoadChart: View {
+struct TopicBreakdownChart: View {
     @EnvironmentObject private var paletteManager: ColorPaletteManager
-    let points: [RevisionProjectedLoad]
+    let points: [RevisionTopicMetric]
 
     var body: some View {
         ThemedCard {
             VStack(alignment: .leading) {
-                Text("Projected Load").font(.headline)
-                PanelFeedback(status: .loaded(.now), isEmpty: points.isEmpty, emptyTitle: "No projected load", emptySystemImage: "calendar", emptyDescription: "Projected ML review load will appear here.")
-                Chart(points) { point in
-                    BarMark(x: .value("Date", point.date), y: .value("Due", point.dueCount))
-                        .foregroundStyle(paletteManager.color(at: 0))
-                    BarMark(x: .value("Date", point.date), y: .value("Overdue", point.overdueCount))
-                        .foregroundStyle(.orange)
+                Text("Topic Mastery").font(.headline)
+                PanelFeedback(status: .loaded(.now), isEmpty: points.isEmpty, emptyTitle: "No topic data", emptySystemImage: "chart.bar.xaxis", emptyDescription: "Topic retention breakdown will appear here.")
+                Chart(points.prefix(6)) { point in
+                    BarMark(
+                        x: .value("Retention", point.averageRetention * 100),
+                        y: .value("Topic", point.topic)
+                    )
+                    .foregroundStyle(paletteManager.color(at: 2))
                 }
                 .frame(height: 190)
             }
