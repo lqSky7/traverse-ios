@@ -38,6 +38,9 @@ struct MainTabView: View {
             .overlay(AchievementToastOverlayContainer(), alignment: .top)
             .onAppear {
                 setupNotificationObserver()
+                Task {
+                    await AchievementToastManager.shared.syncAppOpenUpdates()
+                }
             }
         } else {
             TabView(selection: $selectedTab) {
@@ -70,6 +73,9 @@ struct MainTabView: View {
             .overlay(AchievementToastOverlayContainer(), alignment: .top)
             .onAppear {
                 setupNotificationObserver()
+                Task {
+                    await AchievementToastManager.shared.syncAppOpenUpdates()
+                }
             }
         }
     }

@@ -73,6 +73,8 @@ class FriendsViewModel: ObservableObject {
             DataManager.shared.receivedRequests = receivedRequests
             DataManager.shared.sentRequests = sentRequests
             
+            AchievementToastManager.shared.checkFriendRequests(receivedRequests)
+            
             hasLoadedRequests = true
         } catch is CancellationError {
             // Ignore - user released pull-to-refresh

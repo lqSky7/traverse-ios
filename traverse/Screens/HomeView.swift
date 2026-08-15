@@ -3013,6 +3013,9 @@ class HomeViewModel: ObservableObject {
 
             // Check if solved today and end live activity if needed
             DataManager.shared.checkSolvedTodayAndEndActivity()
+            
+            // Trigger app updates & toast check
+            await AchievementToastManager.shared.syncAppOpenUpdates()
 
         } catch let error where error is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh

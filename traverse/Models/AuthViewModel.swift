@@ -83,6 +83,8 @@ class AuthViewModel: ObservableObject {
             }
             // Clear DataManager cache
             DataManager.shared.clearAllData()
+            // Reset toast manager seen state
+            AchievementToastManager.shared.resetState()
             // Clear widget data
             if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
                 sharedDefaults.removeObject(forKey: "widgetData")
@@ -103,6 +105,8 @@ class AuthViewModel: ObservableObject {
             KeychainHelper.shared.deleteToken()
             // Clear DataManager cache
             DataManager.shared.clearAllData()
+            // Reset toast manager seen state
+            AchievementToastManager.shared.resetState()
             // Clear widget data
             if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
                 sharedDefaults.removeObject(forKey: "widgetData")

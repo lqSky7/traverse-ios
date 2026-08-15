@@ -208,3 +208,11 @@ struct FreezeGiftResponse: Codable {
 struct FreezeDatesResponse: Codable {
     let freezeDates: [String]
 }
+
+// MARK: - App Updates & Sync Response
+struct AppUpdatesResponse: Codable {
+    let achievements: [AchievementDetail]
+    let friendRequests: [FriendRequest]
+    let streakRequests: [FriendStreakRequest]
+    let freezeInfo: FreezeInfoResponse
+}

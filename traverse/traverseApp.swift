@@ -37,6 +37,11 @@ struct traverseApp: App {
                 if let widgetData = WidgetDataManager.shared.loadWidgetData() {
                     WatchSyncManager.shared.syncWidgetData(widgetData)
                 }
+                
+                // Sync updates & show any pending toasts on app open/foregrounding
+                Task {
+                    await AchievementToastManager.shared.syncAppOpenUpdates()
+                }
             }
         }
     }

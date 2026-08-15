@@ -24,6 +24,10 @@ class AchievementToastManager: ObservableObject {
     @AppStorage("seenFriendRequestKeys") private var seenFriendRequestKeysData: String = ""
     @AppStorage("seenStreakRequestKeys") private var seenStreakRequestKeysData: String = ""
     @AppStorage("lastAvailableFreezesCount") private var lastAvailableFreezesCount: Int = -1
+    @AppStorage("hasInitializedAchievements") private var hasInitializedAchievements: Bool = false
+    
+    private var lastSyncTimestamp: Date?
+    private var isSyncing = false
     
     private var seenUnlockedKeys: Set<String> {
         get { Set(seenUnlockedKeysData.split(separator: ",").map(String.init)) }
@@ -42,13 +46,56 @@ class AchievementToastManager: ObservableObject {
     
     private init() {}
     
+    /// Sync updates on app open / foregrounding with throttling (minimum 10s between checks)
+    func syncAppOpenUpdates(force: Bool = false) async {
+        guard NetworkService.shared.isAuthenticated() else { return }
+        
+        if !force, let lastSync = lastSyncTimestamp, Date().timeIntervalSince(lastSync) < 10 {
+            return
+        }
+        
+        guard !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+        
+        do {
+            let updates = try await NetworkService.shared.getAppUpdates()
+            lastSyncTimestamp = Date()
+            
+            await MainActor.run {
+                // Update DataManager cached requests
+                DataManager.shared.receivedRequests = updates.friendRequests
+                DataManager.shared.receivedStreakRequests = updates.streakRequests
+                
+                // Evaluate and display toasts for newly unlocked or received items
+                self.checkNewAchievements(updates.achievements)
+                self.checkFriendRequests(updates.friendRequests)
+                self.checkStreakRequests(updates.streakRequests)
+                self.checkFreezeInfo(updates.freezeInfo)
+            }
+        } catch {
+            print("[AchievementToastManager] syncAppOpenUpdates failed: \(error.localizedDescription)")
+        }
+    }
+    
     /// Check list of achievements from backend response
     /// If >1 unlocked at once, show a single summary toast ("x achievements unlocked")
     func checkNewAchievements(_ achievements: [AchievementDetail]) {
+        let unlockedItems = achievements.filter { $0.unlocked }
+        
+        // On very first launch / clean install for an existing user with unlocked achievements,
+        // seed the keys without spamming historical toasts
+        if !hasInitializedAchievements && seenUnlockedKeysData.isEmpty {
+            seenUnlockedKeys = Set(unlockedItems.map { "\($0.id)" })
+            hasInitializedAchievements = true
+            return
+        }
+        hasInitializedAchievements = true
+        
         var localSeen = seenUnlockedKeys
         var newItems: [AchievementDetail] = []
         
-        for item in achievements where item.unlocked {
+        for item in unlockedItems {
             let key = "\(item.id)"
             if !localSeen.contains(key) {
                 localSeen.insert(key)
@@ -158,6 +205,13 @@ class AchievementToastManager: ObservableObject {
     
     /// Check freeze info to detect gifted freezes with sender details
     func checkFreezeInfo(_ freezeInfo: FreezeInfoResponse, isUserPurchase: Bool = false) {
+        // If first time initializing, save baseline without triggering historical toast
+        if lastSeenGiftedFreezeID == -1 {
+            lastSeenGiftedFreezeID = freezeInfo.latestGift?.id ?? 0
+            lastAvailableFreezesCount = freezeInfo.availableFreezes
+            return
+        }
+        
         if let latestGift = freezeInfo.latestGift, !isUserPurchase {
             if latestGift.id != lastSeenGiftedFreezeID {
                 lastSeenGiftedFreezeID = latestGift.id
@@ -273,4 +327,21 @@ class AchievementToastManager: ObservableObject {
             self?.processQueue()
         }
     }
+    
+    /// Reset cached seen state (e.g. on logout)
+    func resetState() {
+        seenUnlockedKeysData = ""
+        seenFriendRequestKeysData = ""
+        seenStreakRequestKeysData = ""
+        lastAvailableFreezesCount = -1
+        lastSeenGiftedFreezeID = -1
+        hasInitializedAchievements = false
+        lastSyncTimestamp = nil
+        isSyncing = false
+        currentToast = nil
+        toastQueue.removeAll()
+        dismissWorkItem?.cancel()
+        dismissWorkItem = nil
+    }
 }
+
