@@ -226,6 +226,8 @@ struct Solve: Codable, Identifiable, Hashable {
     let solvedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let cognitiveTier: Int?
+    let recallScore: Double?
     let problem: Problem
     let submission: Submission
     let highlight: Highlight?
@@ -243,6 +245,8 @@ struct Submission: Codable, Hashable {
     let happenedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let cognitiveTier: Int?
+    let recallScore: Double?
     let numberOfTries: Int?
     let timeTaken: Int?
 }

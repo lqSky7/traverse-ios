@@ -91,6 +91,8 @@ struct RevisionSolve: Codable {
     let solvedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let cognitiveTier: Int?
+    let recallScore: Double?
     let attempts: [CodeAttempt]?
 }
 

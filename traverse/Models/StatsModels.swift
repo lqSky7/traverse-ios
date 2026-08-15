@@ -90,6 +90,8 @@ struct Solve: Codable, Identifiable {
     let solvedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let cognitiveTier: Int?
+    let recallScore: Double?
     let attempts: [CodeAttempt]?
     let problem: Problem
     let submission: Submission
@@ -118,6 +120,8 @@ struct Submission: Codable {
     let happenedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let cognitiveTier: Int?
+    let recallScore: Double?
     let numberOfTries: Int?
     let timeTaken: Int?
     let attempts: [CodeAttempt]?
