@@ -214,42 +214,65 @@ struct StreakCard: View {
 // MARK: - Lighting Sun Background (Lighting Simulation Shader from Settings > Demo)
 struct LightingSunBackground: View {
     let streak: Int
+    @State private var animatedProgress: Double = 0.0
     
-    private var progress: Float {
-        min(max(Float(streak), 0), 15.0) / 15.0
-    }
-    
-    private var intensity: Float {
-        0.3 + progress * 2.2
-    }
-    
-    private var disperse: Float {
-        0.15 + progress * 0.60
-    }
-    
-    private var radius: Float {
-        10.0 + progress * 40.0
+    private var targetProgress: Double {
+        Double(min(max(Float(streak), 0), 15.0) / 15.0)
     }
     
     var body: some View {
         GeometryReader { geometry in
-            let cardHeight = Float(geometry.size.height > 0 ? geometry.size.height : 90.0)
-            let targetY = cardHeight / 1.2
-            
-            Color.black
-                .layerEffect(
-                    ShaderLibrary.lightingSimulation(
-                        .float2(5.0, targetY),
-                        .float(intensity),
-                        .float(disperse),
-                        .float(-Float.pi / 2.0),
-                        .float(radius)
-                    ),
-                    maxSampleOffset: .zero
-                )
+            AnimatableLightingSun(
+                progress: animatedProgress,
+                cardHeight: geometry.size.height
+            )
+        }
+        .onAppear {
+            animatedProgress = 0.0
+            withAnimation(.spring(response: 1.1, dampingFraction: 0.72, blendDuration: 0)) {
+                animatedProgress = targetProgress
+            }
+        }
+        .onChange(of: streak) { _, newStreak in
+            let newTarget = Double(min(max(Float(newStreak), 0), 15.0) / 15.0)
+            withAnimation(.spring(response: 1.1, dampingFraction: 0.72, blendDuration: 0)) {
+                animatedProgress = newTarget
+            }
         }
     }
 }
+
+private struct AnimatableLightingSun: View, Animatable {
+    var progress: Double
+    var cardHeight: CGFloat
+    
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+    
+    var body: some View {
+        let p = Float(progress)
+        let intensity = 0.3 + p * 2.2
+        let disperse = 0.15 + p * 0.60
+        let radius = 10.0 + p * 40.0
+        let height = Float(cardHeight > 0 ? cardHeight : 90.0)
+        let targetY = height / 1.2
+        
+        Color.black
+            .layerEffect(
+                ShaderLibrary.lightingSimulation(
+                    .float2(5.0, targetY),
+                    .float(intensity),
+                    .float(disperse),
+                    .float(-Float.pi / 2.0),
+                    .float(radius)
+                ),
+                maxSampleOffset: .zero
+            )
+    }
+}
+
 
 
 // MARK: - Main Stats Card
@@ -2442,7 +2465,7 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            Text(analysis)
+                            MarkdownText(markdown: analysis)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -2490,9 +2513,22 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            Text(highlight.note)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            if !highlight.note.isEmpty {
+                                MarkdownText(markdown: highlight.note)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            if !highlight.content.isEmpty && highlight.content != highlight.note {
+                                Text(highlight.content)
+                                    .font(.caption2)
+                                    .fontDesign(.monospaced)
+                                    .foregroundStyle(.secondary.opacity(0.8))
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(6)
+                            }
                             
                             if !highlight.tags.isEmpty {
                                 ScrollView(.horizontal, showsIndicators: false) {

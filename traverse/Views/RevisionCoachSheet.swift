@@ -294,7 +294,7 @@ struct RevisionCoachSheet: View {
                                 .foregroundStyle(.white.opacity(0.35))
 
                             ScrollView(.vertical, showsIndicators: false) {
-                                Text(currentDisplayText)
+                                MarkdownText(markdown: currentDisplayText)
                                     .font(isLoading ? .headline : .subheadline)
                                     .fontWeight(isLoading ? .medium : .regular)
                                     .foregroundStyle(.white)

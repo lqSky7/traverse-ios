@@ -483,9 +483,8 @@ struct RevisionTodayResponse: Codable {
 struct RevisionAnalyticsResponse: Codable {
     let overview: RevisionAnalyticsOverview
     let stabilityDistribution: RevisionStabilityDistribution
-    let accuracyTrend: [RevisionAccuracyPoint]
     let projectedLoad: [RevisionProjectedLoad]
-    let averageIntervalGrowth: [RevisionIntervalGrowth]
+    let weeklyCompletion: [WeeklyCompletion]
     let retentionHeatmap: [RevisionRetentionItem]
     let streaks: RevisionAnalyticsStreaks
 }
@@ -506,11 +505,10 @@ struct RevisionStabilityDistribution: Codable {
     let mastered: Int
 }
 
-struct RevisionAccuracyPoint: Codable, Identifiable {
-    var id: String { date }
-    let date: String
-    let successRate: Double
-    let totalAttempts: Int
+struct WeeklyCompletion: Codable, Identifiable {
+    var id: String { week }
+    let week: String
+    let count: Int
 }
 
 struct RevisionProjectedLoad: Codable, Identifiable {
@@ -518,13 +516,6 @@ struct RevisionProjectedLoad: Codable, Identifiable {
     let date: String
     let dueCount: Int
     let overdueCount: Int
-}
-
-struct RevisionIntervalGrowth: Codable, Identifiable {
-    var id: String { month }
-    let month: String
-    let avgInterval: Double
-    let count: Int
 }
 
 struct RevisionRetentionItem: Codable, Identifiable {
@@ -544,8 +535,6 @@ struct RevisionRetentionItem: Codable, Identifiable {
 
 struct RevisionAnalyticsStreaks: Codable {
     let totalRevisionsCompleted: Int
-    let totalAttempts: Int
-    let overallSuccessRate: Double
 }
 
 

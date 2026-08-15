@@ -61,7 +61,7 @@ struct RevisionsView: View {
             }
             if let analytics = appState.revisionAnalytics {
                 HStack(alignment: .top, spacing: 14) {
-                    AccuracyTrendChart(points: analytics.accuracyTrend)
+                    WeeklyCompletionChart(points: analytics.weeklyCompletion)
                     ProjectedLoadChart(points: analytics.projectedLoad)
                 }
                 RetentionRiskTable(items: analytics.retentionHeatmap)
@@ -143,20 +143,18 @@ struct RevisionRow: View {
     }
 }
 
-struct AccuracyTrendChart: View {
+struct WeeklyCompletionChart: View {
     @EnvironmentObject private var paletteManager: ColorPaletteManager
-    let points: [RevisionAccuracyPoint]
+    let points: [WeeklyCompletion]
 
     var body: some View {
         ThemedCard {
             VStack(alignment: .leading) {
-                Text("Accuracy Trend").font(.headline)
-                PanelFeedback(status: .loaded(.now), isEmpty: points.isEmpty, emptyTitle: "No accuracy trend", emptySystemImage: "chart.xyaxis.line", emptyDescription: "ML attempt history will appear here.")
+                Text("Weekly Activity").font(.headline)
+                PanelFeedback(status: .loaded(.now), isEmpty: points.isEmpty, emptyTitle: "No weekly activity", emptySystemImage: "chart.bar.fill", emptyDescription: "Weekly review activity will appear here.")
                 Chart(points) { point in
-                    LineMark(x: .value("Date", point.date), y: .value("Success", point.successRate))
-                        .foregroundStyle(paletteManager.color(at: 0))
-                    PointMark(x: .value("Date", point.date), y: .value("Success", point.successRate))
-                        .foregroundStyle(paletteManager.color(at: 1))
+                    BarMark(x: .value("Week", point.week), y: .value("Completions", point.count))
+                        .foregroundStyle(paletteManager.color(at: 3))
                 }
                 .frame(height: 190)
             }
