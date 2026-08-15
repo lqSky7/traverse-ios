@@ -215,6 +215,41 @@ struct RevisionAnalyticsResponse: Codable {
     let weeklyCompletion: [WeeklyCompletion]
     let retentionHeatmap: [RevisionRetentionItem]
     let streaks: RevisionAnalyticsStreaks
+
+    enum CodingKeys: String, CodingKey {
+        case overview
+        case stabilityDistribution
+        case projectedLoad
+        case weeklyCompletion
+        case retentionHeatmap
+        case streaks
+    }
+
+    init(
+        overview: RevisionAnalyticsOverview,
+        stabilityDistribution: RevisionStabilityDistribution,
+        projectedLoad: [RevisionProjectedLoad],
+        weeklyCompletion: [WeeklyCompletion],
+        retentionHeatmap: [RevisionRetentionItem],
+        streaks: RevisionAnalyticsStreaks
+    ) {
+        self.overview = overview
+        self.stabilityDistribution = stabilityDistribution
+        self.projectedLoad = projectedLoad
+        self.weeklyCompletion = weeklyCompletion
+        self.retentionHeatmap = retentionHeatmap
+        self.streaks = streaks
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.overview = try container.decode(RevisionAnalyticsOverview.self, forKey: .overview)
+        self.stabilityDistribution = try container.decode(RevisionStabilityDistribution.self, forKey: .stabilityDistribution)
+        self.projectedLoad = try container.decodeIfPresent([RevisionProjectedLoad].self, forKey: .projectedLoad) ?? []
+        self.weeklyCompletion = try container.decodeIfPresent([WeeklyCompletion].self, forKey: .weeklyCompletion) ?? []
+        self.retentionHeatmap = try container.decodeIfPresent([RevisionRetentionItem].self, forKey: .retentionHeatmap) ?? []
+        self.streaks = try container.decode(RevisionAnalyticsStreaks.self, forKey: .streaks)
+    }
 }
 
 struct RevisionAnalyticsOverview: Codable {
