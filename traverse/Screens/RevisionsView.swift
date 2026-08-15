@@ -684,6 +684,8 @@ struct RevisionsView: View {
                 happenedAt: revSolve.solvedAt,
                 aiAnalysis: revSolve.aiAnalysis,
                 mistakeTags: revSolve.mistakeTags,
+                cognitiveTier: revSolve.cognitiveTier,
+                recallScore: revSolve.recallScore,
                 numberOfTries: nil,
                 timeTaken: nil,
                 attempts: revSolve.attempts
@@ -694,6 +696,8 @@ struct RevisionsView: View {
                 solvedAt: revSolve.solvedAt,
                 aiAnalysis: revSolve.aiAnalysis,
                 mistakeTags: revSolve.mistakeTags,
+                cognitiveTier: revSolve.cognitiveTier,
+                recallScore: revSolve.recallScore,
                 attempts: revSolve.attempts,
                 problem: problem,
                 submission: submission,

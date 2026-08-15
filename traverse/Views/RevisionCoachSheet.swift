@@ -60,6 +60,8 @@ struct RevisionCoachSheet: View {
                 happenedAt: solveFromRev.solvedAt,
                 aiAnalysis: solveFromRev.aiAnalysis,
                 mistakeTags: solveFromRev.mistakeTags,
+                cognitiveTier: solveFromRev.cognitiveTier,
+                recallScore: solveFromRev.recallScore,
                 numberOfTries: nil,
                 timeTaken: nil,
                 attempts: solveFromRev.attempts
@@ -70,6 +72,8 @@ struct RevisionCoachSheet: View {
                 solvedAt: solveFromRev.solvedAt,
                 aiAnalysis: solveFromRev.aiAnalysis,
                 mistakeTags: solveFromRev.mistakeTags,
+                cognitiveTier: solveFromRev.cognitiveTier,
+                recallScore: solveFromRev.recallScore,
                 attempts: solveFromRev.attempts,
                 problem: problem,
                 submission: submission,
