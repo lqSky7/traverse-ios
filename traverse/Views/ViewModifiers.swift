@@ -56,3 +56,15 @@ struct LiquidGlassButtonModifier: ViewModifier {
         }
     }
 }
+
+// MARK: - Toolbar Scroll Minimization
+extension View {
+    @ViewBuilder
+    func toolbarScrollMinimization() -> some View {
+        if #available(iOS 27.0, *) {
+            self.toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
+        } else {
+            self
+        }
+    }
+}

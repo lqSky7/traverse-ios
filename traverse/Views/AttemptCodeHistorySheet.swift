@@ -77,6 +77,7 @@ struct AttemptCodeHistorySheet: View {
             }
             .navigationTitle("\(problemTitle) History")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {

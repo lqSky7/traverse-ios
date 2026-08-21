@@ -382,6 +382,7 @@ struct UserProfileView: View {
         }
         .navigationTitle(username)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarScrollMinimization()
         .task {
             // Load profile first, then load streak status in parallel with other data
             await viewModel.loadProfile()

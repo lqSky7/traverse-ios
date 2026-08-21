@@ -321,6 +321,7 @@ struct RevisionCoachSheet: View {
             }
             .navigationTitle("\(revision.problem.title)")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {

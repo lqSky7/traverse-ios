@@ -196,6 +196,7 @@ struct MainView: View {
             }
             .padding()
             .navigationTitle("Traverse")
+            .toolbarScrollMinimization()
         }
     }
 }

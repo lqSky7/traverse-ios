@@ -107,6 +107,7 @@ struct PasswordResetView: View {
             }
             .navigationTitle("Reset Password")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

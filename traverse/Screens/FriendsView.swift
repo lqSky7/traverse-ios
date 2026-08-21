@@ -207,6 +207,7 @@ struct FriendsView: View {
                 }
             }
             .navigationTitle("Friends")
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {

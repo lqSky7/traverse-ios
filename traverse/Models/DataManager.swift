@@ -28,6 +28,8 @@ class DataManager: ObservableObject {
     @Published var solveStats: SolveStats?
     @Published var achievementStats: AchievementStats?
     @Published var recentSolves: [Solve]?
+    @Published var todayRevisions: [Revision] = []
+    @Published var completedRevisions: [Revision] = []
     @Published var lastFetchTimestamp: Date?
     
     // Revision data
@@ -111,6 +113,16 @@ class DataManager: ObservableObject {
             self.recentSolves = decodedSolves
         }
         
+        if let todayRevisionsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("todayRevisions.json")),
+           let decodedRevisions = try? decoder.decode([Revision].self, from: todayRevisionsData) {
+            self.todayRevisions = decodedRevisions
+        }
+        
+        if let completedRevisionsData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("completedRevisions.json")),
+           let decodedRevisions = try? decoder.decode([Revision].self, from: completedRevisionsData) {
+            self.completedRevisions = decodedRevisions
+        }
+        
         // Load timestamp
         if let timestampData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("lastFetchTimestamp.json")),
            let decodedTimestamp = try? decoder.decode(Date.self, from: timestampData) {
@@ -118,7 +130,7 @@ class DataManager: ObservableObject {
         }
         
         // If we have any data, mark as fetched
-        if userStats != nil || submissionStats != nil || solveStats != nil || achievementStats != nil || recentSolves != nil {
+        if userStats != nil || submissionStats != nil || solveStats != nil || achievementStats != nil || recentSolves != nil || !todayRevisions.isEmpty || !completedRevisions.isEmpty {
             hasFetchedInitialData = true
         }
         
@@ -177,6 +189,8 @@ class DataManager: ObservableObject {
         }
         
         // Save revision data
+        saveData(todayRevisions, filename: "todayRevisions.json")
+        saveData(completedRevisions, filename: "completedRevisions.json")
         saveData(revisionGroups, filename: "revisionGroups.json")
         if let revisionStats = revisionStats {
             saveData(revisionStats, filename: "revisionStats.json")
@@ -221,6 +235,9 @@ class DataManager: ObservableObject {
         async let solveStatsTask = NetworkService.shared.getSolveStats()
         async let achievementStatsTask = NetworkService.shared.getAchievementStats()
         async let recentSolvesTask = NetworkService.shared.getSolves(limit: 200)
+        let revisionType = self.revisionMode
+        async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50, type: revisionType)
+        async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true, type: revisionType)
         
         // Wait for all data to be fetched
         let results = try await (
@@ -231,9 +248,37 @@ class DataManager: ObservableObject {
             submissionStatsTask,
             solveStatsTask,
             achievementStatsTask,
-            recentSolvesTask
+            recentSolvesTask,
+            revisionsTask,
+            completedRevisionsTask
         )
         
+        // Filter for today + overdue only
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        let todayAndOverdue = results.8.revisions.filter { revision in
+            let revisionDate = calendar.startOfDay(for: revision.scheduledDate)
+            return revisionDate <= today
+        }
+
+        // Extract completed revisions from last 7 days
+        let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let recentCompletedRevisions = results.9.groups.flatMap { $0.revisions }
+            .filter { revision in
+                guard let completedAtString = revision.completedAt else { return false }
+                var completedDate = formatter.date(from: completedAtString)
+                if completedDate == nil {
+                    formatter.formatOptions = [.withInternetDateTime]
+                    completedDate = formatter.date(from: completedAtString)
+                }
+                guard let date = completedDate else { return false }
+                return date >= sevenDaysAgo
+            }
+
         // Store all fetched data
         self.friends = results.0
         self.receivedRequests = results.1
@@ -242,6 +287,8 @@ class DataManager: ObservableObject {
         self.submissionStats = results.4
         self.solveStats = results.5
         self.achievementStats = results.6
+        self.todayRevisions = todayAndOverdue
+        self.completedRevisions = recentCompletedRevisions
         
         // Merge and persist solves to the local cache
         _ = mergeAndPersistSolves(results.7.solves)
@@ -301,6 +348,8 @@ class DataManager: ObservableObject {
         solveStats = nil
         achievementStats = nil
         recentSolves = nil
+        todayRevisions = []
+        completedRevisions = []
         revisionGroups = []
         revisionStats = nil
         revisionMode = "normal"

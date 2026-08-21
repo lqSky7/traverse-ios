@@ -93,6 +93,7 @@ struct HomeView: View {
             .background(Color.black)
             .navigationTitle(formattedDate)
             .navigationBarTitleDisplayMode(.large)
+            .toolbarScrollMinimization()
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
                     // Use Task to prevent early cancellation from pull-to-refresh gesture
@@ -618,27 +619,34 @@ struct MistakeTagsAnalysisCard: View {
     let solves: [Solve]
     @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var tagCounts: [(String, Int)] {
+    private var cardData: (tagCounts: [(String, Int)], totalTags: Int, maxCount: Int) {
         var counts: [String: Int] = [:]
         for solve in solves {
             if let tags = solve.mistakeTags ?? solve.submission.mistakeTags {
+                var seen = Set<String>()
                 for tag in tags {
+                    guard seen.insert(tag).inserted else { continue }
                     counts[tag, default: 0] += 1
                 }
             }
         }
-        return counts.sorted { $0.value > $1.value }
-    }
-    
-    private var totalTags: Int {
-        tagCounts.reduce(0) { $0 + $1.1 }
-    }
-    
-    private var maxCount: Int {
-        tagCounts.map { $0.1 }.max() ?? 1
+        let sorted = counts.sorted {
+            if $0.value != $1.value {
+                return $0.value > $1.value
+            }
+            return $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending
+        }
+        let total = sorted.reduce(0) { $0 + $1.1 }
+        let maxC = max(sorted.map { $0.1 }.max() ?? 1, 1)
+        return (sorted, total, maxC)
     }
     
     var body: some View {
+        let data = cardData
+        let tagCounts = data.tagCounts
+        let totalTags = data.totalTags
+        let maxCount = data.maxCount
+        
         VStack(spacing: 0) {
             // Header
             HStack {
@@ -691,23 +699,7 @@ struct MistakeTagsAnalysisCard: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, tagCounts.count > 3 ? 12 : 16)
-                
-                if tagCounts.count > 3 {
-                    Divider()
-                        .background(Color.gray.opacity(0.2))
-                    
-                    HStack {
-                        Text("View all \(tagCounts.count) mistake categories")
-                            .font(.caption.weight(.medium))
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(paletteManager.selectedPalette.primary)
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                }
+                .padding(.bottom, 16)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
@@ -739,7 +731,8 @@ struct MistakeTagProgressRow: View {
     
     private var progress: CGFloat {
         guard maxCount > 0 else { return 0 }
-        return CGFloat(count) / CGFloat(maxCount)
+        let p = CGFloat(count) / CGFloat(maxCount)
+        return (p.isFinite && !p.isNaN) ? min(max(p, 0), 1) : 0
     }
     
     var body: some View {
@@ -751,6 +744,11 @@ struct MistakeTagProgressRow: View {
                 .lineLimit(1)
             
             GeometryReader { geometry in
+                let targetWidth = geometry.size.width * progress
+                let safeWidth = (targetWidth.isFinite && !targetWidth.isNaN && geometry.size.width > 0)
+                    ? max(min(targetWidth, geometry.size.width), count > 0 ? 12 : 0)
+                    : (count > 0 ? 12 : 0)
+                
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color.gray.opacity(0.2))
@@ -764,7 +762,7 @@ struct MistakeTagProgressRow: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                        .frame(width: safeWidth, height: 12)
                 }
             }
             .frame(height: 12)
@@ -794,74 +792,116 @@ struct MistakeTagsDetailView: View {
         case alphabetical = "Alphabetical"
     }
     
+    struct MistakeSolveSummary: Identifiable {
+        let id: String
+        let title: String
+        let difficulty: String
+        let solvedAt: String
+    }
+    
     struct TagAnalysisItem: Identifiable {
         let id: String
         let tag: String
         let count: Int
-        let matchingSolves: [Solve]
+        let matchingSolves: [MistakeSolveSummary]
     }
     
-    private var filteredSolvesByDifficulty: [Solve] {
+    private struct MistakeAnalysisData {
+        let allItems: [TagAnalysisItem]
+        let displayedItems: [TagAnalysisItem]
+        let totalMistakes: Int
+        let maxCount: Int
+        let cleanPercentage: Int
+    }
+    
+    private var analysisData: MistakeAnalysisData {
+        // 1. Filter solves by difficulty
+        let difficultyLower = selectedDifficulty.lowercased()
+        let filteredSolves: [Solve]
         if selectedDifficulty == "All" {
-            return solves
+            filteredSolves = solves
+        } else {
+            filteredSolves = solves.filter { $0.problem.difficulty.lowercased() == difficultyLower }
         }
-        return solves.filter { $0.problem.difficulty.lowercased() == selectedDifficulty.lowercased() }
-    }
-    
-    private var allTagItems: [TagAnalysisItem] {
-        var tagMap: [String: (count: Int, solves: [Solve])] = [:]
         
-        for solve in filteredSolvesByDifficulty {
-            if let tags = solve.mistakeTags ?? solve.submission.mistakeTags {
+        // 2. Count mistakes and group solves by tag in one O(N) pass
+        var tagCounts: [String: Int] = [:]
+        var tagSolves: [String: [MistakeSolveSummary]] = [:]
+        var solvesWithMistakes = 0
+        
+        for solve in filteredSolves {
+            let tags = solve.mistakeTags ?? solve.submission.mistakeTags ?? []
+            if !tags.isEmpty {
+                solvesWithMistakes += 1
+                var seen = Set<String>()
+                let summary = MistakeSolveSummary(
+                    id: "\(solve.id)_\(solve.solvedAt)",
+                    title: solve.problem.title,
+                    difficulty: solve.problem.difficulty,
+                    solvedAt: solve.solvedAt
+                )
                 for tag in tags {
-                    let current = tagMap[tag] ?? (count: 0, solves: [])
-                    tagMap[tag] = (count: current.count + 1, solves: current.solves + [solve])
+                    guard seen.insert(tag).inserted else { continue }
+                    tagCounts[tag, default: 0] += 1
+                    tagSolves[tag, default: []].append(summary)
                 }
             }
         }
         
-        return tagMap.map { TagAnalysisItem(id: $0.key, tag: $0.key, count: $0.value.count, matchingSolves: $0.value.solves) }
-    }
-    
-    private var displayedTags: [TagAnalysisItem] {
-        let list = searchText.isEmpty
-            ? allTagItems
-            : allTagItems.filter { item in
-                item.tag.localizedCaseInsensitiveContains(searchText) ||
-                item.matchingSolves.contains { $0.problem.title.localizedCaseInsensitiveContains(searchText) }
-            }
+        // 3. Build TagAnalysisItems
+        let allItems: [TagAnalysisItem] = tagCounts.map { tag, count in
+            TagAnalysisItem(
+                id: tag,
+                tag: tag,
+                count: count,
+                matchingSolves: tagSolves[tag] ?? []
+            )
+        }
         
+        let totalMistakes = allItems.reduce(0) { $0 + $1.count }
+        let maxCount = max(allItems.map { $0.count }.max() ?? 1, 1)
+        
+        let cleanSolves = filteredSolves.count - solvesWithMistakes
+        let cleanPercentage = filteredSolves.isEmpty ? 100 : Int((Double(max(0, cleanSolves)) / Double(filteredSolves.count)) * 100)
+        
+        // 4. Search filter
+        let searchTrimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filteredBySearch: [TagAnalysisItem]
+        if searchTrimmed.isEmpty {
+            filteredBySearch = allItems
+        } else {
+            filteredBySearch = allItems.filter { item in
+                item.tag.localizedCaseInsensitiveContains(searchTrimmed) ||
+                item.matchingSolves.contains { $0.title.localizedCaseInsensitiveContains(searchTrimmed) }
+            }
+        }
+        
+        // 5. Sort
+        let displayedItems: [TagAnalysisItem]
         switch sortOption {
         case .mostFrequent:
-            return list.sorted { $0.count > $1.count }
-        case .leastFrequent:
-            return list.sorted { $0.count < $1.count }
-        case .alphabetical:
-            return list.sorted { $0.tag.localizedCompare($1.tag) == .orderedAscending }
-        }
-    }
-    
-    private var totalMistakesCount: Int {
-        allTagItems.reduce(0) { $0 + $1.count }
-    }
-    
-    private var maxTagCount: Int {
-        allTagItems.map { $0.count }.max() ?? 1
-    }
-    
-    private var solvesWithMistakesCount: Int {
-        filteredSolvesByDifficulty.filter { solve in
-            if let tags = solve.mistakeTags ?? solve.submission.mistakeTags, !tags.isEmpty {
-                return true
+            displayedItems = filteredBySearch.sorted {
+                if $0.count != $1.count { return $0.count > $1.count }
+                return $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
             }
-            return false
-        }.count
-    }
-    
-    private var cleanSolvesPercentage: Int {
-        guard !filteredSolvesByDifficulty.isEmpty else { return 100 }
-        let clean = filteredSolvesByDifficulty.count - solvesWithMistakesCount
-        return Int((Double(clean) / Double(filteredSolvesByDifficulty.count)) * 100)
+        case .leastFrequent:
+            displayedItems = filteredBySearch.sorted {
+                if $0.count != $1.count { return $0.count < $1.count }
+                return $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+            }
+        case .alphabetical:
+            displayedItems = filteredBySearch.sorted {
+                $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+            }
+        }
+        
+        return MistakeAnalysisData(
+            allItems: allItems,
+            displayedItems: displayedItems,
+            totalMistakes: totalMistakes,
+            maxCount: maxCount,
+            cleanPercentage: cleanPercentage
+        )
     }
     
     private func iconForTag(_ tag: String) -> String {
@@ -919,12 +959,17 @@ struct MistakeTagsDetailView: View {
     }
     
     var body: some View {
+        let data = analysisData
+        let totalMistakes = data.totalMistakes
+        let maxCount = max(data.maxCount, 1)
+        let displayedTags = data.displayedItems
+        
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Summary Metrics Row
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(totalMistakesCount)")
+                        Text("\(totalMistakes)")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(paletteManager.selectedPalette.primary)
                         Text("Total Mistakes")
@@ -937,7 +982,7 @@ struct MistakeTagsDetailView: View {
                     .cornerRadius(12)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(allTagItems.count)")
+                        Text("\(data.allItems.count)")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(paletteManager.color(at: 2))
                         Text("Mistake Types")
@@ -950,7 +995,7 @@ struct MistakeTagsDetailView: View {
                     .cornerRadius(12)
                     
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(cleanSolvesPercentage)%")
+                        Text("\(data.cleanPercentage)%")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(paletteManager.color(at: 1))
                         Text("Clean Solves")
@@ -977,7 +1022,7 @@ struct MistakeTagsDetailView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
-                        TextField("Search tags or problems...", text: $searchText)
+                        TextField("Search", text: $searchText)
                             .font(.subheadline)
                         if !searchText.isEmpty {
                             Button(action: { searchText = "" }) {
@@ -1028,12 +1073,12 @@ struct MistakeTagsDetailView: View {
                         ForEach(Array(displayedTags.enumerated()), id: \.element.id) { index, item in
                             let isExpanded = expandedTags.contains(item.id)
                             let tagColor = paletteManager.color(at: index % 10)
-                            let percentage = totalMistakesCount > 0 ? Int((Double(item.count) / Double(totalMistakesCount)) * 100) : 0
+                            let percentage = totalMistakes > 0 ? Int((Double(item.count) / Double(totalMistakes)) * 100) : 0
                             
                             VStack(alignment: .leading, spacing: 10) {
                                 // Header row (tappable to expand)
                                 Button {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
                                         if isExpanded {
                                             expandedTags.remove(item.id)
                                         } else {
@@ -1078,6 +1123,12 @@ struct MistakeTagsDetailView: View {
                                 
                                 // Progress Bar
                                 GeometryReader { geo in
+                                    let ratio = maxCount > 0 ? CGFloat(item.count) / CGFloat(maxCount) : 0
+                                    let targetWidth = geo.size.width * ratio
+                                    let safeWidth = (targetWidth.isFinite && !targetWidth.isNaN && geo.size.width > 0)
+                                        ? max(min(targetWidth, geo.size.width), 8)
+                                        : 8
+
                                     ZStack(alignment: .leading) {
                                         RoundedRectangle(cornerRadius: 4)
                                             .fill(Color.gray.opacity(0.2))
@@ -1090,7 +1141,7 @@ struct MistakeTagsDetailView: View {
                                                     endPoint: .trailing
                                                 )
                                             )
-                                            .frame(width: max(geo.size.width * CGFloat(item.count) / CGFloat(maxTagCount), 8), height: 8)
+                                            .frame(width: safeWidth, height: 8)
                                     }
                                 }
                                 .frame(height: 8)
@@ -1108,19 +1159,19 @@ struct MistakeTagsDetailView: View {
                                         
                                         ForEach(item.matchingSolves) { solve in
                                             HStack(spacing: 8) {
-                                                Text(solve.problem.title)
+                                                Text(solve.title)
                                                     .font(.caption)
                                                     .foregroundStyle(.primary)
                                                     .lineLimit(1)
                                                 
                                                 Spacer()
                                                 
-                                                Text(solve.problem.difficulty.capitalized)
+                                                Text(solve.difficulty.capitalized)
                                                     .font(.system(size: 10, weight: .bold))
                                                     .padding(.horizontal, 6)
                                                     .padding(.vertical, 2)
-                                                    .background(difficultyColor(solve.problem.difficulty).opacity(0.15))
-                                                    .foregroundStyle(difficultyColor(solve.problem.difficulty))
+                                                    .background(difficultyColor(solve.difficulty).opacity(0.15))
+                                                    .foregroundStyle(difficultyColor(solve.difficulty))
                                                     .cornerRadius(4)
                                                 
                                                 Text(formatDate(solve.solvedAt))
@@ -1145,6 +1196,7 @@ struct MistakeTagsDetailView: View {
         .background(Color.black)
         .navigationTitle("Mistake Analysis")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarScrollMinimization()
     }
 }
 
@@ -1566,6 +1618,7 @@ struct AllAchievementsView: View {
         }
         .navigationTitle("All Achievements")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarScrollMinimization()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -2446,6 +2499,7 @@ struct ActivityDetailView: View {
         .background(Color.black)
         .navigationTitle("Activity")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarScrollMinimization()
     }
 }
 
@@ -2717,6 +2771,7 @@ struct AllSolvesView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationTitle("All Solves")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarScrollMinimization()
     }
 }
 
@@ -3298,6 +3353,8 @@ class HomeViewModel: ObservableObject {
             self.solveStats = DataManager.shared.solveStats
             self.achievementStats = DataManager.shared.achievementStats
             self.recentSolves = DataManager.shared.recentSolves
+            self.todayRevisions = DataManager.shared.todayRevisions
+            self.completedRevisions = DataManager.shared.completedRevisions
         }
     }
     
@@ -3317,6 +3374,13 @@ class HomeViewModel: ObservableObject {
         // Check if we can use cached data
         if !forceRefresh && DataManager.shared.isCacheFresh {
             await MainActor.run {
+                if self.userStats == nil { self.userStats = DataManager.shared.userStats }
+                if self.submissionStats == nil { self.submissionStats = DataManager.shared.submissionStats }
+                if self.solveStats == nil { self.solveStats = DataManager.shared.solveStats }
+                if self.achievementStats == nil { self.achievementStats = DataManager.shared.achievementStats }
+                if self.recentSolves == nil { self.recentSolves = DataManager.shared.recentSolves }
+                if self.todayRevisions.isEmpty { self.todayRevisions = DataManager.shared.todayRevisions }
+                if self.completedRevisions.isEmpty { self.completedRevisions = DataManager.shared.completedRevisions }
                 isLoading = false
             }
             // Update widgets with cached data
@@ -3397,6 +3461,8 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.submissionStats = submissionStats
             DataManager.shared.solveStats = solveStats
             DataManager.shared.achievementStats = achievementStats
+            DataManager.shared.todayRevisions = todayAndOverdue
+            DataManager.shared.completedRevisions = recentCompletedRevisions
             
             // Update timestamp
             DataManager.shared.lastFetchTimestamp = Date()

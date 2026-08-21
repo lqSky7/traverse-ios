@@ -29,6 +29,7 @@ struct FriendRequestsView: View {
             }
             .navigationTitle("Friend Requests")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {

@@ -181,6 +181,7 @@ struct RevisionsView: View {
             }
             .navigationTitle("Revisions")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -1126,6 +1127,7 @@ struct DailyReviewLimitSheet: View {
             }
             .navigationTitle("Daily Revision Limit")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
@@ -1172,6 +1174,7 @@ struct AnalyticsInfoSheet: View {
             .padding(20)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -1703,6 +1706,7 @@ struct AllTopicsSheet: View {
             .searchable(text: $searchText, prompt: "Search topics")
             .navigationTitle("All Topics (\(topics.count))")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -1989,6 +1993,7 @@ struct AllAtRiskProblemsSheet: View {
             .searchable(text: $searchText, prompt: "Search problems")
             .navigationTitle("At-Risk Problems (\(items.count))")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
@@ -2150,6 +2155,7 @@ struct MLSchedulingInfoSheet: View {
             }
             .navigationTitle("Smart Revisions")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
@@ -2455,6 +2461,7 @@ struct PauseExamModeSheet: View {
             }
             .navigationTitle("Exam Mode")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -2560,6 +2567,7 @@ struct ResumeRevisionsSheet: View {
             }
             .navigationTitle("Catch Up")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

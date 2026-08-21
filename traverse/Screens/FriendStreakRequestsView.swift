@@ -99,6 +99,7 @@ struct FriendStreakRequestsView: View {
             }
             .navigationTitle("Streak Requests")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
