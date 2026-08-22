@@ -113,6 +113,114 @@ struct Problem: Codable {
     let category: Int?
     let topic: String?
     let subtopic: String?
+    
+    var displayTopic: String? {
+        guard let topic = topic, !topic.isEmpty else { return nil }
+        return formatTopicSlug(topic)
+    }
+}
+
+public func formatTopicSlug(_ slug: String) -> String {
+    let clean = slug.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !clean.isEmpty else { return "General" }
+    
+    let knownNames: [String: String] = [
+        "kadanes-algorithm": "Kadane's Algorithm",
+        "prefix-sum": "Prefix Sum",
+        "prefix-sum-hashmap": "Prefix Sum + Hash Map",
+        "sliding-window-fixed": "Sliding Window (Fixed)",
+        "sliding-window-variable": "Sliding Window (Variable)",
+        "two-pointers-opposite": "Two Pointers (Opposite)",
+        "two-pointers-same": "Two Pointers (Same Direction)",
+        "dutch-national-flag": "Dutch National Flag",
+        "merge-intervals": "Merge Intervals",
+        "cyclic-sort": "Cyclic Sort",
+        "matrix-traversal": "Matrix Traversal",
+        "general-arrays": "General Arrays",
+        "string-matching": "String Matching",
+        "palindrome": "Palindrome Logic",
+        "anagram": "Anagram",
+        "string-parsing": "String Parsing",
+        "general-strings": "General Strings",
+        "fast-slow-pointers": "Fast & Slow Pointers",
+        "linked-list-reversal": "Linked List Reversal",
+        "merge-lists": "Merge Linked Lists",
+        "general-linked-list": "General Linked List",
+        "tree-traversal": "Tree Traversal",
+        "binary-search-tree": "Binary Search Tree",
+        "tree-construction": "Tree Construction",
+        "trie-prefix-tree": "Trie (Prefix Tree)",
+        "segment-tree": "Segment Tree",
+        "lowest-common-ancestor": "Lowest Common Ancestor",
+        "general-trees": "General Trees",
+        "bfs-shortest-path": "Graph BFS (Shortest Path)",
+        "dfs-graph": "Graph DFS / Traversal",
+        "topological-sort": "Topological Sort",
+        "dijkstra": "Dijkstra's Algorithm",
+        "bellman-ford": "Bellman-Ford",
+        "union-find": "Disjoint Set / Union-Find",
+        "minimum-spanning-tree": "Minimum Spanning Tree",
+        "bipartite-check": "Bipartite Graph Check",
+        "general-graphs": "General Graphs",
+        "dp-1d-linear": "1D Linear DP",
+        "dp-2d-grid": "2D Grid DP",
+        "dp-knapsack": "0/1 Knapsack & Subset DP",
+        "dp-lcs": "LCS / Edit Distance",
+        "dp-lis": "Longest Increasing Subsequence",
+        "dp-state-machine": "State Machine DP",
+        "dp-interval": "Interval DP",
+        "dp-tree": "Tree DP",
+        "dp-bitmask": "Bitmask DP",
+        "general-dp": "General DP",
+        "activity-selection": "Activity Selection",
+        "jump-game": "Jump Game Pattern",
+        "task-scheduling": "Task Scheduling",
+        "general-greedy": "General Greedy",
+        "permutations": "Permutations",
+        "combinations-subsets": "Combinations & Subsets",
+        "constraint-satisfaction": "Constraint Satisfaction",
+        "general-backtracking": "General Backtracking",
+        "custom-comparator": "Custom Comparator Sorting",
+        "counting-sort": "Counting Sort",
+        "merge-sort-application": "Merge Sort Applications",
+        "general-sorting": "General Sorting",
+        "binary-search-standard": "Binary Search (Standard)",
+        "binary-search-on-answer": "Binary Search on Answer",
+        "binary-search-rotated": "Binary Search in Rotated Array",
+        "general-searching": "General Binary Search",
+        "monotonic-stack": "Monotonic Stack",
+        "expression-evaluation": "Expression Evaluation",
+        "parenthesis-matching": "Parentheses Matching",
+        "general-stack": "General Stack",
+        "sliding-window-deque": "Monotonic Deque",
+        "bfs-queue": "Queue BFS",
+        "general-queue": "General Queue",
+        "top-k-elements": "Top K Elements",
+        "merge-k-sorted": "Merge K Sorted Streams",
+        "median-finding": "Two Heaps / Median Finding",
+        "general-heap": "General Heap / PQ",
+        "two-sum-pattern": "Two Sum / Pair Lookup",
+        "frequency-counting": "Frequency Counting",
+        "group-by-key": "Grouping by Key",
+        "general-hashing": "General Hash Table",
+        "bit-manipulation": "Bit Manipulation",
+        "modular-arithmetic": "Modular Arithmetic",
+        "gcd-lcm": "GCD & LCM",
+        "prime-sieve": "Primes & Sieve",
+        "general-math": "General Math"
+    ]
+    
+    if let match = knownNames[clean.lowercased()] {
+        return match
+    }
+    
+    if clean.contains("-") {
+        return clean
+            .components(separatedBy: "-")
+            .map { $0.capitalized }
+            .joined(separator: " ")
+    }
+    return clean
 }
 
 struct Submission: Codable {

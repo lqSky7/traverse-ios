@@ -2819,7 +2819,7 @@ struct SolveRow: View {
                         
                         if let topic = solve.problem.topic, !topic.isEmpty {
                             HStack(spacing: 6) {
-                                Text(topic)
+                                Text(solve.problem.displayTopic ?? topic)
                                     .font(.system(size: 10, weight: .medium))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)

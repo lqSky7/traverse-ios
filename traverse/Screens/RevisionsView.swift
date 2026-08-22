@@ -1506,7 +1506,7 @@ struct RevisionTopicBreakdownCard: View {
                     ForEach(displayTopics) { topic in
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
-                                Text(topic.topic)
+                                Text(topic.displayTopic)
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .foregroundStyle(.primary)
@@ -1652,7 +1652,7 @@ struct AllTopicsSheet: View {
                         ForEach(filteredTopics) { topic in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
-                                    Text(topic.topic)
+                                    Text(topic.displayTopic)
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
                                         .foregroundStyle(.primary)

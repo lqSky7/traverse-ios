@@ -83,6 +83,11 @@ struct RevisionProblem: Codable {
     let category: Int?
     let topic: String?
     let subtopic: String?
+    
+    var displayTopic: String? {
+        guard let topic = topic, !topic.isEmpty else { return nil }
+        return formatTopicSlug(topic)
+    }
 }
 
 struct RevisionSolve: Codable {
@@ -277,6 +282,10 @@ struct RevisionTopicMetric: Codable, Identifiable {
     let averageRetention: Double
     let averageStability: Double
     let averageTimeMinutes: Double
+    
+    var displayTopic: String {
+        formatTopicSlug(topic)
+    }
 }
 
 struct WeeklyCompletion: Codable, Identifiable {
