@@ -232,46 +232,57 @@ struct LooselySpacedGridBackground: View {
     
     var body: some View {
         Canvas { context, size in
-            let baseColor = paletteManager.color(at: 0)
-            let lineColor = baseColor.opacity(0.35)
+            let midX = size.width / 2
+            let midY = size.height / 2
             
-            let path = Path { p in
-                let midX = size.width / 2
-                let midY = size.height / 2
-                
-                // Center vertical line
-                p.move(to: CGPoint(x: midX, y: 0))
-                p.addLine(to: CGPoint(x: midX, y: size.height))
-                
-                // Symmetrical left & right vertical lines
-                var offsetX = spacing
-                while midX - offsetX > 0 {
-                    p.move(to: CGPoint(x: midX - offsetX, y: 0))
-                    p.addLine(to: CGPoint(x: midX - offsetX, y: size.height))
-                    
-                    p.move(to: CGPoint(x: midX + offsetX, y: 0))
-                    p.addLine(to: CGPoint(x: midX + offsetX, y: size.height))
-                    
-                    offsetX += spacing
-                }
-                
-                // Center horizontal line
-                p.move(to: CGPoint(x: 0, y: midY))
-                p.addLine(to: CGPoint(x: size.width, y: midY))
-                
-                // Symmetrical top & bottom horizontal lines
-                var offsetY = spacing
-                while midY - offsetY > 0 {
-                    p.move(to: CGPoint(x: 0, y: midY - offsetY))
-                    p.addLine(to: CGPoint(x: size.width, y: midY - offsetY))
-                    
-                    p.move(to: CGPoint(x: 0, y: midY + offsetY))
-                    p.addLine(to: CGPoint(x: size.width, y: midY + offsetY))
-                    
-                    offsetY += spacing
-                }
+            let color0 = paletteManager.color(at: 0).opacity(0.38)
+            let color1 = paletteManager.color(at: 1).opacity(0.38)
+            let color2 = paletteManager.color(at: 2).opacity(0.38)
+            let color3 = paletteManager.color(at: 3).opacity(0.38)
+            
+            // Vertical center line
+            var centerV = Path()
+            centerV.move(to: CGPoint(x: midX, y: 0))
+            centerV.addLine(to: CGPoint(x: midX, y: size.height))
+            context.stroke(centerV, with: .color(color0), lineWidth: 0.5)
+            
+            // Symmetrical left vertical line
+            if midX - spacing > 0 {
+                var leftV = Path()
+                leftV.move(to: CGPoint(x: midX - spacing, y: 0))
+                leftV.addLine(to: CGPoint(x: midX - spacing, y: size.height))
+                context.stroke(leftV, with: .color(color1), lineWidth: 0.5)
             }
-            context.stroke(path, with: .color(lineColor), lineWidth: 0.5)
+            
+            // Symmetrical right vertical line
+            if midX + spacing < size.width {
+                var rightV = Path()
+                rightV.move(to: CGPoint(x: midX + spacing, y: 0))
+                rightV.addLine(to: CGPoint(x: midX + spacing, y: size.height))
+                context.stroke(rightV, with: .color(color2), lineWidth: 0.5)
+            }
+            
+            // Horizontal center line
+            var centerH = Path()
+            centerH.move(to: CGPoint(x: 0, y: midY))
+            centerH.addLine(to: CGPoint(x: size.width, y: midY))
+            context.stroke(centerH, with: .color(color3), lineWidth: 0.5)
+            
+            // Symmetrical top horizontal line
+            if midY - spacing > 0 {
+                var topH = Path()
+                topH.move(to: CGPoint(x: 0, y: midY - spacing))
+                topH.addLine(to: CGPoint(x: size.width, y: midY - spacing))
+                context.stroke(topH, with: .color(color1), lineWidth: 0.5)
+            }
+            
+            // Symmetrical bottom horizontal line
+            if midY + spacing < size.height {
+                var botH = Path()
+                botH.move(to: CGPoint(x: 0, y: midY + spacing))
+                botH.addLine(to: CGPoint(x: size.width, y: midY + spacing))
+                context.stroke(botH, with: .color(color2), lineWidth: 0.5)
+            }
         }
     }
 }
@@ -296,7 +307,7 @@ struct RevisionScoreCard: View {
                     // 1. Pure black background
                     Color.black
                     
-                    // 2. Loosely spaced grid with super thin lines in user selected palette
+                    // 2. Loosely spaced grid with different palette colors on super thin lines
                     LooselySpacedGridBackground(paletteManager: paletteManager, spacing: 48)
                     
                     // 3. Central score number with exact same font and color as streak card number
@@ -308,11 +319,11 @@ struct RevisionScoreCard: View {
                     ShaderLibrary.roundedGlass(
                         .boundingRect,
                         .float2(center),
-                        .float(46),
-                        .float(26),
-                        .float(0.2),
-                        .float(2.6),
-                        .float(260)
+                        .float(22),        // cornerRadius: squircle shape
+                        .float(26),        // intensity
+                        .float(0.2),       // dispersion / CA
+                        .float(2.6),       // blurStrength / refraction
+                        .float(210)        // sizing: larger squircle lens
                     ),
                     maxSampleOffset: CGSize(width: 150, height: 150)
                 )
@@ -322,147 +333,43 @@ struct RevisionScoreCard: View {
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(
-                        paletteManager.color(at: 0).opacity(0.3),
+                        Color.white.opacity(0.12),
                         lineWidth: 1
                     )
             )
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showExplanationSheet) {
-            RevisionScoreExplanationSheet(
-                score: score,
-                paletteManager: paletteManager
-            )
+            RevisionScoreExplanationSheet()
         }
     }
 }
 
-// MARK: - Revision Score Explanation Sheet (General Summary Half-Sheet)
+// MARK: - Revision Score Explanation Sheet (Matches Revision > Analytics Info Sheet 1:1)
 struct RevisionScoreExplanationSheet: View {
-    let score: Int
-    @ObservedObject var paletteManager: ColorPaletteManager
     @Environment(\.dismiss) private var dismiss
-    
-    private var tierTitle: String {
-        if score >= 90 { return "Mastery" }
-        if score >= 70 { return "Strong Retention" }
-        if score >= 50 { return "Building Momentum" }
-        return "Opportunity Zone"
-    }
-    
-    private var tierColor: Color {
-        if score >= 90 { return paletteManager.color(at: 0) }
-        if score >= 70 { return paletteManager.color(at: 1) }
-        if score >= 50 { return .yellow }
-        return .orange
-    }
-    
+
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                // Score & Status Summary
-                HStack(spacing: 16) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.black)
-                            .frame(width: 68, height: 68)
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [tierColor, tierColor.opacity(0.3)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 2.5
-                                    )
-                            )
-                            .shadow(color: tierColor.opacity(0.25), radius: 10, x: 0, y: 3)
-                        
-                        Text("\(score)")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tierTitle)
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(tierColor)
-                        
-                        Text("Weekly Revision Health")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.6))
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.top, 6)
-                
-                // General Explanations (No Business Logic or Formulas)
-                VStack(spacing: 12) {
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 20))
-                            .foregroundStyle(paletteManager.color(at: 0))
-                            .frame(width: 24)
-                        
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Memory Retention")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
-                            Text("Tracks how actively your review habits reinforce learned DSA concepts to maintain strong long-term recall.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(UIColor.systemGray6).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    
-                    HStack(alignment: .top, spacing: 14) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20))
-                            .foregroundStyle(paletteManager.color(at: 1))
-                            .frame(width: 24)
-                        
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Outcome-Independent")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
-                            Text("This score rewards showing up and putting in the recall effort. It is not penalized if you struggle on a difficult problem.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.7))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(UIColor.systemGray6).opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Tracks your overall revision consistency and memory retention health over the past 7 days.\n\n• Memory Retention: Measures how effectively your review habit reinforces learned DSA concepts to maintain strong long-term recall.\n\n• Outcome-Independent: Focuses purely on engagement and recall effort — it is not penalized when you struggle on difficult problems.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .background(Color.black.ignoresSafeArea())
+            .padding(20)
             .navigationTitle("Revision Score")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .foregroundStyle(paletteManager.color(at: 0))
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(.white)
                 }
             }
         }
-        .presentationDetents([.fraction(0.48), .medium])
-        .presentationDragIndicator(.visible)
-        .preferredColorScheme(.dark)
+        .presentationDetents([.medium])
     }
 }
 
