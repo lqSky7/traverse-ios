@@ -266,7 +266,7 @@ struct RevisionScoreCard: View {
     
     var body: some View {
         Button(action: {
-            HapticManager.shared.light()
+            HapticManager.shared.selection()
             showExplanationSheet = true
         }) {
             ZStack {
