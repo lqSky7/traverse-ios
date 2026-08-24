@@ -33,7 +33,6 @@ struct HomeView: View {
                                 
                                 RevisionScoreCard(
                                     score: viewModel.revisionScore?.score ?? 100,
-                                    scoreResult: viewModel.revisionScore,
                                     paletteManager: paletteManager
                                 )
                             }
@@ -229,30 +228,50 @@ struct StreakCard: View {
 // MARK: - Loosely Spaced Grid Background
 struct LooselySpacedGridBackground: View {
     @ObservedObject var paletteManager: ColorPaletteManager
-    var spacing: CGFloat = 22
+    var spacing: CGFloat = 48
     
     var body: some View {
         Canvas { context, size in
             let baseColor = paletteManager.color(at: 0)
-            let lineColor = baseColor.opacity(0.32)
+            let lineColor = baseColor.opacity(0.35)
+            
             let path = Path { p in
-                // Vertical grid lines
-                var x: CGFloat = spacing
-                while x < size.width {
-                    p.move(to: CGPoint(x: x, y: 0))
-                    p.addLine(to: CGPoint(x: x, y: size.height))
-                    x += spacing
+                let midX = size.width / 2
+                let midY = size.height / 2
+                
+                // Center vertical line
+                p.move(to: CGPoint(x: midX, y: 0))
+                p.addLine(to: CGPoint(x: midX, y: size.height))
+                
+                // Symmetrical left & right vertical lines
+                var offsetX = spacing
+                while midX - offsetX > 0 {
+                    p.move(to: CGPoint(x: midX - offsetX, y: 0))
+                    p.addLine(to: CGPoint(x: midX - offsetX, y: size.height))
+                    
+                    p.move(to: CGPoint(x: midX + offsetX, y: 0))
+                    p.addLine(to: CGPoint(x: midX + offsetX, y: size.height))
+                    
+                    offsetX += spacing
                 }
                 
-                // Horizontal grid lines
-                var y: CGFloat = spacing
-                while y < size.height {
-                    p.move(to: CGPoint(x: 0, y: y))
-                    p.addLine(to: CGPoint(x: size.width, y: y))
-                    y += spacing
+                // Center horizontal line
+                p.move(to: CGPoint(x: 0, y: midY))
+                p.addLine(to: CGPoint(x: size.width, y: midY))
+                
+                // Symmetrical top & bottom horizontal lines
+                var offsetY = spacing
+                while midY - offsetY > 0 {
+                    p.move(to: CGPoint(x: 0, y: midY - offsetY))
+                    p.addLine(to: CGPoint(x: size.width, y: midY - offsetY))
+                    
+                    p.move(to: CGPoint(x: 0, y: midY + offsetY))
+                    p.addLine(to: CGPoint(x: size.width, y: midY + offsetY))
+                    
+                    offsetY += spacing
                 }
             }
-            context.stroke(path, with: .color(lineColor), lineWidth: 0.65)
+            context.stroke(path, with: .color(lineColor), lineWidth: 0.5)
         }
     }
 }
@@ -260,7 +279,6 @@ struct LooselySpacedGridBackground: View {
 // MARK: - Revision Score Card (Pure black, loosely spaced thin grid with user palette, central number, liquid glass effect, NO text)
 struct RevisionScoreCard: View {
     let score: Int
-    let scoreResult: RevisionScoreResponse?
     @ObservedObject var paletteManager: ColorPaletteManager
     @State private var showExplanationSheet = false
     
@@ -269,29 +287,35 @@ struct RevisionScoreCard: View {
             HapticManager.shared.selection()
             showExplanationSheet = true
         }) {
-            ZStack {
-                // 1. Pure black background
-                Color.black
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let height = geometry.size.height
+                let center = CGPoint(x: width / 2, y: height / 2)
                 
-                // 2. Loosely spaced grid with super thin lines in user selected palette
-                LooselySpacedGridBackground(paletteManager: paletteManager)
-                
-                // 3. Central score number with exact same font and color as streak card number
-                Text("\(score)")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.white)
-                    .layerEffect(
-                        ShaderLibrary.roundedGlass(
-                            .boundingRect,
-                            .float2(CGPoint(x: 80, y: 55)),
-                            .float(36),
-                            .float(24),
-                            .float(0.2),
-                            .float(2.4),
-                            .float(180)
-                        ),
-                        maxSampleOffset: CGSize(width: 80, height: 80)
-                    )
+                ZStack {
+                    // 1. Pure black background
+                    Color.black
+                    
+                    // 2. Loosely spaced grid with super thin lines in user selected palette
+                    LooselySpacedGridBackground(paletteManager: paletteManager, spacing: 48)
+                    
+                    // 3. Central score number with exact same font and color as streak card number
+                    Text("\(score)")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+                .layerEffect(
+                    ShaderLibrary.roundedGlass(
+                        .boundingRect,
+                        .float2(center),
+                        .float(46),
+                        .float(26),
+                        .float(0.2),
+                        .float(2.6),
+                        .float(260)
+                    ),
+                    maxSampleOffset: CGSize(width: 150, height: 150)
+                )
             }
             .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
