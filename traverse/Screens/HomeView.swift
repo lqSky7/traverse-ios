@@ -303,7 +303,6 @@ struct RevisionScoreCard: View {
                 let height = geometry.size.height
                 let center = CGPoint(x: width / 2, y: height / 2)
                 let circleRadius: CGFloat = 56
-                let sizing: CGFloat = circleRadius / 0.35 // Ensures exact circular SDF (halfSize = 0)
                 
                 ZStack {
                     // 1. Pure black background
@@ -321,11 +320,11 @@ struct RevisionScoreCard: View {
                     ShaderLibrary.roundedGlass(
                         .boundingRect,
                         .float2(center),
-                        .float(circleRadius), // radius
-                        .float(6.9),          // intensity
-                        .float(1.0),          // dispersion / Chromatic Aberration
-                        .float(1.8),          // blurStrength / stroke
-                        .float(sizing)        // sizing
+                        .float(circleRadius), // radius (slider in demo: 56)
+                        .float(6.9),          // intensity (slider in demo: 6.9)
+                        .float(1.0),          // CA (slider in demo: 1.0)
+                        .float(2.6),          // border / refraction (slider in demo: 2.6)
+                        .float(360)           // size (demo default: 360)
                     ),
                     maxSampleOffset: CGSize(width: 150, height: 150)
                 )
