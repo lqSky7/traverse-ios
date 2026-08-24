@@ -307,22 +307,20 @@ struct RevisionScoreCard: View {
         .sheet(isPresented: $showExplanationSheet) {
             RevisionScoreExplanationSheet(
                 score: score,
-                scoreResult: scoreResult,
                 paletteManager: paletteManager
             )
         }
     }
 }
 
-// MARK: - Revision Score Explanation Sheet
+// MARK: - Revision Score Explanation Sheet (General Summary Half-Sheet)
 struct RevisionScoreExplanationSheet: View {
     let score: Int
-    let scoreResult: RevisionScoreResponse?
     @ObservedObject var paletteManager: ColorPaletteManager
     @Environment(\.dismiss) private var dismiss
     
     private var tierTitle: String {
-        if score >= 90 { return "Mastery & Focus" }
+        if score >= 90 { return "Mastery" }
         if score >= 70 { return "Strong Retention" }
         if score >= 50 { return "Building Momentum" }
         return "Opportunity Zone"
@@ -337,130 +335,94 @@ struct RevisionScoreExplanationSheet: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Top Hero Score Badge
-                    VStack(spacing: 12) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.black)
-                                .frame(width: 110, height: 110)
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [tierColor, tierColor.opacity(0.3)],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            ),
-                                            lineWidth: 3
-                                        )
-                                )
-                                .shadow(color: tierColor.opacity(0.35), radius: 16, x: 0, y: 4)
-                            
-                            VStack(spacing: 2) {
-                                Text("\(score)")
-                                    .font(.system(size: 46, weight: .black, design: .rounded))
-                                    .foregroundStyle(.white)
-                                Text("OUT OF 100")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.white.opacity(0.6))
-                            }
-                        }
+            VStack(spacing: 20) {
+                // Score & Status Summary
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.black)
+                            .frame(width: 68, height: 68)
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [tierColor, tierColor.opacity(0.3)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2.5
+                                    )
+                            )
+                            .shadow(color: tierColor.opacity(0.25), radius: 10, x: 0, y: 3)
                         
+                        Text("\(score)")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(tierTitle)
-                            .font(.system(size: 20, weight: .bold))
+                            .font(.system(size: 18, weight: .bold))
                             .foregroundStyle(tierColor)
                         
-                        Text("Weekly Revision Discipline & Retention Score")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .multilineTextAlignment(.center)
+                        Text("Weekly Revision Health")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
                     }
-                    .padding(.top, 16)
                     
-                    // Core Insight Box (Outcome-Agnostic Note)
-                    HStack(spacing: 14) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 24))
+                    Spacer()
+                }
+                .padding(.top, 6)
+                
+                // General Explanations (No Business Logic or Formulas)
+                VStack(spacing: 12) {
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 20))
                             .foregroundStyle(paletteManager.color(at: 0))
+                            .frame(width: 24)
                         
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Outcome-Independent")
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Memory Retention")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(.white)
-                            Text("Whether you passed or failed a problem does not lower this score. Showing up, engaging deeply, and preserving memory health is what matters.")
+                            Text("Tracks how actively your review habits reinforce learned DSA concepts to maintain strong long-term recall.")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.white.opacity(0.7))
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .padding(16)
+                    .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(UIColor.systemGray6).opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(paletteManager.color(at: 0).opacity(0.2), lineWidth: 1)
-                    )
+                    .background(Color(UIColor.systemGray6).opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     
-                    // 4 Dimensions Breakdown
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text("SCORE BREAKDOWN")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .padding(.horizontal, 4)
+                    HStack(alignment: .top, spacing: 14) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20))
+                            .foregroundStyle(paletteManager.color(at: 1))
+                            .frame(width: 24)
                         
-                        // 1. Memory Health (35%)
-                        ScoreDimensionRow(
-                            icon: "brain.head.profile",
-                            title: "Memory Health",
-                            weightText: "35% Weight",
-                            score: scoreResult?.breakdown.memoryHealth.score ?? score,
-                            detail: scoreResult?.breakdown.memoryHealth.detail ?? "Overall retention across all tracked DSA problems",
-                            color: paletteManager.color(at: 0)
-                        )
-                        
-                        // 2. Retention Lift (25%)
-                        ScoreDimensionRow(
-                            icon: "bolt.fill",
-                            title: "Retention Lift",
-                            weightText: "25% Weight",
-                            score: scoreResult?.breakdown.rLift.score ?? score,
-                            detail: scoreResult?.breakdown.rLift.detail ?? "Memory decay prevented by this week's review sessions",
-                            color: paletteManager.color(at: 1)
-                        )
-                        
-                        // 3. Completion Rate (25%)
-                        ScoreDimensionRow(
-                            icon: "checkmark.circle.fill",
-                            title: "Completion Rate",
-                            weightText: "25% Weight",
-                            score: scoreResult?.breakdown.completion.score ?? score,
-                            detail: scoreResult?.breakdown.completion.detail ?? "Percentage of scheduled reviews completed",
-                            color: .green
-                        )
-                        
-                        // 4. Consistency (15%)
-                        ScoreDimensionRow(
-                            icon: "calendar.badge.clock",
-                            title: "Consistency",
-                            weightText: "15% Weight",
-                            score: scoreResult?.breakdown.consistency.score ?? score,
-                            detail: scoreResult?.breakdown.consistency.detail ?? "Distribution of reviews across active days",
-                            color: .cyan
-                        )
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Outcome-Independent")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("This score rewards showing up and putting in the recall effort. It is not penalized if you struggle on a difficult problem.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
-                    
-                    if let period = scoreResult?.period {
-                        Text("Window: \(period.start) to \(period.end)")
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.4))
-                            .padding(.top, 8)
-                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.systemGray6).opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .padding(20)
+                
+                Spacer()
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("Revision Score")
             .navigationBarTitleDisplayMode(.inline)
@@ -474,69 +436,9 @@ struct RevisionScoreExplanationSheet: View {
                 }
             }
         }
+        .presentationDetents([.fraction(0.48), .medium])
+        .presentationDragIndicator(.visible)
         .preferredColorScheme(.dark)
-    }
-}
-
-// MARK: - Score Dimension Row
-struct ScoreDimensionRow: View {
-    let icon: String
-    let title: String
-    let weightText: String
-    let score: Int
-    let detail: String
-    let color: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(color)
-                    .frame(width: 22)
-                
-                Text(title)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.white)
-                
-                Spacer()
-                
-                Text(weightText)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.45))
-                
-                Text("\(score)")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(color)
-            }
-            
-            // Progress Bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(height: 6)
-                    
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [color.opacity(0.8), color],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geo.size.width * CGFloat(min(max(score, 0), 100)) / 100.0, height: 6)
-                }
-            }
-            .frame(height: 6)
-            
-            Text(detail)
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.65))
-        }
-        .padding(14)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
