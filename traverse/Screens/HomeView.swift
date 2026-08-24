@@ -297,7 +297,8 @@ struct RevisionScoreCard: View {
                 let width = geometry.size.width
                 let height = geometry.size.height
                 let center = CGPoint(x: width / 2, y: height / 2)
-                let circleRadius: CGFloat = 44
+                let circleRadius: CGFloat = 35
+                let sizeValue: CGFloat = circleRadius / 0.35 // 100pt, producing exact 35pt radius / 70pt diameter circle
                 
                 ZStack {
                     // 1. Pure black background
@@ -315,11 +316,11 @@ struct RevisionScoreCard: View {
                     ShaderLibrary.roundedGlass(
                         .boundingRect,
                         .float2(center),
-                        .float(circleRadius), // radius
-                        .float(6.9),          // intensity
-                        .float(1.0),          // CA
-                        .float(2.6),          // border / refraction
-                        .float(360)           // size
+                        .float(circleRadius), // radius: 35
+                        .float(6.9),          // intensity: 6.9
+                        .float(1.0),          // CA: 1.0
+                        .float(2.6),          // border / refraction: 2.6
+                        .float(sizeValue)     // size: 100
                     ),
                     maxSampleOffset: CGSize(width: 150, height: 150)
                 )
