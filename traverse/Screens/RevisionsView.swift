@@ -181,6 +181,7 @@ struct RevisionsView: View {
             }
             .navigationTitle("Revisions")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -684,6 +685,8 @@ struct RevisionsView: View {
                 happenedAt: revSolve.solvedAt,
                 aiAnalysis: revSolve.aiAnalysis,
                 mistakeTags: revSolve.mistakeTags,
+                cognitiveTier: revSolve.cognitiveTier,
+                recallScore: revSolve.recallScore,
                 numberOfTries: nil,
                 timeTaken: nil,
                 attempts: revSolve.attempts
@@ -694,6 +697,8 @@ struct RevisionsView: View {
                 solvedAt: revSolve.solvedAt,
                 aiAnalysis: revSolve.aiAnalysis,
                 mistakeTags: revSolve.mistakeTags,
+                cognitiveTier: revSolve.cognitiveTier,
+                recallScore: revSolve.recallScore,
                 attempts: revSolve.attempts,
                 problem: problem,
                 submission: submission,
@@ -1122,6 +1127,7 @@ struct DailyReviewLimitSheet: View {
             }
             .navigationTitle("Daily Revision Limit")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
@@ -1143,11 +1149,40 @@ struct RevisionAnalyticsSection: View {
         VStack(spacing: 16) {
             RevisionOverviewCard(overview: analytics.overview, streaks: analytics.streaks)
             RevisionStabilityDistributionCard(distribution: analytics.stabilityDistribution)
-            RevisionAccuracyTrendCard(points: analytics.accuracyTrend)
-            RevisionIntervalGrowthCard(points: analytics.averageIntervalGrowth)
-            RevisionProjectedLoadCard(points: analytics.projectedLoad)
+            RevisionTopicBreakdownCard(topics: analytics.topicBreakdown)
+            WeeklyCompletionCard(points: analytics.weeklyCompletion)
             RevisionRetentionRiskCard(items: analytics.retentionHeatmap)
         }
+    }
+}
+
+// MARK: - Analytics Info Sheet
+struct AnalyticsInfoSheet: View {
+    let title: String
+    let explanation: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(explanation)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
+            }
+            .padding(20)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 
@@ -1158,10 +1193,6 @@ struct RevisionOverviewCard: View {
 
     private var retrievabilityPercent: String {
         String(format: "%.0f", overview.averageRetrievability * 100)
-    }
-
-    private var successRatePercent: String {
-        String(format: "%.0f", streaks.overallSuccessRate * 100)
     }
 
     var body: some View {
@@ -1203,10 +1234,10 @@ struct RevisionOverviewCard: View {
                     .frame(height: 44)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(successRatePercent)%")
+                    Text("\(streaks.totalRevisionsCompleted)")
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(paletteManager.color(at: 2))
-                    Text("Success Rate")
+                    Text("Completed")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -1222,6 +1253,7 @@ struct RevisionOverviewCard: View {
 struct RevisionStabilityDistributionCard: View {
     let distribution: RevisionStabilityDistribution
     @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var showInfo = false
 
     private struct Bucket: Identifiable {
         let id = UUID()
@@ -1248,6 +1280,11 @@ struct RevisionStabilityDistributionCard: View {
                 Text("Retention Health")
                     .font(.headline)
                 Spacer()
+                Button { showInfo = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()
@@ -1260,6 +1297,13 @@ struct RevisionStabilityDistributionCard: View {
                 )
                 .foregroundStyle(bucket.color.gradient)
                 .cornerRadius(3)
+                .annotation(position: .top) {
+                    if bucket.count > 0 {
+                        Text("\(bucket.count)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .frame(height: 120)
             .chartXAxis {
@@ -1278,284 +1322,61 @@ struct RevisionStabilityDistributionCard: View {
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .sheet(isPresented: $showInfo) {
+            AnalyticsInfoSheet(
+                title: "Retention Health",
+                explanation: "Shows how many of your tracked problems fall into each memory strength tier based on FSRS stability.\n\n• Critical (< 2 days): You'd forget within 2 days without review.\n• Weak (2–7 days): Early-stage memory, needs frequent reviews.\n• Developing (7–21 days): Building up, reviews getting spaced out.\n• Strong (21–60 days): Solid retention, long review intervals.\n• Mastered (60+ days): Deeply learned, rarely needs review."
+            )
+        }
     }
 }
 
-struct RevisionAccuracyTrendCard: View {
-    let points: [RevisionAccuracyPoint]
+// MARK: - Weekly Completion Card
+struct WeeklyCompletionCard: View {
+    let points: [WeeklyCompletion]
     @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var showInfo = false
 
-    private var sortedPoints: [RevisionAccuracyPoint] {
-        points.sorted { $0.date < $1.date }
-    }
-
-    private var averageRate: Double {
-        guard !points.isEmpty else { return 0 }
-        return points.map { $0.successRate }.reduce(0, +) / Double(points.count)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundStyle(paletteManager.color(at: 5))
-                Text("Accuracy Trend")
-                    .font(.headline)
-                Spacer()
-            }
-
-            Divider()
-                .background(Color.gray.opacity(0.3))
-
-            HStack(spacing: 12) {
-                Text(String(format: "%.0f%%", averageRate * 100))
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(paletteManager.color(at: 5))
-                Text("30-day average")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if sortedPoints.isEmpty {
-                Text("No recent attempts")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-            } else {
-                Chart(Array(sortedPoints.enumerated()), id: \.offset) { index, point in
-                    LineMark(
-                        x: .value("Day", index),
-                        y: .value("Accuracy", point.successRate * 100)
-                    )
-                    .foregroundStyle(paletteManager.color(at: 5))
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
-
-                    AreaMark(
-                        x: .value("Day", index),
-                        y: .value("Accuracy", point.successRate * 100)
-                    )
-                    .foregroundStyle(paletteManager.color(at: 5).opacity(0.2))
-                }
-                .frame(height: 110)
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-            }
-        }
-        .padding()
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-    }
-}
-
-struct RevisionProjectedLoadCard: View {
-    let points: [RevisionProjectedLoad]
-    @StateObject private var paletteManager = ColorPaletteManager.shared
-
-    private struct LoadBar: Identifiable {
-        let id = UUID()
-        let dayIndex: Int
-        let count: Int
-        let kind: String
-    }
-
-    private var series: [LoadBar] {
-        let sorted = points.sorted { $0.date < $1.date }
-        return sorted.enumerated().flatMap { index, point in
-            var bars: [LoadBar] = [LoadBar(dayIndex: index, count: point.dueCount, kind: "Due")]
-            if point.overdueCount > 0 {
-                bars.append(LoadBar(dayIndex: index, count: point.overdueCount, kind: "Overdue"))
-            }
-            return bars
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "calendar")
-                    .foregroundStyle(paletteManager.color(at: 6))
-                Text("Projected Load")
-                    .font(.headline)
-                Spacer()
-            }
-
-            Divider()
-                .background(Color.gray.opacity(0.3))
-
-            if series.isEmpty {
-                Text("No upcoming data")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-            } else {
-                Chart(series) { bar in
-                    BarMark(
-                        x: .value("Day", bar.dayIndex),
-                        y: .value("Count", bar.count)
-                    )
-                    .foregroundStyle(bar.kind == "Overdue" ? paletteManager.color(at: 0) : paletteManager.color(at: 6))
-                    .position(by: .value("Type", bar.kind))
-                    .cornerRadius(2)
-                }
-                .frame(height: 110)
-                .chartXAxis {
-                    AxisMarks(values: [0, 3, 6]) { value in
-                        AxisValueLabel {
-                            if let index = value.as(Int.self) {
-                                Text(index == 0 ? "Today" : "T+\(index)")
-                                    .font(.caption2)
-                            }
-                        }
-                    }
-                }
-                .chartYAxis(.hidden)
-
-                HStack(spacing: 12) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(paletteManager.color(at: 6))
-                            .frame(width: 8, height: 8)
-                        Text("Due")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(paletteManager.color(at: 0))
-                            .frame(width: 8, height: 8)
-                        Text("Overdue")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-    }
-}
-
-struct RevisionIntervalGrowthCard: View {
-    let points: [RevisionIntervalGrowth]
-    @StateObject private var paletteManager = ColorPaletteManager.shared
-
-    private struct IntervalPoint: Identifiable {
+    private struct WeekBar: Identifiable {
         let id = UUID()
         let index: Int
         let label: String
-        let avgInterval: Double
         let count: Int
     }
 
-    private static let monthFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
-
-    private static let monthDayFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }()
-
-    private static let isoFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }()
-
-    private static let isoFractionalFormatter: ISO8601DateFormatter = {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }()
-
-    private func parseMonthDate(_ raw: String) -> Date? {
-        if let date = Self.monthFormatter.date(from: raw) {
-            return date
-        }
-        if let date = Self.monthDayFormatter.date(from: raw) {
-            return date
-        }
-        if let date = Self.isoFractionalFormatter.date(from: raw) {
-            return date
-        }
-        if let date = Self.isoFormatter.date(from: raw) {
-            return date
-        }
-        return nil
-    }
-
-    private func monthLabel(for date: Date?, fallback: String) -> String {
-        guard let date = date else { return fallback }
-        let formatter = DateFormatter()
-        formatter.dateFormat = Calendar.current.component(.year, from: date) == Calendar.current.component(.year, from: Date()) ? "MMM" : "MMM yy"
-        return formatter.string(from: date)
-    }
-
-    private var intervalPoints: [IntervalPoint] {
-        let sorted = points.sorted { lhs, rhs in
-            let left = parseMonthDate(lhs.month)
-            let right = parseMonthDate(rhs.month)
-            switch (left, right) {
-            case let (l?, r?): return l < r
-            case (_?, nil): return false
-            case (nil, _?): return true
-            default: return lhs.month < rhs.month
-            }
-        }
-
-        return sorted.enumerated().map { index, point in
-            let date = parseMonthDate(point.month)
-            return IntervalPoint(
+    private var weekBars: [WeekBar] {
+        let labels = ["3w ago", "2w ago", "Last wk", "This wk"]
+        return points.enumerated().map { index, point in
+            WeekBar(
                 index: index,
-                label: monthLabel(for: date, fallback: point.month),
-                avgInterval: point.avgInterval,
+                label: labels[min(index, labels.count - 1)],
                 count: point.count
             )
         }
     }
 
-    private var latestInterval: Double? {
-        intervalPoints.last?.avgInterval
+    private var totalCount: Int {
+        points.map { $0.count }.reduce(0, +)
     }
 
-    private var intervalDelta: Double? {
-        guard intervalPoints.count >= 2 else { return nil }
-        return intervalPoints[intervalPoints.count - 1].avgInterval - intervalPoints[intervalPoints.count - 2].avgInterval
-    }
-
-    private var axisIndices: [Int] {
-        let count = intervalPoints.count
-        guard count > 0 else { return [] }
-        if count <= 4 {
-            return intervalPoints.map { $0.index }
-        }
-        let mid = count / 2
-        return [0, mid, count - 1]
-    }
-
-    private func formatInterval(_ value: Double?) -> String {
-        guard let value = value else { return "0" }
-        return String(format: "%.1f", value)
+    private var weekDelta: Int? {
+        guard points.count >= 2 else { return nil }
+        return points[points.count - 1].count - points[points.count - 2].count
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundStyle(paletteManager.color(at: 4))
-                Text("Interval Growth")
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(paletteManager.color(at: 3))
+                Text("Weekly Activity")
                     .font(.headline)
                 Spacer()
+                Button { showInfo = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()
@@ -1563,22 +1384,22 @@ struct RevisionIntervalGrowthCard: View {
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(formatInterval(latestInterval))d")
+                    Text("\(totalCount)")
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundStyle(paletteManager.color(at: 4))
-                    Text("Latest average interval")
+                        .foregroundStyle(paletteManager.color(at: 3))
+                    Text("Last 4 weeks")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
-                if let delta = intervalDelta {
+                if let delta = weekDelta {
                     Divider()
                         .frame(height: 44)
 
                     HStack(spacing: 6) {
                         Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
                             .foregroundStyle(delta >= 0 ? paletteManager.color(at: 3) : paletteManager.color(at: 0))
-                        Text(String(format: "%+.1fd", delta))
+                        Text("\(delta >= 0 ? "+" : "")\(delta) this week")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundStyle(delta >= 0 ? paletteManager.color(at: 3) : paletteManager.color(at: 0))
@@ -1586,33 +1407,33 @@ struct RevisionIntervalGrowthCard: View {
                 }
             }
 
-            if intervalPoints.isEmpty {
-                Text("Not enough history")
+            if weekBars.isEmpty {
+                Text("No completions yet")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 24)
             } else {
-                Chart(intervalPoints) { point in
-                    LineMark(
-                        x: .value("Month", point.index),
-                        y: .value("Avg Interval", point.avgInterval)
+                Chart(weekBars) { bar in
+                    BarMark(
+                        x: .value("Week", bar.label),
+                        y: .value("Count", bar.count)
                     )
-                    .foregroundStyle(paletteManager.color(at: 4))
-                    .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round))
-
-                    AreaMark(
-                        x: .value("Month", point.index),
-                        y: .value("Avg Interval", point.avgInterval)
-                    )
-                    .foregroundStyle(paletteManager.color(at: 4).opacity(0.2))
+                    .foregroundStyle(paletteManager.color(at: 3).opacity(bar.index == weekBars.count - 1 ? 1.0 : 0.5))
+                    .cornerRadius(4)
+                    .annotation(position: .top) {
+                        if bar.count > 0 {
+                            Text("\(bar.count)")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .frame(height: 110)
                 .chartXAxis {
-                    AxisMarks(values: axisIndices) { value in
+                    AxisMarks { value in
                         AxisValueLabel {
-                            if let index = value.as(Int.self),
-                               let label = intervalPoints.first(where: { $0.index == index })?.label {
+                            if let label = value.as(String.self) {
                                 Text(label)
                                     .font(.caption2)
                             }
@@ -1626,18 +1447,287 @@ struct RevisionIntervalGrowthCard: View {
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .sheet(isPresented: $showInfo) {
+            AnalyticsInfoSheet(
+                title: "Weekly Activity",
+                explanation: "Shows how many revisions you completed each week over the last 4 weeks.\n\nConsistent weekly activity strengthens long-term retention. The arrow shows whether your activity this week is trending up or down compared to last week."
+            )
+        }
     }
 }
 
+// MARK: - Topic Mastery Card (Top 4 + Full Sheet)
+struct RevisionTopicBreakdownCard: View {
+    let topics: [RevisionTopicMetric]
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var showAllTopics = false
+    @State private var showInfo = false
+
+    private var displayTopics: [RevisionTopicMetric] {
+        Array(topics.prefix(4))
+    }
+
+    private func retentionColor(for retention: Double) -> Color {
+        if retention >= 0.80 {
+            return paletteManager.color(at: 3)
+        } else if retention >= 0.60 {
+            return paletteManager.color(at: 1)
+        } else {
+            return paletteManager.color(at: 0)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "folder.fill")
+                    .foregroundStyle(paletteManager.color(at: 2))
+                Text("Topic Mastery & Speed")
+                    .font(.headline)
+                Spacer()
+                Button { showInfo = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+                .background(Color.gray.opacity(0.3))
+
+            if topics.isEmpty {
+                Text("No topic data available")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                VStack(spacing: 14) {
+                    ForEach(displayTopics) { topic in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text(topic.displayTopic)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+
+                                Text("• \(topic.problemCount) \(topic.problemCount == 1 ? "problem" : "problems")")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+
+                                Spacer()
+
+                                if topic.averageTimeMinutes > 0 {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "clock")
+                                            .font(.caption2)
+                                        Text(String(format: "%.1fm", topic.averageTimeMinutes))
+                                            .font(.caption2)
+                                    }
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.white.opacity(0.06))
+                                    .cornerRadius(4)
+                                }
+
+                                Text(String(format: "%.0f%%", topic.averageRetention * 100))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(retentionColor(for: topic.averageRetention))
+                                    .frame(width: 38, alignment: .trailing)
+                            }
+
+                            // Horizontal Retention Bar
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(height: 6)
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(retentionColor(for: topic.averageRetention))
+                                        .frame(width: max(geo.size.width * CGFloat(min(max(topic.averageRetention, 0), 1.0)), 4), height: 6)
+                                }
+                            }
+                            .frame(height: 6)
+                        }
+                    }
+                }
+
+                if topics.count > 4 {
+                    Button {
+                        showAllTopics = true
+                    } label: {
+                        HStack {
+                            Text("View All Topics (\(topics.count))")
+                                .font(.caption.weight(.medium))
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(paletteManager.color(at: 2))
+                        .padding(.top, 4)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemGray6))
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .sheet(isPresented: $showAllTopics) {
+            AllTopicsSheet(topics: topics)
+        }
+        .sheet(isPresented: $showInfo) {
+            AnalyticsInfoSheet(
+                title: "Topic Mastery & Speed",
+                explanation: "Breaks down your memory retention and recall speed across DSA categories.\n\n• Retention Bar: Probability you recall problems in this topic right now.\n• Clock Badge: Average time you spend solving problems in this topic.\n\nHelps identify which algorithms need practice and where your solve velocity is fastest."
+            )
+        }
+    }
+}
+
+// MARK: - All Topics Detail Sheet
+struct AllTopicsSheet: View {
+    let topics: [RevisionTopicMetric]
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var searchText = ""
+    @State private var sortOption: TopicSortOption = .lowestRetention
+
+    enum TopicSortOption: String, CaseIterable {
+        case lowestRetention = "Lowest Retention"
+        case highestRetention = "Highest Retention"
+        case mostProblems = "Most Problems"
+        case slowestTime = "Solve Time"
+    }
+
+    private var filteredTopics: [RevisionTopicMetric] {
+        let list = searchText.isEmpty
+            ? topics
+            : topics.filter { $0.topic.localizedCaseInsensitiveContains(searchText) }
+
+        switch sortOption {
+        case .lowestRetention:
+            return list.sorted { $0.averageRetention < $1.averageRetention }
+        case .highestRetention:
+            return list.sorted { $0.averageRetention > $1.averageRetention }
+        case .mostProblems:
+            return list.sorted { $0.problemCount > $1.problemCount }
+        case .slowestTime:
+            return list.sorted { $0.averageTimeMinutes > $1.averageTimeMinutes }
+        }
+    }
+
+    private func retentionColor(for retention: Double) -> Color {
+        if retention >= 0.80 {
+            return paletteManager.color(at: 3)
+        } else if retention >= 0.60 {
+            return paletteManager.color(at: 1)
+        } else {
+            return paletteManager.color(at: 0)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Picker("Sort by", selection: $sortOption) {
+                        ForEach(TopicSortOption.allCases, id: \.self) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                Section {
+                    if filteredTopics.isEmpty {
+                        Text("No matching topics")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 16)
+                    } else {
+                        ForEach(filteredTopics) { topic in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text(topic.displayTopic)
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.primary)
+
+                                    Spacer()
+
+                                    if topic.averageTimeMinutes > 0 {
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "clock")
+                                                .font(.caption2)
+                                            Text(String(format: "%.1fm avg", topic.averageTimeMinutes))
+                                                .font(.caption2)
+                                        }
+                                        .foregroundStyle(.secondary)
+                                    }
+
+                                    Text(String(format: "%.0f%%", topic.averageRetention * 100))
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(retentionColor(for: topic.averageRetention))
+                                }
+
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 3)
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(height: 6)
+                                        RoundedRectangle(cornerRadius: 3)
+                                            .fill(retentionColor(for: topic.averageRetention))
+                                            .frame(width: max(geo.size.width * CGFloat(min(max(topic.averageRetention, 0), 1.0)), 4), height: 6)
+                                    }
+                                }
+                                .frame(height: 6)
+
+                                HStack {
+                                    Text("\(topic.problemCount) \(topic.problemCount == 1 ? "problem" : "problems")")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+
+                                    Spacer()
+
+                                    Text(String(format: "Avg Stability: %.1fd", topic.averageStability))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search topics")
+            .navigationTitle("All Topics (\(topics.count))")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - At-Risk Problems Card (Top 5 + Full Sheet)
 struct RevisionRetentionRiskCard: View {
     let items: [RevisionRetentionItem]
     @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var showAllAtRisk = false
+    @State private var showInfo = false
 
     private struct RiskItem: Identifiable {
         let id = UUID()
-        let index: Int
+        let problemId: Int
         let title: String
-        let shortTitle: String
         let retrievability: Double
         let lapses: Int
         let isLeech: Bool
@@ -1652,12 +1742,10 @@ struct RevisionRetentionRiskCard: View {
             return $0.lapses > $1.lapses
         }
 
-        return Array(sorted.prefix(6)).enumerated().map { index, item in
-            let short = item.problemTitle.count > 12 ? String(item.problemTitle.prefix(12)) + "..." : item.problemTitle
-            return RiskItem(
-                index: index,
+        return Array(sorted.prefix(5)).map { item in
+            RiskItem(
+                problemId: item.problemId,
                 title: item.problemTitle,
-                shortTitle: short,
                 retrievability: item.retrievability,
                 lapses: item.lapses,
                 isLeech: item.isLeech
@@ -1673,7 +1761,7 @@ struct RevisionRetentionRiskCard: View {
         items.filter { $0.retrievability < 0.6 }.count
     }
 
-    private func barColor(for item: RiskItem) -> Color {
+    private func riskColor(for item: RiskItem) -> Color {
         if item.isLeech || item.retrievability < 0.5 {
             return paletteManager.color(at: 0)
         }
@@ -1691,6 +1779,11 @@ struct RevisionRetentionRiskCard: View {
                 Text("At-Risk Problems")
                     .font(.headline)
                 Spacer()
+                Button { showInfo = true } label: {
+                    Image(systemName: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()
@@ -1723,52 +1816,54 @@ struct RevisionRetentionRiskCard: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 24)
             } else {
-                Chart(focusItems) { item in
-                    BarMark(
-                        x: .value("Retrievability", item.retrievability * 100),
-                        y: .value("Problem", item.shortTitle)
-                    )
-                    .foregroundStyle(barColor(for: item))
-                    .cornerRadius(2)
-                }
-                .frame(height: 130)
-                .chartXAxis {
-                    AxisMarks(values: [0, 50, 100]) { value in
-                        AxisValueLabel {
-                            if let number = value.as(Int.self) {
-                                Text("\(number)%")
-                                    .font(.caption2)
+                VStack(spacing: 10) {
+                    ForEach(focusItems) { item in
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(riskColor(for: item))
+                                .frame(width: 8, height: 8)
+
+                            Text(item.title)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            // Inline mini progress bar
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Color.gray.opacity(0.2))
+                                        .frame(height: 4)
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(riskColor(for: item))
+                                        .frame(width: max(geo.size.width * CGFloat(min(max(item.retrievability, 0), 1.0)), 2), height: 4)
+                                }
                             }
-                        }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks { value in
-                        AxisValueLabel {
-                            if let label = value.as(String.self) {
-                                Text(label)
-                                    .font(.caption2)
-                                    .lineLimit(1)
-                            }
+                            .frame(width: 50, height: 4)
+
+                            Text(String(format: "%.0f%%", item.retrievability * 100))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 38, alignment: .trailing)
                         }
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(focusItems) { item in
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(barColor(for: item))
-                                .frame(width: 6, height: 6)
-                            Text(item.title)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                if items.count > 5 {
+                    Button {
+                        showAllAtRisk = true
+                    } label: {
+                        HStack {
+                            Text("View All At-Risk Problems (\(items.count))")
+                                .font(.caption.weight(.medium))
                             Spacer()
-                            Text(String(format: "%.0f%%", item.retrievability * 100))
+                            Image(systemName: "chevron.right")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
                         }
+                        .foregroundStyle(paletteManager.color(at: 0))
+                        .padding(.top, 4)
                     }
                 }
             }
@@ -1777,6 +1872,135 @@ struct RevisionRetentionRiskCard: View {
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .sheet(isPresented: $showAllAtRisk) {
+            AllAtRiskProblemsSheet(items: items)
+        }
+        .sheet(isPresented: $showInfo) {
+            AnalyticsInfoSheet(
+                title: "At-Risk Problems",
+                explanation: "Problems with the weakest memory retention right now — these are most likely to be forgotten if not reviewed soon.\n\n• Leeches: Problems you've forgotten 8+ times. These need a different approach — try re-solving from scratch.\n• Below 60%: Problems where your recall probability has dropped significantly.\n\nThe percentage shows how likely you are to remember the solution right now."
+            )
+        }
+    }
+}
+
+// MARK: - All At-Risk Problems Detail Sheet
+struct AllAtRiskProblemsSheet: View {
+    let items: [RevisionRetentionItem]
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var paletteManager = ColorPaletteManager.shared
+    @State private var searchText = ""
+    @State private var sortOption: RiskSortOption = .lowestRetention
+
+    enum RiskSortOption: String, CaseIterable {
+        case lowestRetention = "Lowest Retention"
+        case mostLapses = "Most Lapses"
+        case alphabetical = "Alphabetical"
+    }
+
+    private var filteredItems: [RevisionRetentionItem] {
+        let list = searchText.isEmpty
+            ? items
+            : items.filter { $0.problemTitle.localizedCaseInsensitiveContains(searchText) }
+
+        switch sortOption {
+        case .lowestRetention:
+            return list.sorted { $0.retrievability < $1.retrievability }
+        case .mostLapses:
+            return list.sorted { $0.lapses > $1.lapses }
+        case .alphabetical:
+            return list.sorted { $0.problemTitle.localizedCaseInsensitiveCompare($1.problemTitle) == .orderedAscending }
+        }
+    }
+
+    private func riskColor(for item: RevisionRetentionItem) -> Color {
+        if item.isLeech || item.retrievability < 0.5 {
+            return paletteManager.color(at: 0)
+        }
+        if item.retrievability < 0.7 {
+            return paletteManager.color(at: 1)
+        }
+        return paletteManager.color(at: 2)
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Picker("Sort by", selection: $sortOption) {
+                        ForEach(RiskSortOption.allCases, id: \.self) { option in
+                            Text(option.rawValue).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                Section {
+                    if filteredItems.isEmpty {
+                        Text("No matching problems")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 16)
+                    } else {
+                        ForEach(filteredItems) { item in
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(riskColor(for: item))
+                                    .frame(width: 10, height: 10)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(item.problemTitle)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(1)
+
+                                    HStack(spacing: 8) {
+                                        Text("\(item.platform.capitalized) • \(item.difficulty.capitalized)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+
+                                        if item.isLeech {
+                                            Text("Leech (\(item.lapses) lapses)")
+                                                .font(.caption2.weight(.bold))
+                                                .foregroundStyle(paletteManager.color(at: 0))
+                                        } else if item.lapses > 0 {
+                                            Text("\(item.lapses) lapses")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+
+                                Spacer()
+
+                                VStack(alignment: .trailing, spacing: 3) {
+                                    Text(String(format: "%.0f%%", item.retrievability * 100))
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(riskColor(for: item))
+
+                                    Text(String(format: "%.1fd stability", item.stability))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Search problems")
+            .navigationTitle("At-Risk Problems (\(items.count))")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(.white)
+                }
+            }
+        }
     }
 }
 
@@ -1931,6 +2155,7 @@ struct MLSchedulingInfoSheet: View {
             }
             .navigationTitle("Smart Revisions")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
@@ -2236,6 +2461,7 @@ struct PauseExamModeSheet: View {
             }
             .navigationTitle("Exam Mode")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -2341,6 +2567,7 @@ struct ResumeRevisionsSheet: View {
             }
             .navigationTitle("Catch Up")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

@@ -84,6 +84,7 @@ struct ChangePasswordView: View {
             }
             .navigationTitle("Change Password")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

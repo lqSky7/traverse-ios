@@ -94,6 +94,7 @@ struct FreezeShopSheet: View {
             .background(Color(UIColor.systemBackground))
             .navigationTitle("Freeze Shop")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {

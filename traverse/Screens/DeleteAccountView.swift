@@ -86,6 +86,7 @@ struct DeleteAccountView: View {
             }
             .navigationTitle("Delete Account")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

@@ -83,6 +83,11 @@ struct RevisionProblem: Codable {
     let category: Int?
     let topic: String?
     let subtopic: String?
+    
+    var displayTopic: String? {
+        guard let topic = topic, !topic.isEmpty else { return nil }
+        return formatTopicSlug(topic)
+    }
 }
 
 struct RevisionSolve: Codable {
@@ -91,6 +96,8 @@ struct RevisionSolve: Codable {
     let solvedAt: String
     let aiAnalysis: String?
     let mistakeTags: [String]?
+    let cognitiveTier: Int?
+    let recallScore: Double?
     let attempts: [CodeAttempt]?
 }
 
@@ -211,11 +218,45 @@ struct ResumeRevisionsResponse: Codable {
 struct RevisionAnalyticsResponse: Codable {
     let overview: RevisionAnalyticsOverview
     let stabilityDistribution: RevisionStabilityDistribution
-    let accuracyTrend: [RevisionAccuracyPoint]
-    let projectedLoad: [RevisionProjectedLoad]
-    let averageIntervalGrowth: [RevisionIntervalGrowth]
+    let topicBreakdown: [RevisionTopicMetric]
+    let weeklyCompletion: [WeeklyCompletion]
     let retentionHeatmap: [RevisionRetentionItem]
     let streaks: RevisionAnalyticsStreaks
+
+    enum CodingKeys: String, CodingKey {
+        case overview
+        case stabilityDistribution
+        case topicBreakdown
+        case weeklyCompletion
+        case retentionHeatmap
+        case streaks
+    }
+
+    init(
+        overview: RevisionAnalyticsOverview,
+        stabilityDistribution: RevisionStabilityDistribution,
+        topicBreakdown: [RevisionTopicMetric],
+        weeklyCompletion: [WeeklyCompletion],
+        retentionHeatmap: [RevisionRetentionItem],
+        streaks: RevisionAnalyticsStreaks
+    ) {
+        self.overview = overview
+        self.stabilityDistribution = stabilityDistribution
+        self.topicBreakdown = topicBreakdown
+        self.weeklyCompletion = weeklyCompletion
+        self.retentionHeatmap = retentionHeatmap
+        self.streaks = streaks
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.overview = try container.decode(RevisionAnalyticsOverview.self, forKey: .overview)
+        self.stabilityDistribution = try container.decode(RevisionStabilityDistribution.self, forKey: .stabilityDistribution)
+        self.topicBreakdown = try container.decodeIfPresent([RevisionTopicMetric].self, forKey: .topicBreakdown) ?? []
+        self.weeklyCompletion = try container.decodeIfPresent([WeeklyCompletion].self, forKey: .weeklyCompletion) ?? []
+        self.retentionHeatmap = try container.decodeIfPresent([RevisionRetentionItem].self, forKey: .retentionHeatmap) ?? []
+        self.streaks = try container.decode(RevisionAnalyticsStreaks.self, forKey: .streaks)
+    }
 }
 
 struct RevisionAnalyticsOverview: Codable {
@@ -234,24 +275,22 @@ struct RevisionStabilityDistribution: Codable {
     let mastered: Int
 }
 
-struct RevisionAccuracyPoint: Codable, Identifiable {
-    var id: String { date }
-    let date: String
-    let successRate: Double
-    let totalAttempts: Int
+struct RevisionTopicMetric: Codable, Identifiable {
+    var id: String { topic }
+    let topic: String
+    let problemCount: Int
+    let averageRetention: Double
+    let averageStability: Double
+    let averageTimeMinutes: Double
+    
+    var displayTopic: String {
+        formatTopicSlug(topic)
+    }
 }
 
-struct RevisionProjectedLoad: Codable, Identifiable {
-    var id: String { date }
-    let date: String
-    let dueCount: Int
-    let overdueCount: Int
-}
-
-struct RevisionIntervalGrowth: Codable, Identifiable {
-    var id: String { month }
-    let month: String
-    let avgInterval: Double
+struct WeeklyCompletion: Codable, Identifiable {
+    var id: String { week }
+    let week: String
     let count: Int
 }
 
@@ -272,7 +311,5 @@ struct RevisionRetentionItem: Codable, Identifiable {
 
 struct RevisionAnalyticsStreaks: Codable {
     let totalRevisionsCompleted: Int
-    let totalAttempts: Int
-    let overallSuccessRate: Double
 }
 

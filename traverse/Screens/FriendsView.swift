@@ -73,6 +73,8 @@ class FriendsViewModel: ObservableObject {
             DataManager.shared.receivedRequests = receivedRequests
             DataManager.shared.sentRequests = sentRequests
             
+            AchievementToastManager.shared.checkFriendRequests(receivedRequests)
+            
             hasLoadedRequests = true
         } catch is CancellationError {
             // Ignore - user released pull-to-refresh
@@ -205,6 +207,7 @@ struct FriendsView: View {
                 }
             }
             .navigationTitle("Friends")
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {

@@ -60,6 +60,8 @@ struct RevisionCoachSheet: View {
                 happenedAt: solveFromRev.solvedAt,
                 aiAnalysis: solveFromRev.aiAnalysis,
                 mistakeTags: solveFromRev.mistakeTags,
+                cognitiveTier: solveFromRev.cognitiveTier,
+                recallScore: solveFromRev.recallScore,
                 numberOfTries: nil,
                 timeTaken: nil,
                 attempts: solveFromRev.attempts
@@ -70,6 +72,8 @@ struct RevisionCoachSheet: View {
                 solvedAt: solveFromRev.solvedAt,
                 aiAnalysis: solveFromRev.aiAnalysis,
                 mistakeTags: solveFromRev.mistakeTags,
+                cognitiveTier: solveFromRev.cognitiveTier,
+                recallScore: solveFromRev.recallScore,
                 attempts: solveFromRev.attempts,
                 problem: problem,
                 submission: submission,
@@ -294,7 +298,7 @@ struct RevisionCoachSheet: View {
                                 .foregroundStyle(.white.opacity(0.35))
 
                             ScrollView(.vertical, showsIndicators: false) {
-                                Text(currentDisplayText)
+                                MarkdownText(markdown: currentDisplayText)
                                     .font(isLoading ? .headline : .subheadline)
                                     .fontWeight(isLoading ? .medium : .regular)
                                     .foregroundStyle(.white)
@@ -317,6 +321,7 @@ struct RevisionCoachSheet: View {
             }
             .navigationTitle("\(revision.problem.title)")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {

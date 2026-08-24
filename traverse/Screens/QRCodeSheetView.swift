@@ -86,6 +86,7 @@ struct QRCodeSheetView: View {
             }
             .navigationTitle("My QR Code")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {

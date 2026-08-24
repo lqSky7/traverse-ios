@@ -96,6 +96,7 @@ struct UserSearchView: View {
             }
             .navigationTitle("Search Users")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {

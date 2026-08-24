@@ -128,6 +128,7 @@ struct SettingsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("User")
+            .toolbarScrollMinimization()
             .sheet(isPresented: $showingEditProfile) {
                 ProfileEditView()
                     .environmentObject(authViewModel)
@@ -249,6 +250,7 @@ struct ImportPaletteView: View {
             }
             .navigationTitle("Import Palette")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {

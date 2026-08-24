@@ -68,7 +68,10 @@ struct HomeView: View {
                                 }
                                 
                                 // Mistake Tags Analysis full width
-                                MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                NavigationLink(destination: MistakeTagsDetailView(solves: solves, paletteManager: paletteManager)) {
+                                    MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                }
+                                .buttonStyle(PlainButtonStyle())
                                 
                                 // Best Solving Hours (replaces Submission Breakdown)
                                 BestSolvingHoursCard(solves: solves, paletteManager: paletteManager)
@@ -90,6 +93,7 @@ struct HomeView: View {
             .background(Color.black)
             .navigationTitle(formattedDate)
             .navigationBarTitleDisplayMode(.large)
+            .toolbarScrollMinimization()
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
                     // Use Task to prevent early cancellation from pull-to-refresh gesture
@@ -214,42 +218,65 @@ struct StreakCard: View {
 // MARK: - Lighting Sun Background (Lighting Simulation Shader from Settings > Demo)
 struct LightingSunBackground: View {
     let streak: Int
+    @State private var animatedProgress: Double = 0.0
     
-    private var progress: Float {
-        min(max(Float(streak), 0), 15.0) / 15.0
-    }
-    
-    private var intensity: Float {
-        0.3 + progress * 2.2
-    }
-    
-    private var disperse: Float {
-        0.15 + progress * 0.60
-    }
-    
-    private var radius: Float {
-        10.0 + progress * 40.0
+    private var targetProgress: Double {
+        Double(min(max(Float(streak), 0), 15.0) / 15.0)
     }
     
     var body: some View {
         GeometryReader { geometry in
-            let cardHeight = Float(geometry.size.height > 0 ? geometry.size.height : 90.0)
-            let targetY = cardHeight / 1.2
-            
-            Color.black
-                .layerEffect(
-                    ShaderLibrary.lightingSimulation(
-                        .float2(5.0, targetY),
-                        .float(intensity),
-                        .float(disperse),
-                        .float(-Float.pi / 2.0),
-                        .float(radius)
-                    ),
-                    maxSampleOffset: .zero
-                )
+            AnimatableLightingSun(
+                progress: animatedProgress,
+                cardHeight: geometry.size.height
+            )
+        }
+        .onAppear {
+            animatedProgress = 0.0
+            withAnimation(.spring(response: 1.1, dampingFraction: 0.72, blendDuration: 0)) {
+                animatedProgress = targetProgress
+            }
+        }
+        .onChange(of: streak) { _, newStreak in
+            let newTarget = Double(min(max(Float(newStreak), 0), 15.0) / 15.0)
+            withAnimation(.spring(response: 1.1, dampingFraction: 0.72, blendDuration: 0)) {
+                animatedProgress = newTarget
+            }
         }
     }
 }
+
+private struct AnimatableLightingSun: View, Animatable {
+    var progress: Double
+    var cardHeight: CGFloat
+    
+    var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+    
+    var body: some View {
+        let p = Float(progress)
+        let intensity = 0.3 + p * 2.2
+        let disperse = 0.15 + p * 0.60
+        let radius = 10.0 + p * 40.0
+        let height = Float(cardHeight > 0 ? cardHeight : 90.0)
+        let targetY = height / 1.2
+        
+        Color.black
+            .layerEffect(
+                ShaderLibrary.lightingSimulation(
+                    .float2(5.0, targetY),
+                    .float(intensity),
+                    .float(disperse),
+                    .float(-Float.pi / 2.0),
+                    .float(radius)
+                ),
+                maxSampleOffset: .zero
+            )
+    }
+}
+
 
 
 // MARK: - Main Stats Card
@@ -592,27 +619,34 @@ struct MistakeTagsAnalysisCard: View {
     let solves: [Solve]
     @ObservedObject var paletteManager: ColorPaletteManager
     
-    private var tagCounts: [(String, Int)] {
+    private var cardData: (tagCounts: [(String, Int)], totalTags: Int, maxCount: Int) {
         var counts: [String: Int] = [:]
         for solve in solves {
             if let tags = solve.mistakeTags ?? solve.submission.mistakeTags {
+                var seen = Set<String>()
                 for tag in tags {
+                    guard seen.insert(tag).inserted else { continue }
                     counts[tag, default: 0] += 1
                 }
             }
         }
-        return counts.sorted { $0.value > $1.value }
-    }
-    
-    private var totalTags: Int {
-        tagCounts.reduce(0) { $0 + $1.1 }
-    }
-    
-    private var maxCount: Int {
-        tagCounts.map { $0.1 }.max() ?? 1
+        let sorted = counts.sorted {
+            if $0.value != $1.value {
+                return $0.value > $1.value
+            }
+            return $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending
+        }
+        let total = sorted.reduce(0) { $0 + $1.1 }
+        let maxC = max(sorted.map { $0.1 }.max() ?? 1, 1)
+        return (sorted, total, maxC)
     }
     
     var body: some View {
+        let data = cardData
+        let tagCounts = data.tagCounts
+        let totalTags = data.totalTags
+        let maxCount = data.maxCount
+        
         VStack(spacing: 0) {
             // Header
             HStack {
@@ -621,11 +655,17 @@ struct MistakeTagsAnalysisCard: View {
                         .foregroundStyle(paletteManager.color(at: 5))
                     Text("Mistake Analysis")
                         .font(.headline)
+                        .foregroundStyle(.white)
                 }
                 Spacer()
-                Text("\(tagCounts.count)")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(paletteManager.color(at: 5))
+                HStack(spacing: 6) {
+                    Text("\(tagCounts.count)")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(paletteManager.color(at: 5))
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal)
             .padding(.top)
@@ -647,9 +687,9 @@ struct MistakeTagsAnalysisCard: View {
                 .padding(.top, 12)
                 .padding(.bottom, 16)
                 
-                // Horizontal bars for each tag
+                // Horizontal bars for TOP 3 tags
                 VStack(spacing: 12) {
-                    ForEach(Array(tagCounts.prefix(6).enumerated()), id: \.element.0) { index, item in
+                    ForEach(Array(tagCounts.prefix(3).enumerated()), id: \.element.0) { index, item in
                         MistakeTagProgressRow(
                             label: item.0,
                             count: item.1,
@@ -659,7 +699,7 @@ struct MistakeTagsAnalysisCard: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom)
+                .padding(.bottom, 16)
             } else {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
@@ -691,7 +731,8 @@ struct MistakeTagProgressRow: View {
     
     private var progress: CGFloat {
         guard maxCount > 0 else { return 0 }
-        return CGFloat(count) / CGFloat(maxCount)
+        let p = CGFloat(count) / CGFloat(maxCount)
+        return (p.isFinite && !p.isNaN) ? min(max(p, 0), 1) : 0
     }
     
     var body: some View {
@@ -703,6 +744,11 @@ struct MistakeTagProgressRow: View {
                 .lineLimit(1)
             
             GeometryReader { geometry in
+                let targetWidth = geometry.size.width * progress
+                let safeWidth = (targetWidth.isFinite && !targetWidth.isNaN && geometry.size.width > 0)
+                    ? max(min(targetWidth, geometry.size.width), count > 0 ? 12 : 0)
+                    : (count > 0 ? 12 : 0)
+                
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 6)
                         .fill(Color.gray.opacity(0.2))
@@ -716,7 +762,7 @@ struct MistakeTagProgressRow: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                        .frame(width: safeWidth, height: 12)
                 }
             }
             .frame(height: 12)
@@ -729,6 +775,431 @@ struct MistakeTagProgressRow: View {
         }
     }
 }
+
+// MARK: - Mistake Tags Detail View
+struct MistakeTagsDetailView: View {
+    let solves: [Solve]
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    @State private var searchText = ""
+    @State private var selectedDifficulty: String = "All"
+    @State private var sortOption: MistakeSortOption = .mostFrequent
+    @State private var expandedTags: Set<String> = []
+    
+    enum MistakeSortOption: String, CaseIterable {
+        case mostFrequent = "Most Frequent"
+        case leastFrequent = "Least Frequent"
+        case alphabetical = "Alphabetical"
+    }
+    
+    struct MistakeSolveSummary: Identifiable {
+        let id: String
+        let title: String
+        let difficulty: String
+        let solvedAt: String
+    }
+    
+    struct TagAnalysisItem: Identifiable {
+        let id: String
+        let tag: String
+        let count: Int
+        let matchingSolves: [MistakeSolveSummary]
+    }
+    
+    private struct MistakeAnalysisData {
+        let allItems: [TagAnalysisItem]
+        let displayedItems: [TagAnalysisItem]
+        let totalMistakes: Int
+        let maxCount: Int
+        let cleanPercentage: Int
+    }
+    
+    private var analysisData: MistakeAnalysisData {
+        // 1. Filter solves by difficulty
+        let difficultyLower = selectedDifficulty.lowercased()
+        let filteredSolves: [Solve]
+        if selectedDifficulty == "All" {
+            filteredSolves = solves
+        } else {
+            filteredSolves = solves.filter { $0.problem.difficulty.lowercased() == difficultyLower }
+        }
+        
+        // 2. Count mistakes and group solves by tag in one O(N) pass
+        var tagCounts: [String: Int] = [:]
+        var tagSolves: [String: [MistakeSolveSummary]] = [:]
+        var solvesWithMistakes = 0
+        
+        for solve in filteredSolves {
+            let tags = solve.mistakeTags ?? solve.submission.mistakeTags ?? []
+            if !tags.isEmpty {
+                solvesWithMistakes += 1
+                var seen = Set<String>()
+                let summary = MistakeSolveSummary(
+                    id: "\(solve.id)_\(solve.solvedAt)",
+                    title: solve.problem.title,
+                    difficulty: solve.problem.difficulty,
+                    solvedAt: solve.solvedAt
+                )
+                for tag in tags {
+                    guard seen.insert(tag).inserted else { continue }
+                    tagCounts[tag, default: 0] += 1
+                    tagSolves[tag, default: []].append(summary)
+                }
+            }
+        }
+        
+        // 3. Build TagAnalysisItems
+        let allItems: [TagAnalysisItem] = tagCounts.map { tag, count in
+            TagAnalysisItem(
+                id: tag,
+                tag: tag,
+                count: count,
+                matchingSolves: tagSolves[tag] ?? []
+            )
+        }
+        
+        let totalMistakes = allItems.reduce(0) { $0 + $1.count }
+        let maxCount = max(allItems.map { $0.count }.max() ?? 1, 1)
+        
+        let cleanSolves = filteredSolves.count - solvesWithMistakes
+        let cleanPercentage = filteredSolves.isEmpty ? 100 : Int((Double(max(0, cleanSolves)) / Double(filteredSolves.count)) * 100)
+        
+        // 4. Search filter
+        let searchTrimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let filteredBySearch: [TagAnalysisItem]
+        if searchTrimmed.isEmpty {
+            filteredBySearch = allItems
+        } else {
+            filteredBySearch = allItems.filter { item in
+                item.tag.localizedCaseInsensitiveContains(searchTrimmed) ||
+                item.matchingSolves.contains { $0.title.localizedCaseInsensitiveContains(searchTrimmed) }
+            }
+        }
+        
+        // 5. Sort
+        let displayedItems: [TagAnalysisItem]
+        switch sortOption {
+        case .mostFrequent:
+            displayedItems = filteredBySearch.sorted {
+                if $0.count != $1.count { return $0.count > $1.count }
+                return $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+            }
+        case .leastFrequent:
+            displayedItems = filteredBySearch.sorted {
+                if $0.count != $1.count { return $0.count < $1.count }
+                return $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+            }
+        case .alphabetical:
+            displayedItems = filteredBySearch.sorted {
+                $0.tag.localizedCaseInsensitiveCompare($1.tag) == .orderedAscending
+            }
+        }
+        
+        return MistakeAnalysisData(
+            allItems: allItems,
+            displayedItems: displayedItems,
+            totalMistakes: totalMistakes,
+            maxCount: maxCount,
+            cleanPercentage: cleanPercentage
+        )
+    }
+    
+    private func iconForTag(_ tag: String) -> String {
+        let lower = tag.lowercased()
+        if lower.contains("time") || lower.contains("tle") {
+            return "clock.badge.exclamationmark"
+        } else if lower.contains("memory") || lower.contains("mle") || lower.contains("space") {
+            return "memorychip"
+        } else if lower.contains("edge") || lower.contains("corner") || lower.contains("bound") {
+            return "exclamationmark.triangle.fill"
+        } else if lower.contains("approach") || lower.contains("logic") || lower.contains("algo") {
+            return "brain.head.profile"
+        } else if lower.contains("base") || lower.contains("recursion") {
+            return "arrow.triangle.2.circlepath"
+        } else if lower.contains("null") || lower.contains("nil") || lower.contains("pointer") {
+            return "questionmark.diamond.fill"
+        } else if lower.contains("syntax") || lower.contains("type") {
+            return "curlybraces"
+        } else if lower.contains("overflow") {
+            return "arrow.up.right.and.arrow.down.left.rectangle"
+        } else if lower.contains("off-by-one") || lower.contains("index") {
+            return "arrow.left.and.right"
+        } else {
+            return "tag.fill"
+        }
+    }
+    
+    private func formattedTagName(_ tag: String) -> String {
+        tag.replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+    }
+    
+    private func difficultyColor(_ difficulty: String) -> Color {
+        switch difficulty.lowercased() {
+        case "easy": return .green
+        case "medium": return .orange
+        case "hard": return .red
+        default: return .blue
+        }
+    }
+    
+    private func formatDate(_ dateString: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = formatter.date(from: dateString)
+        if date == nil {
+            formatter.formatOptions = [.withInternetDateTime]
+            date = formatter.date(from: dateString)
+        }
+        guard let d = date else { return dateString }
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "MMM d"
+        return displayFormatter.string(from: d)
+    }
+    
+    var body: some View {
+        let data = analysisData
+        let totalMistakes = data.totalMistakes
+        let maxCount = max(data.maxCount, 1)
+        let displayedTags = data.displayedItems
+        
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Summary Metrics Row
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(totalMistakes)")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(paletteManager.selectedPalette.primary)
+                        Text("Total Mistakes")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(12)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(data.allItems.count)")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 2))
+                        Text("Mistake Types")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(12)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(data.cleanPercentage)%")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 1))
+                        Text("Clean Solves")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(12)
+                }
+                
+                // Difficulty Segmented Picker
+                Picker("Difficulty", selection: $selectedDifficulty) {
+                    Text("All").tag("All")
+                    Text("Easy").tag("Easy")
+                    Text("Medium").tag("Medium")
+                    Text("Hard").tag("Hard")
+                }
+                .pickerStyle(.segmented)
+                
+                // Search Bar & Sort Menu
+                HStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search", text: $searchText)
+                            .font(.subheadline)
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(UIColor.systemGray6))
+                    .cornerRadius(10)
+                    
+                    Menu {
+                        Picker("Sort by", selection: $sortOption) {
+                            ForEach(MistakeSortOption.allCases, id: \.self) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.arrow.down")
+                            Text(sortOption.rawValue)
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color(UIColor.systemGray6))
+                        .cornerRadius(10)
+                        .foregroundStyle(paletteManager.selectedPalette.primary)
+                    }
+                }
+                
+                // Tags List
+                if displayedTags.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text(searchText.isEmpty ? "No mistake tags found" : "No results for \"\(searchText)\"")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(Array(displayedTags.enumerated()), id: \.element.id) { index, item in
+                            let isExpanded = expandedTags.contains(item.id)
+                            let tagColor = paletteManager.color(at: index % 10)
+                            let percentage = totalMistakes > 0 ? Int((Double(item.count) / Double(totalMistakes)) * 100) : 0
+                            
+                            VStack(alignment: .leading, spacing: 10) {
+                                // Header row (tappable to expand)
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        if isExpanded {
+                                            expandedTags.remove(item.id)
+                                        } else {
+                                            expandedTags.insert(item.id)
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(tagColor.opacity(0.18))
+                                                .frame(width: 36, height: 36)
+                                            Image(systemName: iconForTag(item.tag))
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundStyle(tagColor)
+                                        }
+                                        
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(formattedTagName(item.tag))
+                                                .font(.subheadline)
+                                                .fontWeight(.semibold)
+                                                .foregroundStyle(.primary)
+                                            
+                                            Text("\(percentage)% of all mistakes • \(item.matchingSolves.count) \(item.matchingSolves.count == 1 ? "problem" : "problems")")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        Text("\(item.count)")
+                                            .font(.headline)
+                                            .bold()
+                                            .foregroundStyle(tagColor)
+                                        
+                                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                // Progress Bar
+                                GeometryReader { geo in
+                                    let ratio = maxCount > 0 ? CGFloat(item.count) / CGFloat(maxCount) : 0
+                                    let targetWidth = geo.size.width * ratio
+                                    let safeWidth = (targetWidth.isFinite && !targetWidth.isNaN && geo.size.width > 0)
+                                        ? max(min(targetWidth, geo.size.width), 8)
+                                        : 8
+
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.gray.opacity(0.2))
+                                            .frame(height: 8)
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [tagColor, tagColor.opacity(0.7)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: safeWidth, height: 8)
+                                    }
+                                }
+                                .frame(height: 8)
+                                
+                                // Expanded Problem List
+                                if isExpanded {
+                                    Divider()
+                                        .background(Color.gray.opacity(0.2))
+                                        .padding(.vertical, 2)
+                                    
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("Recent Problems")
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                        
+                                        ForEach(item.matchingSolves) { solve in
+                                            HStack(spacing: 8) {
+                                                Text(solve.title)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.primary)
+                                                    .lineLimit(1)
+                                                
+                                                Spacer()
+                                                
+                                                Text(solve.difficulty.capitalized)
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 2)
+                                                    .background(difficultyColor(solve.difficulty).opacity(0.15))
+                                                    .foregroundStyle(difficultyColor(solve.difficulty))
+                                                    .cornerRadius(4)
+                                                
+                                                Text(formatDate(solve.solvedAt))
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(.secondary)
+                                            }
+                                            .padding(.vertical, 3)
+                                        }
+                                    }
+                                    .padding(.top, 4)
+                                }
+                            }
+                            .padding()
+                            .background(Color(UIColor.systemGray6))
+                            .cornerRadius(14)
+                        }
+                    }
+                }
+            }
+            .padding()
+        }
+        .background(Color.black)
+        .navigationTitle("Mistake Analysis")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbarScrollMinimization()
+    }
+}
+
 
 // MARK: - Achievement Stats Card (Compact Half-Width)
 struct AchievementStatsCard: View {
@@ -1147,6 +1618,7 @@ struct AllAchievementsView: View {
         }
         .navigationTitle("All Achievements")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarScrollMinimization()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
@@ -2027,6 +2499,7 @@ struct ActivityDetailView: View {
         .background(Color.black)
         .navigationTitle("Activity")
         .navigationBarTitleDisplayMode(.large)
+        .toolbarScrollMinimization()
     }
 }
 
@@ -2298,6 +2771,7 @@ struct AllSolvesView: View {
         .background(Color.black.ignoresSafeArea())
         .navigationTitle("All Solves")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarScrollMinimization()
     }
 }
 
@@ -2345,7 +2819,7 @@ struct SolveRow: View {
                         
                         if let topic = solve.problem.topic, !topic.isEmpty {
                             HStack(spacing: 6) {
-                                Text(topic)
+                                Text(solve.problem.displayTopic ?? topic)
                                     .font(.system(size: 10, weight: .medium))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -2442,7 +2916,7 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            Text(analysis)
+                            MarkdownText(markdown: analysis)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -2490,9 +2964,22 @@ struct SolveRow: View {
                                     .fontWeight(.semibold)
                             }
                             
-                            Text(highlight.note)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            if !highlight.note.isEmpty {
+                                MarkdownText(markdown: highlight.note)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            if !highlight.content.isEmpty && highlight.content != highlight.note {
+                                Text(highlight.content)
+                                    .font(.caption2)
+                                    .fontDesign(.monospaced)
+                                    .foregroundStyle(.secondary.opacity(0.8))
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(6)
+                            }
                             
                             if !highlight.tags.isEmpty {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -2866,6 +3353,8 @@ class HomeViewModel: ObservableObject {
             self.solveStats = DataManager.shared.solveStats
             self.achievementStats = DataManager.shared.achievementStats
             self.recentSolves = DataManager.shared.recentSolves
+            self.todayRevisions = DataManager.shared.todayRevisions
+            self.completedRevisions = DataManager.shared.completedRevisions
         }
     }
     
@@ -2885,6 +3374,13 @@ class HomeViewModel: ObservableObject {
         // Check if we can use cached data
         if !forceRefresh && DataManager.shared.isCacheFresh {
             await MainActor.run {
+                if self.userStats == nil { self.userStats = DataManager.shared.userStats }
+                if self.submissionStats == nil { self.submissionStats = DataManager.shared.submissionStats }
+                if self.solveStats == nil { self.solveStats = DataManager.shared.solveStats }
+                if self.achievementStats == nil { self.achievementStats = DataManager.shared.achievementStats }
+                if self.recentSolves == nil { self.recentSolves = DataManager.shared.recentSolves }
+                if self.todayRevisions.isEmpty { self.todayRevisions = DataManager.shared.todayRevisions }
+                if self.completedRevisions.isEmpty { self.completedRevisions = DataManager.shared.completedRevisions }
                 isLoading = false
             }
             // Update widgets with cached data
@@ -2965,6 +3461,8 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.submissionStats = submissionStats
             DataManager.shared.solveStats = solveStats
             DataManager.shared.achievementStats = achievementStats
+            DataManager.shared.todayRevisions = todayAndOverdue
+            DataManager.shared.completedRevisions = recentCompletedRevisions
             
             // Update timestamp
             DataManager.shared.lastFetchTimestamp = Date()
@@ -2977,6 +3475,9 @@ class HomeViewModel: ObservableObject {
 
             // Check if solved today and end live activity if needed
             DataManager.shared.checkSolvedTodayAndEndActivity()
+            
+            // Trigger app updates & toast check
+            await AchievementToastManager.shared.syncAppOpenUpdates()
 
         } catch let error where error is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh

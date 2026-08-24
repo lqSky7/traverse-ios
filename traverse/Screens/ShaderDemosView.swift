@@ -95,6 +95,7 @@ struct ShaderDemosView: View {
             }
             .navigationTitle("Shader & UI Gallery")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarScrollMinimization()
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarBackground(Color.black, for: .navigationBar)
             .toolbarColorScheme(.dark, for: .navigationBar)
