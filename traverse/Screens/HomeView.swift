@@ -302,6 +302,8 @@ struct RevisionScoreCard: View {
                 let width = geometry.size.width
                 let height = geometry.size.height
                 let center = CGPoint(x: width / 2, y: height / 2)
+                let sizingValue = max(width, height) / 0.70
+                let cornerRadiusValue: CGFloat = 16
                 
                 ZStack {
                     // 1. Pure black background
@@ -319,11 +321,11 @@ struct RevisionScoreCard: View {
                     ShaderLibrary.roundedGlass(
                         .boundingRect,
                         .float2(center),
-                        .float(22),        // cornerRadius: squircle shape
+                        .float(cornerRadiusValue),        // cornerRadius: squircle shape
                         .float(26),        // intensity
                         .float(0.2),       // dispersion / CA
                         .float(2.6),       // blurStrength / refraction
-                        .float(210)        // sizing: larger squircle lens
+                        .float(sizingValue)        // sizing: larger squircle lens
                     ),
                     maxSampleOffset: CGSize(width: 150, height: 150)
                 )
