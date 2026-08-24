@@ -1212,7 +1212,7 @@ class NetworkService {
     }
     
     // MARK: - Get Revisions
-    func getRevisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0, type: String = "normal") async throws -> RevisionsResponse {
+    func getRevisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0) async throws -> RevisionsResponse {
         var urlComponents = URLComponents(string: "\(baseURL)/revisions")!
         var queryItems: [URLQueryItem] = []
         
@@ -1224,7 +1224,6 @@ class NetworkService {
         }
         queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
         queryItems.append(URLQueryItem(name: "offset", value: String(offset)))
-        queryItems.append(URLQueryItem(name: "type", value: type))
         
         urlComponents.queryItems = queryItems
         
@@ -1263,11 +1262,10 @@ class NetworkService {
     }
     
     // MARK: - Get Grouped Revisions
-    func getGroupedRevisions(includeCompleted: Bool = false, type: String = "normal") async throws -> GroupedRevisionsResponse {
+    func getGroupedRevisions(includeCompleted: Bool = false) async throws -> GroupedRevisionsResponse {
         var urlComponents = URLComponents(string: "\(baseURL)/revisions/grouped")!
         urlComponents.queryItems = [
-            URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false"),
-            URLQueryItem(name: "type", value: type)
+            URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false")
         ]
         
         guard let url = urlComponents.url else {
@@ -1305,13 +1303,8 @@ class NetworkService {
     }
     
     // MARK: - Get Revision Stats
-    func getRevisionStats(type: String = "normal") async throws -> RevisionStatsResponse {
-        var components = URLComponents(string: "\(baseURL)/revisions/stats")!
-        components.queryItems = [
-            URLQueryItem(name: "type", value: type)
-        ]
-        
-        guard let url = components.url else {
+    func getRevisionStats() async throws -> RevisionStatsResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/stats") else {
             throw NetworkError.invalidURL
         }
         
@@ -1485,9 +1478,9 @@ class NetworkService {
     }
 
     
-    // MARK: - Complete Revision
-    func completeRevision(id: Int) async throws -> CompleteRevisionResponse {
-        guard let url = URL(string: "\(baseURL)/revisions/\(id)/complete") else {
+    // MARK: - Get Revision Score
+    func getRevisionScore() async throws -> RevisionScoreResponse {
+        guard let url = URL(string: "\(baseURL)/revisions/score") else {
             throw NetworkError.invalidURL
         }
         
@@ -1496,7 +1489,7 @@ class NetworkService {
         }
         
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = "GET"
         request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -1507,8 +1500,8 @@ class NetworkService {
         
         if httpResponse.statusCode == 200 {
             do {
-                let completeResponse = try JSONDecoder().decode(CompleteRevisionResponse.self, from: data)
-                return completeResponse
+                let scoreResponse = try JSONDecoder().decode(RevisionScoreResponse.self, from: data)
+                return scoreResponse
             } catch {
                 print("Decoding error: \(error)")
                 throw NetworkError.decodingError
@@ -1517,7 +1510,7 @@ class NetworkService {
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
                 throw NetworkError.serverError(errorResponse.error)
             }
-            throw NetworkError.serverError("Failed to complete revision (Status: \(httpResponse.statusCode))")
+            throw NetworkError.serverError("Failed to get revision score (Status: \(httpResponse.statusCode))")
         }
     }
     

@@ -28,7 +28,6 @@ struct RevisionsView: View {
     @State private var dailyCapDraft: Int = 20
     @State private var isSavingDailyCap = false
     @State private var dailyCapMessage: String?
-    @AppStorage("revisionMode") private var revisionMode: String = "normal"
     @State private var loadTask: Task<Void, Never>?
     @State private var isSubscribed = false
     @State private var showProUpgradeSheet = false
@@ -193,48 +192,6 @@ struct RevisionsView: View {
                             Label("Daily Revision Limit", systemImage: "slider.horizontal.3")
                         }
 
-                        if !useMLRevision {
-                            Toggle(isOn: $showCompletedRevisions) {
-                                Label("Show Completed", systemImage: showCompletedRevisions ? "checkmark.circle.fill" : "circle")
-                            }
-                            .onChange(of: showCompletedRevisions) { _, _ in
-                                Task { await loadData() }
-                            }
-                        }
-
-                        if !isSubscribed {
-                            Toggle(isOn: Binding(
-                                get: { useMLRevision },
-                                set: { newValue in
-                                    if newValue {
-                                        // User is trying to enable ML - force check subscription status
-                                        Task {
-                                            await checkSubscriptionStatus(forceCheck: true)
-                                            await MainActor.run {
-                                                if isSubscribed {
-                                                    useMLRevision = true
-                                                    revisionMode = "ml"
-                                                    Task { await loadData(forceType: "ml") }
-                                                } else {
-                                                    // Not subscribed - show upgrade sheet
-                                                    showProUpgradeSheet = true
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // Turning off ML - no need to check subscription
-                                        useMLRevision = false
-                                        revisionMode = "normal"
-                                        Task { await loadData(forceType: "normal") }
-                                    }
-                                }
-                            )) {
-                                Label("ML-Based Scheduling", systemImage: useMLRevision ? "brain.head.profile.fill" : "brain.head.profile")
-                            }
-                        }
-                        
-                        Divider()
-                        
                         Button(action: { Task { await toggleNotifications() } }) {
                             Label(
                                 notificationsEnabled ? "Disable Notifications" : "Enable Notifications",
@@ -297,11 +254,7 @@ struct RevisionsView: View {
         }
 
         .onAppear {
-            useMLRevision = revisionMode == "ml"
-            if cachedSubscriptionStatus {
-                useMLRevision = true
-                revisionMode = "ml"
-            }
+            useMLRevision = true
             dailyCapDraft = authViewModel.currentUser?.maxDailyReviews ?? 20
             // Load from cache first
             if !DataManager.shared.revisionGroups.isEmpty {
@@ -311,7 +264,7 @@ struct RevisionsView: View {
                 stats = cachedStats
             }
             Task {
-                await checkSubscriptionStatus(reloadIfNeeded: false)
+                await checkSubscriptionStatus()
                 await loadData()
                 await checkNotificationStatus()
             }
@@ -328,74 +281,45 @@ struct RevisionsView: View {
         }
     }
     
-    private func loadData(forceType: String? = nil) async {
+    private func loadData() async {
         loadTask?.cancel()
-        
-        let revisionType = forceType ?? (useMLRevision ? "ml" : "normal")
         
         loadTask = Task {
             guard !Task.isCancelled else { return }
-            await loadStats(type: revisionType)
+            await loadStats()
             
             guard !Task.isCancelled else { return }
-            await loadRevisions(type: revisionType)
+            await loadRevisions()
 
             guard !Task.isCancelled else { return }
-            if revisionType == "ml" {
-                await loadAnalytics()
-            } else {
-                analytics = nil
-                analyticsError = nil
-                isAnalyticsLoading = false
-                do {
-                    todaySummary = try await NetworkService.shared.getTodayRevisions()
-                    if let isPaused = todaySummary?.isPaused {
-                        isExamModeActive = isPaused
-                    }
-                } catch {
-                    print("Failed to check today summary: \(error.localizedDescription)")
-                }
-            }
+            await loadAnalytics()
         }
         
         await loadTask?.value
     }
     
-    private func loadStats(type: String) async {
+    private func loadStats() async {
         do {
-            stats = try await NetworkService.shared.getRevisionStats(type: type)
+            stats = try await NetworkService.shared.getRevisionStats()
         } catch {
             print("Failed to load revision stats: \(error.localizedDescription)")
         }
     }
     
-    private func loadRevisions(type: String) async {
+    private func loadRevisions() async {
         isLoading = true
         errorMessage = nil
         
         do {
-            if type == "ml" {
-                let response = try await NetworkService.shared.getTodayRevisions()
-                todaySummary = response
-                if let isPaused = response.isPaused {
-                    isExamModeActive = isPaused
-                }
-                revisionGroups = groupRevisionsByDate(response.revisions)
+            let response = try await NetworkService.shared.getTodayRevisions()
+            todaySummary = response
+            if let isPaused = response.isPaused {
+                isExamModeActive = isPaused
+            }
+            revisionGroups = groupRevisionsByDate(response.revisions)
 
-                if notificationsEnabled {
-                    await NotificationManager.shared.scheduleRevisionNotifications(for: response.revisions)
-                }
-            } else {
-                let response = try await NetworkService.shared.getGroupedRevisions(
-                    includeCompleted: showCompletedRevisions,
-                    type: type
-                )
-                revisionGroups = response.groups
-
-                if notificationsEnabled {
-                    let allRevisions = response.groups.flatMap { $0.revisions }
-                    await NotificationManager.shared.scheduleRevisionNotifications(for: allRevisions)
-                }
+            if notificationsEnabled {
+                await NotificationManager.shared.scheduleRevisionNotifications(for: response.revisions)
             }
         } catch let error as NetworkError {
             errorMessage = error.errorDescription
@@ -410,7 +334,6 @@ struct RevisionsView: View {
         // Save to DataManager cache
         DataManager.shared.revisionGroups = revisionGroups
         DataManager.shared.revisionStats = stats
-        DataManager.shared.revisionMode = useMLRevision ? "ml" : "normal"
         DataManager.shared.persistData()
         
         isLoading = false
@@ -431,44 +354,19 @@ struct RevisionsView: View {
         notificationsEnabled = await NotificationManager.shared.checkAuthorizationStatus()
     }
     
-    private func checkSubscriptionStatus(forceCheck: Bool = false, reloadIfNeeded: Bool = true) async {
-        // Use cached value first
-        isSubscribed = cachedSubscriptionStatus
-
-        // Check if we need to refresh from network
+    private func checkSubscriptionStatus(forceCheck: Bool = false) async {
         let now = Date()
-        let lastCheckDate = Date(timeIntervalSince1970: lastSubscriptionCheckDate)
         let calendar = Calendar.current
-
-        // Calculate 00:01 today
         let todayStart = calendar.startOfDay(for: now)
+        let lastCheckDate = Date(timeIntervalSince1970: lastSubscriptionCheckDate)
+
         guard let todayAt0001 = calendar.date(byAdding: .minute, value: 1, to: todayStart) else { return }
 
-        // Only fetch from network if:
-        // 1. forceCheck is true (ML toggle was pressed), OR
-        // 2. It's past 00:01 today AND we haven't checked today yet
         let lastCheckWasBeforeToday = !calendar.isDate(lastCheckDate, inSameDayAs: now)
         let isPast0001 = now >= todayAt0001
         let shouldRefresh = forceCheck || (isPast0001 && lastCheckWasBeforeToday)
 
         guard shouldRefresh else {
-            await MainActor.run {
-                if isSubscribed {
-                    if !useMLRevision {
-                        useMLRevision = true
-                        revisionMode = "ml"
-                        if reloadIfNeeded {
-                            Task { await loadData(forceType: "ml") }
-                        }
-                    }
-                } else if useMLRevision {
-                    useMLRevision = false
-                    revisionMode = "normal"
-                    if reloadIfNeeded {
-                        Task { await loadData(forceType: "normal") }
-                    }
-                }
-            }
             return
         }
 
@@ -478,26 +376,9 @@ struct RevisionsView: View {
                 isSubscribed = status.isSubscriptionActive
                 cachedSubscriptionStatus = status.isSubscriptionActive
                 lastSubscriptionCheckDate = now.timeIntervalSince1970
-
-                if isSubscribed {
-                    if !useMLRevision {
-                        useMLRevision = true
-                        revisionMode = "ml"
-                        if reloadIfNeeded {
-                            Task { await loadData(forceType: "ml") }
-                        }
-                    }
-                } else if useMLRevision {
-                    useMLRevision = false
-                    revisionMode = "normal"
-                    if reloadIfNeeded {
-                        Task { await loadData(forceType: "normal") }
-                    }
-                }
             }
         } catch {
             print("Failed to check subscription status: \(error.localizedDescription)")
-            // Keep using cached value on error
         }
     }
     
@@ -519,11 +400,9 @@ struct RevisionsView: View {
         guard notificationsEnabled else { return }
         
         do {
-            let revisionType = useMLRevision ? "ml" : "normal"
             let response = try await NetworkService.shared.getRevisions(
                 upcoming: true,
-                limit: 1000,
-                type: revisionType
+                limit: 1000
             )
             await NotificationManager.shared.scheduleRevisionNotifications(for: response.revisions)
             await NotificationManager.shared.scheduleDailyRevisionReminder()
@@ -534,7 +413,12 @@ struct RevisionsView: View {
     
     private func completeRevision(_ revision: Revision) async {
         do {
-            _ = try await NetworkService.shared.completeRevision(id: revision.id)
+            _ = try await NetworkService.shared.recordRevisionAttempt(
+                id: revision.id,
+                outcome: 1,
+                numTries: 1,
+                timeSpentMinutes: 5.0
+            )
             HapticManager.shared.success()
 
             // Notify HomeView to refresh and check live activity
@@ -609,7 +493,7 @@ struct RevisionsView: View {
             _ = try await NetworkService.shared.pauseMLRevisions(pauseDays: days)
             HapticManager.shared.success()
             showPauseConfirm = false
-            await loadData(forceType: "ml")
+            await loadData()
         } catch {
             print("Failed to pause revisions: \(error.localizedDescription)")
             isExamModeActive = false
@@ -625,7 +509,7 @@ struct RevisionsView: View {
             _ = try await NetworkService.shared.resumeMLRevisions(backlogDays: backlogDays)
             HapticManager.shared.success()
             showResumeConfirm = false
-            await loadData(forceType: "ml")
+            await loadData()
         } catch {
             print("Failed to resume revisions: \(error.localizedDescription)")
             isExamModeActive = true
@@ -660,7 +544,7 @@ struct RevisionsView: View {
                 maxDailyReviews: dailyCapDraft
             )
             dailyCapMessage = "Daily limit updated"
-            await loadData(forceType: "ml")
+            await loadData()
         } catch {
             dailyCapMessage = "Failed to update daily limit"
         }

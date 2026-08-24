@@ -304,7 +304,7 @@ struct BentoSettingsGrid: View {
                         Text("Shader & Glass Demos")
                             .font(.headline)
                             .fontWeight(.semibold)
-                        Text("16 Metal & UI Demos from @radiofun")
+                        Text("18 Metal & UI Demos from @radiofun")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

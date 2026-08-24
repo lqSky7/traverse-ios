@@ -35,7 +35,7 @@ class DataManager: ObservableObject {
     // Revision data
     @Published var revisionGroups: [RevisionGroup] = []
     @Published var revisionStats: RevisionStatsResponse?
-    @Published var revisionMode: String = "normal"
+    @Published var revisionScore: RevisionScoreResponse?
     
     private var hasFetchedInitialData = false
     
@@ -145,9 +145,9 @@ class DataManager: ObservableObject {
             self.revisionStats = decodedStats
         }
         
-        if let revisionModeData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionMode.json")),
-           let decodedMode = try? decoder.decode(String.self, from: revisionModeData) {
-            self.revisionMode = decodedMode
+        if let revisionScoreData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("revisionScore.json")),
+           let decodedScore = try? decoder.decode(RevisionScoreResponse.self, from: revisionScoreData) {
+            self.revisionScore = decodedScore
         }
     }
     
@@ -195,7 +195,9 @@ class DataManager: ObservableObject {
         if let revisionStats = revisionStats {
             saveData(revisionStats, filename: "revisionStats.json")
         }
-        saveData(revisionMode, filename: "revisionMode.json")
+        if let revisionScore = revisionScore {
+            saveData(revisionScore, filename: "revisionScore.json")
+        }
     }
     
     func mergeAndPersistSolves(_ fetchedSolves: [Solve]) -> [Solve] {
@@ -235,9 +237,8 @@ class DataManager: ObservableObject {
         async let solveStatsTask = NetworkService.shared.getSolveStats()
         async let achievementStatsTask = NetworkService.shared.getAchievementStats()
         async let recentSolvesTask = NetworkService.shared.getSolves(limit: 200)
-        let revisionType = self.revisionMode
-        async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50, type: revisionType)
-        async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true, type: revisionType)
+        async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50)
+        async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true)
         
         // Wait for all data to be fetched
         let results = try await (
@@ -352,7 +353,7 @@ class DataManager: ObservableObject {
         completedRevisions = []
         revisionGroups = []
         revisionStats = nil
-        revisionMode = "normal"
+        revisionScore = nil
         hasFetchedInitialData = false
     }
     

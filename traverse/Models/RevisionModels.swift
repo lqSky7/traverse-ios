@@ -313,3 +313,27 @@ struct RevisionAnalyticsStreaks: Codable {
     let totalRevisionsCompleted: Int
 }
 
+// MARK: - Revision Score
+struct RevisionScoreResponse: Codable {
+    let score: Int
+    let breakdown: RevisionScoreBreakdown
+    let period: RevisionScorePeriod
+}
+
+struct RevisionScoreBreakdown: Codable {
+    let memoryHealth: RevisionScoreDimension
+    let rLift: RevisionScoreDimension
+    let completion: RevisionScoreDimension
+    let consistency: RevisionScoreDimension
+}
+
+struct RevisionScoreDimension: Codable {
+    let score: Int
+    let weight: Double
+    let detail: String
+}
+
+struct RevisionScorePeriod: Codable {
+    let start: String
+    let end: String
+}

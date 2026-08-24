@@ -19,7 +19,6 @@ final class AppState: ObservableObject {
     @Published var revisionStats: RevisionStatsResponse?
     @Published var revisionAnalytics: RevisionAnalyticsResponse?
     @Published var todayRevisions: RevisionTodayResponse?
-    @Published var revisionMode = "normal"
 
     @Published var friends: [Friend] = []
     @Published var receivedRequests: [FriendRequest] = []
@@ -86,10 +85,9 @@ final class AppState: ObservableObject {
     }
 
     func refreshRevisions() async {
-        revisionMode = "ml"
         await run(panel: .revisions) {
-            async let grouped = api.groupedRevisions(includeCompleted: false, type: "ml")
-            async let stats = api.revisionStats(type: "ml")
+            async let grouped = api.groupedRevisions(includeCompleted: false)
+            async let stats = api.revisionStats()
             self.revisionGroups = try await grouped.groups
             self.revisionStats = try await stats
             async let analytics = api.revisionAnalytics()

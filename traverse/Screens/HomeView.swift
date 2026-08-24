@@ -26,9 +26,17 @@ struct HomeView: View {
                             }
                         })
                     } else {
-                        // Streak Card
+                        // Top Row: Streak Card & Revision Score Card side by side
                         if let userStats = viewModel.userStats {
-                            StreakCard(streak: userStats.stats.currentStreak, maxStreak: userStats.stats.totalStreakDays)
+                            HStack(spacing: 12) {
+                                StreakCard(streak: userStats.stats.currentStreak, maxStreak: userStats.stats.totalStreakDays)
+                                
+                                RevisionScoreCard(
+                                    score: viewModel.revisionScore?.score ?? 100,
+                                    scoreResult: viewModel.revisionScore,
+                                    paletteManager: paletteManager
+                                )
+                            }
                         }
                         
                         // Main Stats Cards
@@ -161,7 +169,7 @@ struct HomeView: View {
 
 }
 
-// MARK: - Streak Card
+// MARK: - Streak Card (Half Width)
 struct StreakCard: View {
     let streak: Int
     var maxStreak: Int? = nil
@@ -179,39 +187,356 @@ struct StreakCard: View {
     }
     
     var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: streak == 0 ? "flame" : "flame.fill")
-                .font(.system(size: 40, weight: .semibold))
-                .foregroundStyle(.white)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: streak == 0 ? "flame" : "flame.fill")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                if maxStreakDisplay > 0 {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text("BEST")
+                            .font(.system(size: 9, weight: .bold))
+                            .textCase(.uppercase)
+                        Text("\(maxStreakDisplay)D")
+                            .font(.system(size: 11, weight: .bold))
+                    }
+                    .foregroundStyle(.white.opacity(0.5))
+                }
+            }
             
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(displayNumber)
-                    .font(.system(size: 48, weight: .bold))
+                    .font(.system(size: 40, weight: .bold))
                     .foregroundStyle(.white)
                 Text(daysText)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white.opacity(0.8))
             }
-            
-            Spacer()
-            
-            if maxStreakDisplay > 0 {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("BEST")
-                        .font(.system(size: 10, weight: .bold))
-                        .textCase(.uppercase)
-                    Text("\(maxStreakDisplay) DAYS")
-                        .font(.system(size: 13, weight: .bold))
-                }
-                .foregroundStyle(.white.opacity(0.4))
-            }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110, alignment: .leading)
         .background(
             LightingSunBackground(streak: streak)
         )
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+// MARK: - Loosely Spaced Grid Background
+struct LooselySpacedGridBackground: View {
+    @ObservedObject var paletteManager: ColorPaletteManager
+    var spacing: CGFloat = 22
+    
+    var body: some View {
+        Canvas { context, size in
+            let baseColor = paletteManager.color(at: 0)
+            let lineColor = baseColor.opacity(0.32)
+            let path = Path { p in
+                // Vertical grid lines
+                var x: CGFloat = spacing
+                while x < size.width {
+                    p.move(to: CGPoint(x: x, y: 0))
+                    p.addLine(to: CGPoint(x: x, y: size.height))
+                    x += spacing
+                }
+                
+                // Horizontal grid lines
+                var y: CGFloat = spacing
+                while y < size.height {
+                    p.move(to: CGPoint(x: 0, y: y))
+                    p.addLine(to: CGPoint(x: size.width, y: y))
+                    y += spacing
+                }
+            }
+            context.stroke(path, with: .color(lineColor), lineWidth: 0.65)
+        }
+    }
+}
+
+// MARK: - Revision Score Card (Pure black, loosely spaced thin grid with user palette, central number, liquid glass effect, NO text)
+struct RevisionScoreCard: View {
+    let score: Int
+    let scoreResult: RevisionScoreResponse?
+    @ObservedObject var paletteManager: ColorPaletteManager
+    @State private var showExplanationSheet = false
+    
+    var body: some View {
+        Button(action: {
+            HapticManager.shared.light()
+            showExplanationSheet = true
+        }) {
+            ZStack {
+                // 1. Pure black background
+                Color.black
+                
+                // 2. Loosely spaced grid with super thin lines in user selected palette
+                LooselySpacedGridBackground(paletteManager: paletteManager)
+                
+                // 3. Central score number with exact same font and color as streak card number
+                Text("\(score)")
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundStyle(.white)
+                    .layerEffect(
+                        ShaderLibrary.roundedGlass(
+                            .boundingRect,
+                            .float2(CGPoint(x: 80, y: 55)),
+                            .float(36),
+                            .float(24),
+                            .float(0.2),
+                            .float(2.4),
+                            .float(180)
+                        ),
+                        maxSampleOffset: CGSize(width: 80, height: 80)
+                    )
+            }
+            .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        paletteManager.color(at: 0).opacity(0.3),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+        .sheet(isPresented: $showExplanationSheet) {
+            RevisionScoreExplanationSheet(
+                score: score,
+                scoreResult: scoreResult,
+                paletteManager: paletteManager
+            )
+        }
+    }
+}
+
+// MARK: - Revision Score Explanation Sheet
+struct RevisionScoreExplanationSheet: View {
+    let score: Int
+    let scoreResult: RevisionScoreResponse?
+    @ObservedObject var paletteManager: ColorPaletteManager
+    @Environment(\.dismiss) private var dismiss
+    
+    private var tierTitle: String {
+        if score >= 90 { return "Mastery & Focus" }
+        if score >= 70 { return "Strong Retention" }
+        if score >= 50 { return "Building Momentum" }
+        return "Opportunity Zone"
+    }
+    
+    private var tierColor: Color {
+        if score >= 90 { return paletteManager.color(at: 0) }
+        if score >= 70 { return paletteManager.color(at: 1) }
+        if score >= 50 { return .yellow }
+        return .orange
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Top Hero Score Badge
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.black)
+                                .frame(width: 110, height: 110)
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [tierColor, tierColor.opacity(0.3)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 3
+                                        )
+                                )
+                                .shadow(color: tierColor.opacity(0.35), radius: 16, x: 0, y: 4)
+                            
+                            VStack(spacing: 2) {
+                                Text("\(score)")
+                                    .font(.system(size: 46, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white)
+                                Text("OUT OF 100")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                        }
+                        
+                        Text(tierTitle)
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(tierColor)
+                        
+                        Text("Weekly Revision Discipline & Retention Score")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 16)
+                    
+                    // Core Insight Box (Outcome-Agnostic Note)
+                    HStack(spacing: 14) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 24))
+                            .foregroundStyle(paletteManager.color(at: 0))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Outcome-Independent")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                            Text("Whether you passed or failed a problem does not lower this score. Showing up, engaging deeply, and preserving memory health is what matters.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.systemGray6).opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(paletteManager.color(at: 0).opacity(0.2), lineWidth: 1)
+                    )
+                    
+                    // 4 Dimensions Breakdown
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("SCORE BREAKDOWN")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .padding(.horizontal, 4)
+                        
+                        // 1. Memory Health (35%)
+                        ScoreDimensionRow(
+                            icon: "brain.head.profile",
+                            title: "Memory Health",
+                            weightText: "35% Weight",
+                            score: scoreResult?.breakdown.memoryHealth.score ?? score,
+                            detail: scoreResult?.breakdown.memoryHealth.detail ?? "Overall retention across all tracked DSA problems",
+                            color: paletteManager.color(at: 0)
+                        )
+                        
+                        // 2. Retention Lift (25%)
+                        ScoreDimensionRow(
+                            icon: "bolt.fill",
+                            title: "Retention Lift",
+                            weightText: "25% Weight",
+                            score: scoreResult?.breakdown.rLift.score ?? score,
+                            detail: scoreResult?.breakdown.rLift.detail ?? "Memory decay prevented by this week's review sessions",
+                            color: paletteManager.color(at: 1)
+                        )
+                        
+                        // 3. Completion Rate (25%)
+                        ScoreDimensionRow(
+                            icon: "checkmark.circle.fill",
+                            title: "Completion Rate",
+                            weightText: "25% Weight",
+                            score: scoreResult?.breakdown.completion.score ?? score,
+                            detail: scoreResult?.breakdown.completion.detail ?? "Percentage of scheduled reviews completed",
+                            color: .green
+                        )
+                        
+                        // 4. Consistency (15%)
+                        ScoreDimensionRow(
+                            icon: "calendar.badge.clock",
+                            title: "Consistency",
+                            weightText: "15% Weight",
+                            score: scoreResult?.breakdown.consistency.score ?? score,
+                            detail: scoreResult?.breakdown.consistency.detail ?? "Distribution of reviews across active days",
+                            color: .cyan
+                        )
+                    }
+                    
+                    if let period = scoreResult?.period {
+                        Text("Window: \(period.start) to \(period.end)")
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.4))
+                            .padding(.top, 8)
+                    }
+                }
+                .padding(20)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .navigationTitle("Revision Score")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundStyle(paletteManager.color(at: 0))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Score Dimension Row
+struct ScoreDimensionRow: View {
+    let icon: String
+    let title: String
+    let weightText: String
+    let score: Int
+    let detail: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(color)
+                    .frame(width: 22)
+                
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                
+                Spacer()
+                
+                Text(weightText)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.45))
+                
+                Text("\(score)")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(color)
+            }
+            
+            // Progress Bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 6)
+                    
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [color.opacity(0.8), color],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * CGFloat(min(max(score, 0), 100)) / 100.0, height: 6)
+                }
+            }
+            .frame(height: 6)
+            
+            Text(detail)
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.65))
+        }
+        .padding(14)
+        .background(Color(UIColor.systemGray6).opacity(0.4))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -3341,6 +3666,7 @@ class HomeViewModel: ObservableObject {
     @Published var recentSolves: [Solve]?
     @Published var todayRevisions: [Revision] = []
     @Published var completedRevisions: [Revision] = []  // Completed revisions for last 7 days
+    @Published var revisionScore: RevisionScoreResponse?
     @Published var frozenDates: Set<String> = []  // YYYY-MM-DD format for reliable comparison
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -3355,6 +3681,7 @@ class HomeViewModel: ObservableObject {
             self.recentSolves = DataManager.shared.recentSolves
             self.todayRevisions = DataManager.shared.todayRevisions
             self.completedRevisions = DataManager.shared.completedRevisions
+            self.revisionScore = DataManager.shared.revisionScore
         }
     }
     
@@ -3381,6 +3708,7 @@ class HomeViewModel: ObservableObject {
                 if self.recentSolves == nil { self.recentSolves = DataManager.shared.recentSolves }
                 if self.todayRevisions.isEmpty { self.todayRevisions = DataManager.shared.todayRevisions }
                 if self.completedRevisions.isEmpty { self.completedRevisions = DataManager.shared.completedRevisions }
+                if self.revisionScore == nil { self.revisionScore = DataManager.shared.revisionScore }
                 isLoading = false
             }
             // Update widgets with cached data
@@ -3400,20 +3728,19 @@ class HomeViewModel: ObservableObject {
             async let solveStatsTask = NetworkService.shared.getSolveStats()
             async let achievementStatsTask = NetworkService.shared.getAchievementStats()
             async let recentSolvesTask = NetworkService.shared.getSolves(limit: 200)
-            // Fetch upcoming only - backend filters for incomplete revisions
-            // Use revisionMode to fetch ML or normal revisions based on user setting
-            let revisionType = DataManager.shared.revisionMode
-            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50, type: revisionType)
-            async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true, type: revisionType)
+            async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50)
+            async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true)
+            async let scoreTask = try? NetworkService.shared.getRevisionScore()
 
-            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse, completedRevisionsResponse) = try await (
+            let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse, completedRevisionsResponse, scoreResult) = try await (
                 userStatsTask,
                 submissionStatsTask,
                 solveStatsTask,
                 achievementStatsTask,
                 recentSolvesTask,
                 revisionsTask,
-                completedRevisionsTask
+                completedRevisionsTask,
+                scoreTask
             )
             
             // Filter for today + overdue only (upcoming includes future dates we don't want)
@@ -3453,6 +3780,9 @@ class HomeViewModel: ObservableObject {
                 self.recentSolves = mergedSolves
                 self.todayRevisions = todayAndOverdue
                 self.completedRevisions = recentCompletedRevisions
+                if let scoreResult = scoreResult {
+                    self.revisionScore = scoreResult
+                }
                 // frozenDates already set at start of loadData
             }
             
@@ -3463,6 +3793,9 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.achievementStats = achievementStats
             DataManager.shared.todayRevisions = todayAndOverdue
             DataManager.shared.completedRevisions = recentCompletedRevisions
+            if let scoreResult = scoreResult {
+                DataManager.shared.revisionScore = scoreResult
+            }
             
             // Update timestamp
             DataManager.shared.lastFetchTimestamp = Date()
