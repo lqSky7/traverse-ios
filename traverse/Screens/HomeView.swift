@@ -227,31 +227,26 @@ struct StreakCard: View {
 
 // MARK: - Loosely Spaced Grid Background
 struct LooselySpacedGridBackground: View {
-    @ObservedObject var paletteManager: ColorPaletteManager
     var spacing: CGFloat = 48
     
     var body: some View {
         Canvas { context, size in
             let midX = size.width / 2
             let midY = size.height / 2
-            
-            let color0 = paletteManager.color(at: 0).opacity(0.38)
-            let color1 = paletteManager.color(at: 1).opacity(0.38)
-            let color2 = paletteManager.color(at: 2).opacity(0.38)
-            let color3 = paletteManager.color(at: 3).opacity(0.38)
+            let lineColor = Color.white.opacity(0.12)
             
             // Vertical center line
             var centerV = Path()
             centerV.move(to: CGPoint(x: midX, y: 0))
             centerV.addLine(to: CGPoint(x: midX, y: size.height))
-            context.stroke(centerV, with: .color(color0), lineWidth: 0.5)
+            context.stroke(centerV, with: .color(lineColor), lineWidth: 0.5)
             
             // Symmetrical left vertical line
             if midX - spacing > 0 {
                 var leftV = Path()
                 leftV.move(to: CGPoint(x: midX - spacing, y: 0))
                 leftV.addLine(to: CGPoint(x: midX - spacing, y: size.height))
-                context.stroke(leftV, with: .color(color1), lineWidth: 0.5)
+                context.stroke(leftV, with: .color(lineColor), lineWidth: 0.5)
             }
             
             // Symmetrical right vertical line
@@ -259,21 +254,21 @@ struct LooselySpacedGridBackground: View {
                 var rightV = Path()
                 rightV.move(to: CGPoint(x: midX + spacing, y: 0))
                 rightV.addLine(to: CGPoint(x: midX + spacing, y: size.height))
-                context.stroke(rightV, with: .color(color2), lineWidth: 0.5)
+                context.stroke(rightV, with: .color(lineColor), lineWidth: 0.5)
             }
             
             // Horizontal center line
             var centerH = Path()
             centerH.move(to: CGPoint(x: 0, y: midY))
             centerH.addLine(to: CGPoint(x: size.width, y: midY))
-            context.stroke(centerH, with: .color(color3), lineWidth: 0.5)
+            context.stroke(centerH, with: .color(lineColor), lineWidth: 0.5)
             
             // Symmetrical top horizontal line
             if midY - spacing > 0 {
                 var topH = Path()
                 topH.move(to: CGPoint(x: 0, y: midY - spacing))
                 topH.addLine(to: CGPoint(x: size.width, y: midY - spacing))
-                context.stroke(topH, with: .color(color1), lineWidth: 0.5)
+                context.stroke(topH, with: .color(lineColor), lineWidth: 0.5)
             }
             
             // Symmetrical bottom horizontal line
@@ -281,7 +276,7 @@ struct LooselySpacedGridBackground: View {
                 var botH = Path()
                 botH.move(to: CGPoint(x: 0, y: midY + spacing))
                 botH.addLine(to: CGPoint(x: size.width, y: midY + spacing))
-                context.stroke(botH, with: .color(color2), lineWidth: 0.5)
+                context.stroke(botH, with: .color(lineColor), lineWidth: 0.5)
             }
         }
     }
@@ -302,14 +297,14 @@ struct RevisionScoreCard: View {
                 let width = geometry.size.width
                 let height = geometry.size.height
                 let center = CGPoint(x: width / 2, y: height / 2)
-                let circleRadius: CGFloat = 56
+                let circleRadius: CGFloat = 44
                 
                 ZStack {
                     // 1. Pure black background
                     Color.black
                     
-                    // 2. Loosely spaced grid with different palette colors on super thin lines
-                    LooselySpacedGridBackground(paletteManager: paletteManager, spacing: 48)
+                    // 2. Loosely spaced grayscale grid matching border
+                    LooselySpacedGridBackground(spacing: 48)
                     
                     // 3. Central score number with exact same font and color as streak card number
                     Text("\(score)")
@@ -320,11 +315,11 @@ struct RevisionScoreCard: View {
                     ShaderLibrary.roundedGlass(
                         .boundingRect,
                         .float2(center),
-                        .float(circleRadius), // radius (slider in demo: 56)
-                        .float(6.9),          // intensity (slider in demo: 6.9)
-                        .float(1.0),          // CA (slider in demo: 1.0)
-                        .float(2.6),          // border / refraction (slider in demo: 2.6)
-                        .float(360)           // size (demo default: 360)
+                        .float(circleRadius), // radius
+                        .float(6.9),          // intensity
+                        .float(1.0),          // CA
+                        .float(2.6),          // border / refraction
+                        .float(360)           // size
                     ),
                     maxSampleOffset: CGSize(width: 150, height: 150)
                 )
