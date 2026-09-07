@@ -57,6 +57,28 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				INDEX.md,
+				"Models/INDEX.md",
+				"Screens/INDEX.md",
+				"Screens/Home/INDEX.md",
+				"Screens/Home/Components/INDEX.md",
+				"Screens/Home/Screens/INDEX.md",
+				"Screens/Home/Sheets/INDEX.md",
+				"Screens/OnPaper/INDEX.md",
+				"Screens/OnPaper/Components/INDEX.md",
+				"Screens/OnPaper/Sheets/INDEX.md",
+				"Screens/Profile/INDEX.md",
+				"Screens/Profile/Components/INDEX.md",
+				"Screens/Revisions/INDEX.md",
+				"Screens/Revisions/Components/INDEX.md",
+				"Screens/Revisions/Helpers/INDEX.md",
+				"Screens/Revisions/Sheets/INDEX.md",
+				"Services/INDEX.md",
+				"Services/Network/INDEX.md",
+				"Shaders/INDEX.md",
+				"Views/INDEX.md",
+				"Views/Demos/INDEX.md",
+				"assets/INDEX.md",
 			);
 			target = 6AAF62C72EF90FE6006944A1 /* traverse */;
 		};
