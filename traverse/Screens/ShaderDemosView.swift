@@ -24,6 +24,8 @@ enum ShaderDemoTab: String, CaseIterable, Identifiable {
     case lightAndTilt = "Light & Tilt"
     case lightCard = "Light Card"
     case domainWarping = "Voice Domain Warp"
+    case liquidGlass = "Liquid Glass"
+    case cornerPeel = "Corner Peel"
 
     var id: String { rawValue }
 
@@ -45,6 +47,8 @@ enum ShaderDemoTab: String, CaseIterable, Identifiable {
         case .lightAndTilt: return "iphone.radiowaves.left.and.right"
         case .lightCard: return "light.beacon.max"
         case .domainWarping: return "waveform"
+        case .liquidGlass: return "drop.degreesign.fill"
+        case .cornerPeel: return "arrow.turn.down.right"
         }
     }
 }
@@ -91,6 +95,10 @@ struct ShaderDemosView: View {
                     LightCardDemoView()
                 case .domainWarping:
                     DomainWarpingDemoView()
+                case .liquidGlass:
+                    LiquidGlassDemoView()
+                case .cornerPeel:
+                    CornerPeelDemoView()
                 }
             }
             .navigationTitle("Shader & UI Gallery")

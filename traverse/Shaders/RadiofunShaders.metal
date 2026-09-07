@@ -408,3 +408,155 @@ static float rf_fbm(float2 st) {
     half3 color = half3(l.sample(newpos * size).rgb);
     return half4(color, 1.0);
 }
+
+// MARK: - Minsang Metal Sample (MinsangMetalSample)
+static float sdRoundedRectLens(float2 pos, float2 halfSize, float4 cornerRadius) {
+    cornerRadius.xy = (pos.x > 0.0) ? cornerRadius.xy : cornerRadius.zw;
+    cornerRadius.x  = (pos.y > 0.0) ? cornerRadius.x  : cornerRadius.y;
+    float2 q = abs(pos) - halfSize + cornerRadius.x;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - cornerRadius.x;
+}
+
+[[ stitchable ]]
+half4 roundedGlass(float2 pos,
+                   SwiftUI::Layer l,
+                   float4 boundingRect,
+                   float2 dragp,
+                   float cornerRadius,
+                   float intensity,
+                   float dispersion,
+                   float blurStrength,
+                   float sizing)
+{
+    float2 size = float2(sizing, sizing);
+    float2 uv   = pos / size;
+    float2 p    = pos - dragp;
+
+    // chaotic radius
+    float localCorner = max(1.0, cornerRadius);
+
+    // SDF
+    float sdf = sdRoundedRectLens(p, size * 0.35 - localCorner, float4(localCorner));
+
+    // band/edge masks
+    const float band     = cornerRadius * 0.2;
+    const float strokePx = 0.5;
+    float edgeMask   = 1.0 - smoothstep(0.0, band,    abs(sdf));
+    float strokeMask = 1.0 - smoothstep(0.0, strokePx,abs(sdf));
+
+    if (sdf > strokeMask) { return l.sample(uv * size); }
+
+    // refraction
+    float2 n       = normalize(float2(dfdx(sdf), dfdy(sdf)) + 1e-5);
+    float2 offset  = n * edgeMask * intensity / size * 1.3;
+    float2 uvSample = uv - offset;
+
+    float chroma   = offset.y * dispersion * edgeMask;
+    half4 colR = l.sample((uvSample - n * chroma) * size);
+    half4 colG = l.sample( uvSample * size);
+    half4 colB = l.sample((uvSample + n * chroma) * size);
+    half3 rgb  = half3(colR.r, colG.g, colB.b);
+
+    rgb = mix(rgb * 0.94h,   // 20 % darker inside
+              rgb,           // unchanged outside
+              step(0.0, sdf) // 0 inside (sdf < 0) → 1 outside
+    );
+
+    // ── translucent stroke ──
+    const float strokeOpacity = 0.6;               // adjust to taste
+    rgb  = mix(rgb, half3(1.0), strokeMask * strokeOpacity);
+
+    float baseAlpha = l.sample(uvSample * size).a;
+    float alpha     = mix(baseAlpha, baseAlpha * strokeOpacity, strokeMask);
+
+    return half4(rgb, alpha);
+}
+
+// --- Corner Peel: paper folds from a corner based on the angle, progress 0=flat 1=fully folded ---
+// Geometry: fold line sweeps across the image based on the provided angle.
+[[ stitchable ]] half4 cornerPeel(float2 pos, SwiftUI::Layer l, float4 boundingRect, float progress, float opacity, float angle) {
+    float2 size  = boundingRect.zw;
+    float2 uv    = pos / size;
+
+    if (progress <= 0.001) return l.sample(pos);
+    if (progress >= 0.999) return half4(0.0);
+
+    float aspect  = size.x / size.y;
+
+    // Physical UV: x scaled by aspect for isotropic distance
+    float physX = uv.x * aspect;
+    float physY = uv.y;
+
+    // Normal vector for the fold line based on the angle.
+    // Default 45 degrees (pi/4) points from top-left to bottom-right.
+    float2 N = float2(cos(angle), sin(angle));
+
+    float pDist = physX * N.x + physY * N.y;
+
+    // Determine the minimum and maximum projections of the 4 corners of the image onto the normal N.
+    float d1 = 0.0;
+    float d2 = aspect * N.x;
+    float d3 = 1.0 * N.y;
+    float d4 = aspect * N.x + 1.0 * N.y;
+
+    float minD = min(min(d1, d2), min(d3, d4));
+    float maxD = max(max(d1, d2), max(d3, d4));
+
+    // foldC sweeps across the entire image based on progress
+    float foldC = mix(maxD, minD, progress);
+
+    // Signed distance from fold line
+    float d = pDist - foldC;
+
+    if (d > 0.0) {
+        // Vacated area where the corner used to be
+        return half4(0.0);
+    } else {
+        // Flat side of the fold line, which includes the flat paper AND the folded flap lying on top.
+        
+        // Find where this pixel maps to on the original un-folded paper
+        float reflX = physX - 2.0 * d * N.x;
+        float reflY = physY - 2.0 * d * N.y;
+        
+        bool inFlap = (reflX >= 0.0 && reflX <= aspect && reflY >= 0.0 && reflY <= 1.0);
+        
+        if (inFlap) {
+            // This pixel is part of the folded flap covering the flat paper!
+            // Sample the source pixel of the flap to show the reflected image
+            // Horizontally flip the UV to simulate seeing through the back of the paper
+            float2 srcUV = float2(1.0 - (reflX / aspect), reflY);
+            half4 srcColor = l.sample(srcUV * size);
+            
+            // Mix the image with white paper color (e.g. 15% opacity for the image)
+            half3 baseColor = mix(half3(1.0), srcColor.rgb, opacity);
+            
+            float foldDist = -d;
+            
+            // Self-shadow near the fold line for 3D volume
+            float selfShadow = exp(-foldDist * 25.0) * 0.15;
+            
+            // Specular curl highlight where the paper starts to bend
+            float curlHighlight = smoothstep(0.0, 0.05, foldDist) * smoothstep(0.15, 0.05, foldDist) * 0.3;
+            
+            // Apply shading to the base paper color to give it 3D volume
+            half3 flapColor = baseColor * half3(1.0 - selfShadow) + half3(curlHighlight);
+            
+            return half4(flapColor, srcColor.a);
+        } else {
+            // Flat paper
+            half4 color = l.sample(pos);
+            
+            // Distance from this pixel to the folded flap
+            float distX = max(0.0, reflX < 0.0 ? -reflX : (reflX > aspect ? reflX - aspect : 0.0));
+            float distY = max(0.0, reflY < 0.0 ? -reflY : (reflY > 1.0 ? reflY - 1.0 : 0.0));
+            float flapDist = sqrt(distX * distX + distY * distY);
+            
+            // Soft drop shadow cast by the flap onto the flat paper
+            float dropShadowStr = exp(-flapDist * 30.0) * 0.4;
+            color.rgb *= half3(1.0 - dropShadowStr);
+            
+            return color;
+        }
+    }
+}
+

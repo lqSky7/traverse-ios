@@ -62,6 +62,7 @@ struct User: Codable {
     let createdAt: String?
     var profileImageURL: String?
     var calendarToken: String?
+    var isSubscriptionActive: Bool?
 }
 
 struct AuthResponse: Codable {

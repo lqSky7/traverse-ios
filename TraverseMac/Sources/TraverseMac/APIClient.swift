@@ -253,30 +253,28 @@ final class APIClient {
         try await delete("/friends/\(username)")
     }
 
-    func revisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0, type: String = "normal") async throws -> RevisionsResponse {
+    func revisions(upcoming: Bool = false, overdue: Bool = false, limit: Int = 50, offset: Int = 0) async throws -> RevisionsResponse {
         var items = [
             URLQueryItem(name: "limit", value: "\(limit)"),
-            URLQueryItem(name: "offset", value: "\(offset)"),
-            URLQueryItem(name: "type", value: type)
+            URLQueryItem(name: "offset", value: "\(offset)")
         ]
         if upcoming { items.append(URLQueryItem(name: "upcoming", value: "true")) }
         if overdue { items.append(URLQueryItem(name: "overdue", value: "true")) }
         return try await send("/revisions", queryItems: items, authorized: true)
     }
 
-    func groupedRevisions(includeCompleted: Bool = false, type: String = "normal") async throws -> GroupedRevisionsResponse {
+    func groupedRevisions(includeCompleted: Bool = false) async throws -> GroupedRevisionsResponse {
         try await send(
             "/revisions/grouped",
             queryItems: [
-                URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false"),
-                URLQueryItem(name: "type", value: type)
+                URLQueryItem(name: "includeCompleted", value: includeCompleted ? "true" : "false")
             ],
             authorized: true
         )
     }
 
-    func revisionStats(type: String = "normal") async throws -> RevisionStatsResponse {
-        try await send("/revisions/stats", queryItems: [URLQueryItem(name: "type", value: type)], authorized: true)
+    func revisionStats() async throws -> RevisionStatsResponse {
+        try await send("/revisions/stats", authorized: true)
     }
 
     func revisionAnalytics() async throws -> RevisionAnalyticsResponse {
@@ -288,8 +286,8 @@ final class APIClient {
     }
 
 
-    func completeRevision(id: Int) async throws -> CompleteRevisionResponse {
-        try await send("/revisions/\(id)/complete", method: "POST", body: EmptyBody(), authorized: true)
+    func completeRevision(id: Int) async throws -> RevisionAttemptResponse {
+        try await recordRevisionAttempt(id: id, outcome: 1, numTries: 1, timeSpentMinutes: 5)
     }
 
     func recordRevisionAttempt(id: Int, outcome: Int, numTries: Int, timeSpentMinutes: Double) async throws -> RevisionAttemptResponse {
