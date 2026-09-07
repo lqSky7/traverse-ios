@@ -26,6 +26,12 @@ struct MainTabView: View {
                     }
                     .tag(2)
                 
+                OnPaperMainView()
+                    .tabItem {
+                        Label("OnPaper", systemImage: "book.pages")
+                    }
+                    .tag(4)
+                
                 SettingsView()
                     .tint(.blue)
                     .tabItem {
@@ -61,6 +67,12 @@ struct MainTabView: View {
                         Label("Friends", systemImage: selectedTab == 2 ? "person.2.fill" : "person.2")
                     }
                     .tag(2)
+                
+                OnPaperMainView()
+                    .tabItem {
+                        Label("OnPaper", systemImage: selectedTab == 4 ? "book.pages.fill" : "book.pages")
+                    }
+                    .tag(4)
                 
                 SettingsView()
                     .tint(.blue)

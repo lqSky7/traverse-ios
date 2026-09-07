@@ -225,64 +225,67 @@ struct StreakCard: View {
     }
 }
 
-// MARK: - Loosely Spaced Grid Background
-struct LooselySpacedGridBackground: View {
-    var spacing: CGFloat = 48
+// MARK: - Thinking Orb Score Effect (Settings > Shaders & Demos > Thinking Orb)
+struct ThinkingOrbScoreView: View {
+    let score: Int
+    @ObservedObject var paletteManager: ColorPaletteManager
+    
+    // Normalized score factor [0.0, 1.0]
+    private var normalizedScore: CGFloat {
+        CGFloat(min(max(score, 0), 100)) / 100.0
+    }
     
     var body: some View {
-        Canvas { context, size in
-            let midX = size.width / 2
-            let midY = size.height / 2
-            let lineColor = Color.white.opacity(0.12)
+        TimelineView(.animation) { timeline in
+            let now = timeline.date.timeIntervalSinceReferenceDate
+            let speed = 0.6 + Double(normalizedScore) * 0.8
+            let phase = now * speed
+            let progress = sin(phase)
             
-            // Vertical center line
-            var centerV = Path()
-            centerV.move(to: CGPoint(x: midX, y: 0))
-            centerV.addLine(to: CGPoint(x: midX, y: size.height))
-            context.stroke(centerV, with: .color(lineColor), lineWidth: 0.5)
+            let primaryColor = paletteManager.color(at: 0)
+            let secondaryColor = paletteManager.color(at: 1)
             
-            // Symmetrical left vertical line
-            if midX - spacing > 0 {
-                var leftV = Path()
-                leftV.move(to: CGPoint(x: midX - spacing, y: 0))
-                leftV.addLine(to: CGPoint(x: midX - spacing, y: size.height))
-                context.stroke(leftV, with: .color(lineColor), lineWidth: 0.5)
+            // Dynamic scale and opacity driven by revision score
+            let orbScale = 0.55 + 0.35 * normalizedScore
+            let orbOpacity = 0.40 + 0.55 * normalizedScore
+            
+            ZStack {
+                // Primary ambient glow body
+                RoundedRectangle(cornerRadius: 120, style: .continuous)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [primaryColor, secondaryColor],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 110, height: 110)
+                    .blur(radius: 24)
+                    .rotationEffect(Angle(radians: progress * 0.7))
+                
+                // Secondary core layer
+                RoundedRectangle(cornerRadius: 120, style: .continuous)
+                    .foregroundStyle(secondaryColor.mix(with: .white, by: 0.35))
+                    .frame(width: 70, height: 42)
+                    .blur(radius: 18)
+                    .rotationEffect(Angle(radians: -progress * 0.7))
+                
+                // Bright white filament highlight
+                RoundedRectangle(cornerRadius: 120, style: .continuous)
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .frame(width: 80, height: 40)
+                    .offset(y: -14)
+                    .blur(radius: 24)
+                    .rotationEffect(Angle(radians: progress * 0.35))
             }
-            
-            // Symmetrical right vertical line
-            if midX + spacing < size.width {
-                var rightV = Path()
-                rightV.move(to: CGPoint(x: midX + spacing, y: 0))
-                rightV.addLine(to: CGPoint(x: midX + spacing, y: size.height))
-                context.stroke(rightV, with: .color(lineColor), lineWidth: 0.5)
-            }
-            
-            // Horizontal center line
-            var centerH = Path()
-            centerH.move(to: CGPoint(x: 0, y: midY))
-            centerH.addLine(to: CGPoint(x: size.width, y: midY))
-            context.stroke(centerH, with: .color(lineColor), lineWidth: 0.5)
-            
-            // Symmetrical top horizontal line
-            if midY - spacing > 0 {
-                var topH = Path()
-                topH.move(to: CGPoint(x: 0, y: midY - spacing))
-                topH.addLine(to: CGPoint(x: size.width, y: midY - spacing))
-                context.stroke(topH, with: .color(lineColor), lineWidth: 0.5)
-            }
-            
-            // Symmetrical bottom horizontal line
-            if midY + spacing < size.height {
-                var botH = Path()
-                botH.move(to: CGPoint(x: 0, y: midY + spacing))
-                botH.addLine(to: CGPoint(x: size.width, y: midY + spacing))
-                context.stroke(botH, with: .color(lineColor), lineWidth: 0.5)
-            }
+            .scaleEffect(orbScale)
+            .opacity(orbOpacity)
+            .blendMode(.screen)
         }
     }
 }
 
-// MARK: - Revision Score Card (Pure black, loosely spaced thin grid with user palette, central number, liquid glass effect, NO text)
+// MARK: - Revision Score Card (Pure black, Thinking Orb in top right, central number, NO grid, NO glass)
 struct RevisionScoreCard: View {
     let score: Int
     @ObservedObject var paletteManager: ColorPaletteManager
@@ -293,37 +296,24 @@ struct RevisionScoreCard: View {
             HapticManager.shared.selection()
             showExplanationSheet = true
         }) {
-            GeometryReader { geometry in
-                let width = geometry.size.width
-                let height = geometry.size.height
-                let center = CGPoint(x: width / 2, y: height / 2)
-                let circleRadius: CGFloat = 35
-                let sizeValue: CGFloat = circleRadius / 0.35 // 100pt, producing exact 35pt radius / 70pt diameter circle
+            ZStack {
+                // 1. Pure black background
+                Color.black
                 
-                ZStack {
-                    // 1. Pure black background
-                    Color.black
-                    
-                    // 2. Loosely spaced grayscale grid matching border
-                    LooselySpacedGridBackground(spacing: 48)
-                    
-                    // 3. Central score number with exact same font and color as streak card number
-                    Text("\(score)")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundStyle(.white)
+                // 2. Thinking Orb pushed to very top-right corner
+                VStack {
+                    HStack {
+                        Spacer()
+                        ThinkingOrbScoreView(score: score, paletteManager: paletteManager)
+                            .offset(x: 24, y: -24)
+                    }
+                    Spacer()
                 }
-                .layerEffect(
-                    ShaderLibrary.roundedGlass(
-                        .boundingRect,
-                        .float2(center),
-                        .float(circleRadius), // radius: 35
-                        .float(6.9),          // intensity: 6.9
-                        .float(1.0),          // CA: 1.0
-                        .float(2.6),          // border / refraction: 2.6
-                        .float(sizeValue)     // size: 100
-                    ),
-                    maxSampleOffset: CGSize(width: 150, height: 150)
-                )
+                
+                // 3. Central score number with exact same font and color as streak card number
+                Text("\(score)")
+                    .font(.system(size: 40, weight: .bold))
+                    .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

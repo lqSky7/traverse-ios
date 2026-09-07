@@ -67,32 +67,37 @@ struct RevisionsView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
-                            if useMLRevision {
-                                if isSubscribed {
-                                    Picker("ML View", selection: $mlTab) {
-                                        ForEach(MLTab.allCases) { tab in
-                                            Text(tab.rawValue).tag(tab)
-                                        }
-                                    }
-                                    .pickerStyle(.segmented)
+                            // Segmented Picker for Upcoming vs Analytics
+                            Picker("View", selection: $mlTab) {
+                                ForEach(MLTab.allCases) { tab in
+                                    Text(tab.rawValue).tag(tab)
                                 }
+                            }
+                            .pickerStyle(.segmented)
 
-                                if mlTab == .analytics {
-                                    if isAnalyticsLoading {
-                                        ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
-                                            .padding(.top, 8)
-                                    } else if let analytics = analytics {
-                                        RevisionAnalyticsSection(analytics: analytics)
-                                    } else if let analyticsError = analyticsError {
+                            if mlTab == .analytics {
+                                if isAnalyticsLoading && analytics == nil {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
+                                        .padding(.top, 40)
+                                } else if let analytics = analytics {
+                                    RevisionAnalyticsSection(analytics: analytics)
+                                } else if let analyticsError = analyticsError {
+                                    VStack(spacing: 12) {
                                         Text(analyticsError)
-                                            .font(.caption)
+                                            .font(.subheadline)
                                             .foregroundStyle(.secondary)
+                                        Button("Retry") {
+                                            Task { await loadAnalytics() }
+                                        }
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(paletteManager.selectedPalette.primary)
                                     }
+                                    .padding(.top, 40)
                                 }
                             }
 
-                            if !useMLRevision || mlTab == .upcoming {
+                            if mlTab == .upcoming {
                                 if isLoading && revisionGroups.isEmpty {
                                     ProgressView()
                                         .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
@@ -254,6 +259,7 @@ struct RevisionsView: View {
         }
 
         .onAppear {
+            isSubscribed = authViewModel.currentUser?.isSubscriptionActive ?? cachedSubscriptionStatus
             useMLRevision = true
             dailyCapDraft = authViewModel.currentUser?.maxDailyReviews ?? 20
             // Load from cache first
@@ -367,6 +373,9 @@ struct RevisionsView: View {
         let shouldRefresh = forceCheck || (isPast0001 && lastCheckWasBeforeToday)
 
         guard shouldRefresh else {
+            await MainActor.run {
+                isSubscribed = cachedSubscriptionStatus
+            }
             return
         }
 
