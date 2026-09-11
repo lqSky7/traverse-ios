@@ -102,3 +102,41 @@ struct RecoveryResponse: Codable {
 struct ErrorResponse: Codable {
     let error: String
 }
+
+// MARK: - Social (WorkOS) Auth
+
+/// Social identity providers exposed by the backend via WorkOS.
+/// The raw value is what the backend's `/auth/social/:provider` route expects.
+enum SocialProvider: String, CaseIterable, Identifiable {
+    case google
+    case github
+    case apple
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .google: return "Google"
+        case .github: return "GitHub"
+        case .apple: return "Apple"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .google: return "globe"
+        case .github: return "chevron.left.forwardslash.chevron.right"
+        case .apple: return "apple.logo"
+        }
+    }
+}
+
+/// Response of `GET /auth/social/:provider` — the WorkOS authorization URL.
+struct SocialAuthURLResponse: Codable {
+    let url: String
+}
+
+/// Request body for `POST /auth/social/callback`.
+struct SocialCallbackRequest: Codable {
+    let code: String
+}

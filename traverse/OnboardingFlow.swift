@@ -16,6 +16,11 @@ struct OnboardingFlow: View {
     let form: [FormStep]
     let completion: CompletionStep
     
+    /// Optional WorkOS social sign-in row shown on the welcome step.
+    var socialProviders: [SocialProvider] = []
+    var isSocialLoading: Bool = false
+    var onSocialLogin: ((SocialProvider) -> Void)? = nil
+    
     @FocusState private var keyboardShown: Bool
     @State private var showGradient = true
     @State private var continueTapped = 0
@@ -100,7 +105,10 @@ struct OnboardingFlow: View {
                                     }
                                 }
                             }
-                        }
+                        },
+                        socialProviders: socialProviders,
+                        isSocialLoading: isSocialLoading,
+                        onSocialLogin: onSocialLogin
                     )
                     .transition(
                         .opacity
