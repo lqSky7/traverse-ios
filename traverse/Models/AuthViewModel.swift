@@ -90,6 +90,7 @@ class AuthViewModel: ObservableObject {
                 sharedDefaults.removeObject(forKey: "widgetData")
                 sharedDefaults.synchronize()
             }
+            KeychainHelper.shared.deleteRefreshToken()
             isAuthenticated = false
             currentUser = nil
             profileImageUrl = nil
@@ -103,6 +104,7 @@ class AuthViewModel: ObservableObject {
                 UserDefaults.standard.removeObject(forKey: "catImageURL_\(userId)")
             }
             KeychainHelper.shared.deleteToken()
+            KeychainHelper.shared.deleteRefreshToken()
             // Clear DataManager cache
             DataManager.shared.clearAllData()
             // Reset toast manager seen state

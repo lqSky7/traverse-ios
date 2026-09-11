@@ -15,7 +15,7 @@ extension NetworkService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -53,7 +53,7 @@ extension NetworkService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -92,7 +92,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -132,7 +132,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -169,7 +169,7 @@ extension NetworkService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -207,7 +207,7 @@ extension NetworkService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         

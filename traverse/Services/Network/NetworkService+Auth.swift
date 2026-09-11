@@ -29,6 +29,9 @@ extension NetworkService {
                 if let token = authResponse.token {
                     _ = KeychainHelper.shared.saveToken(token)
                 }
+                if let refreshToken = authResponse.refreshToken {
+                    _ = KeychainHelper.shared.saveRefreshToken(refreshToken)
+                }
                 
                 return authResponse
             } catch {
@@ -75,6 +78,9 @@ extension NetworkService {
                 if let token = loginResponse.token {
                     _ = KeychainHelper.shared.saveToken(token)
                 }
+                if let refreshToken = loginResponse.refreshToken {
+                    _ = KeychainHelper.shared.saveRefreshToken(refreshToken)
+                }
                 
                 return loginResponse
             } catch {
@@ -112,7 +118,7 @@ extension NetworkService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (_, response) = try await URLSession.shared.data(for: request)
         
@@ -139,7 +145,7 @@ extension NetworkService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
@@ -188,7 +194,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -228,7 +234,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -326,7 +332,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -366,7 +372,7 @@ extension NetworkService {
         
         // Add existing token if available
         if let token = KeychainHelper.shared.getToken() {
-            request.setValue("auth_token=\(token)", forHTTPHeaderField: "Cookie")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
         request.httpBody = try JSONEncoder().encode(requestBody)
@@ -393,5 +399,41 @@ extension NetworkService {
         }
     }
     
-
+    // MARK: - Refresh Access Token
+    func refreshAccessToken() async throws {
+        guard let refreshToken = KeychainHelper.shared.getRefreshToken() else {
+            throw NetworkError.serverError("No refresh token available")
+        }
+        
+        guard let url = URL(string: "\(baseURL)/auth/refresh") else {
+            throw NetworkError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["refreshToken": refreshToken])
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            KeychainHelper.shared.deleteToken()
+            KeychainHelper.shared.deleteRefreshToken()
+            throw NetworkError.serverError("Token refresh failed")
+        }
+        
+        struct RefreshResponse: Codable {
+            let accessToken: String
+            let refreshToken: String?
+            let token: String?
+        }
+        
+        let refreshResponse = try JSONDecoder().decode(RefreshResponse.self, from: data)
+        let newToken = refreshResponse.token ?? refreshResponse.accessToken
+        _ = KeychainHelper.shared.saveToken(newToken)
+        if let newRefresh = refreshResponse.refreshToken {
+            _ = KeychainHelper.shared.saveRefreshToken(newRefresh)
+        }
+    }
 }

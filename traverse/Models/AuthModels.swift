@@ -69,12 +69,14 @@ struct AuthResponse: Codable {
     let message: String
     let user: User
     let token: String?
+    let refreshToken: String?
 }
 
 struct LoginResponse: Codable {
     let message: String
     let user: User
     let token: String?
+    let refreshToken: String?
 }
 
 struct UserResponse: Codable {
