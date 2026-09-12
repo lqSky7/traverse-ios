@@ -123,24 +123,7 @@ struct SignInView: View {
                         authViewModel.isAuthenticated = true
                     }
                 }
-            ), socialProviders: SocialProvider.allCases,
-            isSocialLoading: authViewModel.isSocialSigningIn,
-            onSocialLogin: { provider in
-                Task {
-                    try? await authViewModel.signInWithSocial(provider: provider)
-                }
-            }
-        )
-        .alert(
-            "Sign-in failed",
-            isPresented: Binding(
-                get: { authViewModel.errorMessage != nil },
-                set: { if !$0 { authViewModel.errorMessage = nil } }
             )
-        ) {
-            Button("OK", role: .cancel) { authViewModel.errorMessage = nil }
-        } message: {
-            Text(authViewModel.errorMessage ?? "")
-        }
+        )
     }
 }

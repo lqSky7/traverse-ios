@@ -16,10 +16,8 @@ class AuthViewModel: ObservableObject {
     @Published var currentUser: User?
     @Published var errorMessage: String?
     @Published var profileImageUrl: String?
-    @Published var isSocialSigningIn: Bool = false
     
     private let networkService = NetworkService.shared
-    private let socialAuthManager = SocialAuthManager.shared
     
     init() {
         checkAuthentication()
@@ -71,49 +69,6 @@ class AuthViewModel: ObservableObject {
             throw error
         } catch {
             errorMessage = "Login failed"
-            throw error
-        }
-    }
-    
-    /// Runs the WorkOS social sign-in flow (Google / GitHub / Apple).
-    ///
-    /// 1. Asks the backend for a WorkOS authorization URL for the provider.
-    /// 2. Presents it in a secure system browser session.
-    /// 3. Exchanges the returned authorization code for a Traverse session.
-    /// 4. Hydrates the profile + cached data and flips `isAuthenticated`.
-    func signInWithSocial(provider: SocialProvider) async throws {
-        isSocialSigningIn = true
-        errorMessage = nil
-
-        defer { isSocialSigningIn = false }
-
-        do {
-            let authURL = try await networkService.getSocialAuthURL(
-                provider: provider,
-                redirectURI: SocialAuthManager.redirectURI
-            )
-
-            let code = try await socialAuthManager.authenticate(url: authURL)
-
-            let response = try await networkService.exchangeSocialCode(code)
-            currentUser = response.user
-            username = response.user.username
-            email = response.user.email ?? ""
-
-            // Hydrate the freshly signed-in account the same way password sign-in does.
-            try await fetchCurrentUser()
-
-            if let username = currentUser?.username {
-                try await DataManager.shared.fetchAllData(username: username)
-            }
-
-            isAuthenticated = true
-            errorMessage = nil
-        } catch let error as NetworkError {
-            errorMessage = error.localizedDescription
-            throw error
-        } catch {
-            errorMessage = error.localizedDescription
             throw error
         }
     }

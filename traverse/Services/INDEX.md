@@ -10,7 +10,6 @@
 | `NotificationManager.swift` | Local user notification scheduler for daily streak and review reminders | `class NotificationManager` |
 | `OnPaperAPIService.swift` | Networking client connecting to OnPaper project & FSRS sync backends | `class OnPaperAPIService` |
 | `QRCodeGenerator.swift` | CoreImage utility rendering personal profile QR code images | `class QRCodeGenerator` |
-| `SocialAuthManager.swift` | Runs the WorkOS Google/GitHub/Apple OAuth handshake in an `ASWebAuthenticationSession` | `class SocialAuthManager: NSObject`, `enum SocialAuthError` |
 | `WatchSyncManager.swift` | WatchConnectivity session coordinator syncing data with Apple Watch | `class WatchSyncManager: NSObject` |
 | `WidgetDataUpdater.swift` | App Group data synchronizer reloading WidgetKit timelines | `class WidgetDataUpdater` |
 

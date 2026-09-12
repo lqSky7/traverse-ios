@@ -122,13 +122,6 @@ struct SignUpView: View {
                     }
                 )
             ],
-            socialProviders: SocialProvider.allCases,
-            isSocialLoading: authViewModel.isSocialSigningIn,
-            onSocialLogin: { provider in
-                Task {
-                    try? await authViewModel.signInWithSocial(provider: provider)
-                }
-            },
             completion: CompletionStep(
                 title: "Creating your account",
                 description: "Hold tight while we set everything up",
@@ -154,17 +147,6 @@ struct SignUpView: View {
                 }
             )
         )
-        .alert(
-            "Sign-in failed",
-            isPresented: Binding(
-                get: { authViewModel.errorMessage != nil },
-                set: { if !$0 { authViewModel.errorMessage = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) { authViewModel.errorMessage = nil }
-        } message: {
-            Text(authViewModel.errorMessage ?? "")
-        }
     }
 }
 

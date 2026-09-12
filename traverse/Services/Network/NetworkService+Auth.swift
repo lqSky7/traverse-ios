@@ -29,9 +29,6 @@ extension NetworkService {
                 if let token = authResponse.token {
                     _ = KeychainHelper.shared.saveToken(token)
                 }
-                if let refreshToken = authResponse.refreshToken {
-                    _ = KeychainHelper.shared.saveRefreshToken(refreshToken)
-                }
                 
                 return authResponse
             } catch {
@@ -77,9 +74,6 @@ extension NetworkService {
                 // Save token to Keychain if present
                 if let token = loginResponse.token {
                     _ = KeychainHelper.shared.saveToken(token)
-                }
-                if let refreshToken = loginResponse.refreshToken {
-                    _ = KeychainHelper.shared.saveRefreshToken(refreshToken)
                 }
                 
                 return loginResponse
@@ -396,124 +390,6 @@ extension NetworkService {
                 throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to recover account (Status: \(httpResponse.statusCode))")
-        }
-    }
-    
-    // MARK: - Refresh Access Token
-    func refreshAccessToken() async throws {
-        guard let refreshToken = KeychainHelper.shared.getRefreshToken() else {
-            throw NetworkError.serverError("No refresh token available")
-        }
-        
-        guard let url = URL(string: "\(baseURL)/auth/refresh") else {
-            throw NetworkError.invalidURL
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: ["refreshToken": refreshToken])
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            KeychainHelper.shared.deleteToken()
-            KeychainHelper.shared.deleteRefreshToken()
-            throw NetworkError.serverError("Token refresh failed")
-        }
-        
-        struct RefreshResponse: Codable {
-            let accessToken: String
-            let refreshToken: String?
-            let token: String?
-        }
-        
-        let refreshResponse = try JSONDecoder().decode(RefreshResponse.self, from: data)
-        let newToken = refreshResponse.token ?? refreshResponse.accessToken
-        _ = KeychainHelper.shared.saveToken(newToken)
-        if let newRefresh = refreshResponse.refreshToken {
-            _ = KeychainHelper.shared.saveRefreshToken(newRefresh)
-        }
-    }
-
-    // MARK: - Social Auth (WorkOS)
-
-    /// Asks the backend for the WorkOS authorization URL for a social provider.
-    /// `redirectURI` must be a URI registered in the WorkOS dashboard.
-    func getSocialAuthURL(provider: SocialProvider, redirectURI: String) async throws -> URL {
-        guard var components = URLComponents(string: "\(baseURL)/auth/social/\(provider.rawValue)") else {
-            throw NetworkError.invalidURL
-        }
-        components.queryItems = [URLQueryItem(name: "redirect_uri", value: redirectURI)]
-
-        guard let url = components.url else {
-            throw NetworkError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.error)
-            }
-            throw NetworkError.serverError("Could not start \(provider.displayName) sign-in (Status: \(httpResponse.statusCode))")
-        }
-
-        guard let urlResponse = try? JSONDecoder().decode(SocialAuthURLResponse.self, from: data),
-              let authURL = URL(string: urlResponse.url) else {
-            throw NetworkError.decodingError
-        }
-
-        return authURL
-    }
-
-    /// Exchanges the OAuth authorization code returned to the app for a Traverse session.
-    func exchangeSocialCode(_ code: String) async throws -> AuthResponse {
-        guard let url = URL(string: "\(baseURL)/auth/social/callback") else {
-            throw NetworkError.invalidURL
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(SocialCallbackRequest(code: code))
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-
-        if httpResponse.statusCode == 200 {
-            do {
-                let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
-
-                if let token = authResponse.token {
-                    _ = KeychainHelper.shared.saveToken(token)
-                }
-                if let refreshToken = authResponse.refreshToken {
-                    _ = KeychainHelper.shared.saveRefreshToken(refreshToken)
-                }
-
-                return authResponse
-            } catch {
-                print("Decoding error: \(error)")
-                throw NetworkError.decodingError
-            }
-        } else {
-            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.error)
-            }
-            throw NetworkError.serverError("Social sign-in failed (Status: \(httpResponse.statusCode))")
         }
     }
 }
