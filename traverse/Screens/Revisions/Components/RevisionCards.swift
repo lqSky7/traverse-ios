@@ -2,8 +2,6 @@ import SwiftUI
 
 struct RevisionGroupCard: View {
     let group: RevisionGroup
-    let useMLMode: Bool
-    let onComplete: (Revision) async -> Void
     let onOpenCoach: (Revision) -> Void
     let onDelete: (Revision) async -> Void
     let onReschedule: (Revision, Int) async -> Void
@@ -36,8 +34,6 @@ struct RevisionGroupCard: View {
                 ForEach(Array(group.revisions.enumerated()), id: \.element.id) { index, revision in
                     RevisionCard(
                          revision: revision,
-                         useMLMode: useMLMode,
-                         onComplete: onComplete,
                          onOpenCoach: onOpenCoach,
                          onDelete: onDelete,
                          onReschedule: onReschedule,
@@ -87,13 +83,10 @@ struct RevisionGroupCard: View {
 
 struct RevisionCard: View {
     let revision: Revision
-    let useMLMode: Bool
-    let onComplete: (Revision) async -> Void
     let onOpenCoach: (Revision) -> Void
     let onDelete: (Revision) async -> Void
     let onReschedule: (Revision, Int) async -> Void
     let onDeleteProblem: (Revision) async -> Void
-    @State private var isCompleting = false
     @State private var isDeleting = false
     @StateObject private var paletteManager = ColorPaletteManager.shared
     
@@ -149,32 +142,6 @@ struct RevisionCard: View {
                     .cornerRadius(8)
             }
             .buttonStyle(PlainButtonStyle())
-            
-            if !useMLMode {
-                if revision.isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(paletteManager.color(at: 1))
-                        .font(.title2)
-                } else {
-                    Button(action: {
-                        Task {
-                            isCompleting = true
-                            await onComplete(revision)
-                            isCompleting = false
-                        }
-                    }) {
-                        if isCompleting {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: paletteManager.selectedPalette.primary))
-                        } else {
-                            Image(systemName: "circle")
-                                .foregroundStyle(paletteManager.selectedPalette.primary)
-                                .font(.title2)
-                        }
-                    }
-                    .disabled(isCompleting)
-                }
-            }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
@@ -210,17 +177,15 @@ struct RevisionCard: View {
                     Label("Remove from Revision List", systemImage: "trash")
                 }
                 
-                if useMLMode {
-                    Divider()
-                    Button(role: .destructive) {
-                        Task {
-                            isDeleting = true
-                            await onDelete(revision)
-                            isDeleting = false
-                        }
-                    } label: {
-                        Label("Delete Single ML Revision", systemImage: "minus.circle")
+                Divider()
+                Button(role: .destructive) {
+                    Task {
+                        isDeleting = true
+                        await onDelete(revision)
+                        isDeleting = false
                     }
+                } label: {
+                    Label("Delete Single Revision", systemImage: "minus.circle")
                 }
             }
         }

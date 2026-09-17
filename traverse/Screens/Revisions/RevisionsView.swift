@@ -18,10 +18,7 @@ struct RevisionsView: View {
     @State private var errorMessage: String?
     @State private var isAnalyticsLoading = false
     @State private var analyticsError: String?
-    @State private var showCompletedRevisions = false
     @State private var notificationsEnabled = false
-    @State private var useMLRevision = false
-    @State private var selectedRevision: Revision?
     @State private var selectedRevisionForCoach: Revision? = nil
     @State private var showMLInfoSheet = false
     @State private var showDailyLimitSheet = false
@@ -29,21 +26,18 @@ struct RevisionsView: View {
     @State private var isSavingDailyCap = false
     @State private var dailyCapMessage: String?
     @State private var loadTask: Task<Void, Never>?
-    @State private var isSubscribed = false
+    // NOTE: `showProUpgradeSheet` is still bound to the ProUpgradeSheet sheet below,
+    // but nothing sets it to true any more — revisions are no longer premium-gated.
+    // Kept deliberately so the paywall entry point isn't lost; remove it together
+    // with the sheet when that UI is redesigned.
     @State private var showProUpgradeSheet = false
     @State private var mlTab: MLTab = .upcoming
-    @State private var showPauseConfirm = false
     @State private var showResumeConfirm = false
-    @State private var pauseDaysInput: Int = 7
     @State private var backlogDaysInput: Int = 3
     @State private var isPausingOrResuming = false
 
     // Exam mode caching to prevent flicker on load
     @AppStorage("cachedExamModeActive") private var isExamModeActive: Bool = false
-
-    // Subscription caching - only check once per day at 00:01
-    @AppStorage("cachedSubscriptionStatus") private var cachedSubscriptionStatus: Bool = false
-    @AppStorage("lastSubscriptionCheckDate") private var lastSubscriptionCheckDate: Double = 0
 
     private enum MLTab: String, CaseIterable, Identifiable {
         case upcoming = "Upcoming"
@@ -128,10 +122,6 @@ struct RevisionsView: View {
                                     ForEach(revisionGroups) { group in
                                         RevisionGroupCard(
                                             group: group,
-                                            useMLMode: useMLRevision,
-                                            onComplete: { revision in
-                                                await completeRevision(revision)
-                                            },
                                             onOpenCoach: { revision in
                                                 selectedRevisionForCoach = revision
                                             },
@@ -259,8 +249,6 @@ struct RevisionsView: View {
         }
 
         .onAppear {
-            isSubscribed = authViewModel.currentUser?.isSubscriptionActive ?? cachedSubscriptionStatus
-            useMLRevision = true
             dailyCapDraft = authViewModel.currentUser?.maxDailyReviews ?? 20
             // Load from cache first
             if !DataManager.shared.revisionGroups.isEmpty {
@@ -270,7 +258,6 @@ struct RevisionsView: View {
                 stats = cachedStats
             }
             Task {
-                await checkSubscriptionStatus()
                 await loadData()
                 await checkNotificationStatus()
             }
@@ -360,37 +347,6 @@ struct RevisionsView: View {
         notificationsEnabled = await NotificationManager.shared.checkAuthorizationStatus()
     }
     
-    private func checkSubscriptionStatus(forceCheck: Bool = false) async {
-        let now = Date()
-        let calendar = Calendar.current
-        let todayStart = calendar.startOfDay(for: now)
-        let lastCheckDate = Date(timeIntervalSince1970: lastSubscriptionCheckDate)
-
-        guard let todayAt0001 = calendar.date(byAdding: .minute, value: 1, to: todayStart) else { return }
-
-        let lastCheckWasBeforeToday = !calendar.isDate(lastCheckDate, inSameDayAs: now)
-        let isPast0001 = now >= todayAt0001
-        let shouldRefresh = forceCheck || (isPast0001 && lastCheckWasBeforeToday)
-
-        guard shouldRefresh else {
-            await MainActor.run {
-                isSubscribed = cachedSubscriptionStatus
-            }
-            return
-        }
-
-        do {
-            let status = try await NetworkService.shared.getSubscriptionStatus()
-            await MainActor.run {
-                isSubscribed = status.isSubscriptionActive
-                cachedSubscriptionStatus = status.isSubscriptionActive
-                lastSubscriptionCheckDate = now.timeIntervalSince1970
-            }
-        } catch {
-            print("Failed to check subscription status: \(error.localizedDescription)")
-        }
-    }
-    
     private func toggleNotifications() async {
         if notificationsEnabled {
             await NotificationManager.shared.removePendingRevisionNotifications()
@@ -417,25 +373,6 @@ struct RevisionsView: View {
             await NotificationManager.shared.scheduleDailyRevisionReminder()
         } catch {
             print("Failed to schedule notifications: \(error.localizedDescription)")
-        }
-    }
-    
-    private func completeRevision(_ revision: Revision) async {
-        do {
-            _ = try await NetworkService.shared.recordRevisionAttempt(
-                id: revision.id,
-                outcome: 1,
-                numTries: 1,
-                timeSpentMinutes: 5.0
-            )
-            HapticManager.shared.success()
-
-            // Notify HomeView to refresh and check live activity
-            NotificationCenter.default.post(name: .revisionCompleted, object: nil)
-
-            await loadData()
-        } catch {
-            print("Failed to complete revision: \(error.localizedDescription)")
         }
     }
     
@@ -501,7 +438,6 @@ struct RevisionsView: View {
         do {
             _ = try await NetworkService.shared.pauseMLRevisions(pauseDays: days)
             HapticManager.shared.success()
-            showPauseConfirm = false
             await loadData()
         } catch {
             print("Failed to pause revisions: \(error.localizedDescription)")
@@ -525,17 +461,6 @@ struct RevisionsView: View {
             HapticManager.shared.error()
         }
         isPausingOrResuming = false
-    }
-
-    private func formattedPausedDate(_ dateString: String) -> String {
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = iso.date(from: dateString) ?? ISO8601DateFormatter().date(from: dateString) else {
-            return dateString
-        }
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
     }
 
     private func saveDailyCap() async {

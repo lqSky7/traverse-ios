@@ -32,7 +32,7 @@ struct HomeView: View {
                                 StreakCard(streak: userStats.stats.currentStreak, maxStreak: userStats.stats.totalStreakDays)
                                 
                                 RevisionScoreCard(
-                                    score: viewModel.revisionScore?.score ?? 100,
+                                    score: viewModel.revisionScore?.score,
                                     paletteManager: paletteManager
                                 )
                             }

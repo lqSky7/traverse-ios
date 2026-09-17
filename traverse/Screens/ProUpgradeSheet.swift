@@ -10,8 +10,12 @@ import Combine
 struct ProUpgradeSheet: View {
     @Environment(\.openURL) private var openURL
     
+    // NOTE: "ML Revision" used to head this list. It is no longer a premium
+    // feature — every tier gets scheduled revisions on the same FSRS forgetting
+    // curve. What premium actually buys is the AI-scored inputs that feed it
+    // (cognitiveTier / recallScore), which is what "AI Insights" below covers.
+    // Mirrors the same removal in the Android ProUpgradeSheet.
     private let features: [(icon: String, text: String)] = [
-        ("brain.head.profile", "ML Revision"),
         ("rectangle.grid.2x2.fill", "All Platforms"),
         ("bolt.fill", "Early Access"),
         ("applewatch", "WatchOS"),

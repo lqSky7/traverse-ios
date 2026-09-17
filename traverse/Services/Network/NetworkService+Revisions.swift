@@ -304,50 +304,6 @@ extension NetworkService {
         }
     }
     
-    // MARK: - Record ML Revision Attempt
-    func recordRevisionAttempt(id: Int, outcome: Int, numTries: Int, timeSpentMinutes: Double) async throws -> RevisionAttemptResponse {
-        guard let url = URL(string: "\(baseURL)/revisions/\(id)/attempt") else {
-            throw NetworkError.invalidURL
-        }
-        
-        guard let token = KeychainHelper.shared.getToken() else {
-            throw NetworkError.serverError("Not authenticated")
-        }
-        
-        let requestBody = RevisionAttemptRequest(
-            outcome: outcome,
-            numTries: numTries,
-            timeSpentMinutes: timeSpentMinutes
-        )
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(requestBody)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse
-        }
-        
-        if httpResponse.statusCode == 200 {
-            do {
-                let attemptResponse = try JSONDecoder().decode(RevisionAttemptResponse.self, from: data)
-                return attemptResponse
-            } catch {
-                print("Decoding error: \(error)")
-                throw NetworkError.decodingError
-            }
-        } else {
-            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                throw NetworkError.serverError(errorResponse.error)
-            }
-            throw NetworkError.serverError("Failed to record revision attempt (Status: \(httpResponse.statusCode))")
-        }
-    }
-    
     // MARK: - Fetch Single Revision Details (On-Demand)
     func fetchRevisionDetails(id: Int) async throws -> RevisionDetailsResponse {
         guard let url = URL(string: "\(baseURL)/revisions/\(id)") else {

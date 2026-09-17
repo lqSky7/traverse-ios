@@ -30,7 +30,11 @@ struct MLSchedulingInfoSheet: View {
                 
                 // What is this section
                 Section {
-                    Text("This is an ML-powered spaced repetition system based on FSRS-5 (Free Spaced Repetition Scheduler). Instead of static intervals (1d, 3d, 7d...), the algorithm tracks item-level Memory Stability (S) and Difficulty (D) to schedule reviews right when your retrievability reaches 90%.")
+                    // NOTE: this used to say "ML-powered". It is not ML — FSRS-5 is a
+                    // deterministic power-law forgetting curve. What AI contributes is one
+                    // input to the quality score (the cognitive recall score) plus tier-based
+                    // damping of stability growth, and only for premium accounts.
+                    Text("This is a spaced repetition system based on FSRS-5 (Free Spaced Repetition Scheduler). Instead of static intervals (1d, 3d, 7d...), the algorithm tracks item-level Memory Stability (S) and Difficulty (D) to schedule reviews right when your retrievability reaches 90%.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
@@ -50,17 +54,21 @@ struct MLSchedulingInfoSheet: View {
                 }
                 
                 // Features Section
+                // Weights mirror computeQualityScore() in
+                // traverse-backend/src/lib/forgettingCurveScheduler.ts. There used to be a sixth
+                // row here for "Mistake Tags (18%)" — no such factor exists in the scheduler,
+                // and mistake tags no longer affect scheduling at all. The attempt-number
+                // weight was also shown as 8% when it is 4%.
                 Section {
                     FeatureListRow(icon: "clock", text: "Time Spent Ratio (28%)", detail: "Ratio vs your personal median time per difficulty", iconColor: paletteManager.selectedPalette.primary)
                     FeatureListRow(icon: "gauge.medium", text: "Problem Difficulty (18%)", detail: "Intrinsic problem baseline (Easy / Medium / Hard)", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "exclamationmark.triangle", text: "Mistake Tags (18%)", detail: "Penalties for approach, TLE, syntax, or DS errors", iconColor: paletteManager.selectedPalette.primary)
                     FeatureListRow(icon: "arrow.counterclockwise", text: "Number of Retries (15%)", detail: "Softly scaled runs (typos & code runs non-punitive)", iconColor: paletteManager.selectedPalette.primary)
                     FeatureListRow(icon: "calendar.badge.clock", text: "Spacing Bonus (13%)", detail: "Logarithmic reward for long-gap successful recall", iconColor: paletteManager.selectedPalette.primary)
-                    FeatureListRow(icon: "number", text: "Attempt Number (8%)", detail: "Review iteration expectation adjustment", iconColor: paletteManager.selectedPalette.primary)
+                    FeatureListRow(icon: "number", text: "Attempt Number (4%)", detail: "Review iteration expectation adjustment", iconColor: paletteManager.selectedPalette.primary)
                 } header: {
-                    Label("6 Quality Signals We Track", systemImage: "chart.line.uptrend.xyaxis")
+                    Label("5 Quality Signals We Track", systemImage: "chart.line.uptrend.xyaxis")
                 } footer: {
-                    Text("Signals compute a Quality Score (q ∈ [0, 1]) mapped to FSRS grades (Again, Hard, Good, Easy) to scale stability.")
+                    Text("Those five signals are normalised into a behavioural score. On premium accounts it is blended 60/40 with an AI cognitive recall score, and a hint or solution lowers the result further. The blend maps to FSRS grades (Again, Hard, Good, Easy) to scale stability. Free accounts use the behavioural score alone.")
                 }
                 
                 // Technical Details Section

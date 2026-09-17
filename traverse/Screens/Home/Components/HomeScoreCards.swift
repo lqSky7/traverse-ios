@@ -118,7 +118,12 @@ struct ThinkingOrbScoreView: View {
 
 // MARK: - Revision Score Card (Pure black, Thinking Orb in top right, central number, NO grid, NO glass)
 struct RevisionScoreCard: View {
-    let score: Int
+    /// Optional on purpose. This used to be non-optional and HomeView passed
+    /// `revisionScore?.score ?? 100`, so the card displayed a perfect 100 whenever
+    /// the score hadn't loaded yet or the fetch had failed — a fake "you're doing
+    /// great" on the one card whose whole job is to tell you the truth. nil now
+    /// renders as "--" with an empty orb.
+    let score: Int?
     @ObservedObject var paletteManager: ColorPaletteManager
     @State private var showExplanationSheet = false
     
@@ -135,14 +140,14 @@ struct RevisionScoreCard: View {
                 VStack {
                     HStack {
                         Spacer()
-                        ThinkingOrbScoreView(score: score, paletteManager: paletteManager)
+                        ThinkingOrbScoreView(score: score ?? 0, paletteManager: paletteManager)
                             .offset(x: 24, y: -24)
                     }
                     Spacer()
                 }
                 
                 // 3. Central score number with exact same font and color as streak card number
-                Text("\(score)")
+                Text(score.map(String.init) ?? "--")
                     .font(.system(size: 40, weight: .bold))
                     .foregroundStyle(.white)
             }

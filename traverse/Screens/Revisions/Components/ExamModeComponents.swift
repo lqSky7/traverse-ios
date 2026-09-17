@@ -22,7 +22,7 @@ struct DailyReviewLimitCard: View {
                 Spacer()
             }
 
-            Text("Cap the number of ML revisions shown each day. Overflow rolls into the next days.")
+            Text("Cap the number of revisions shown each day. Overflow rolls into the next days.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
