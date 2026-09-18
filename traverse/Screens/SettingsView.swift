@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var showingDreamPicker = false
     @State private var showingFreezeShop = false
     @State private var showingShaderDemos = false
+    @State private var showingNotificationSettings = false
 
     var body: some View {
         NavigationStack {
@@ -122,7 +123,8 @@ struct SettingsView: View {
                         showingImportPalette: $showingImportPalette,
                         showingDreamPicker: $showingDreamPicker,
                         showingFreezeShop: $showingFreezeShop,
-                        showingShaderDemos: $showingShaderDemos
+                        showingShaderDemos: $showingShaderDemos,
+                        showingNotificationSettings: $showingNotificationSettings
                     )
                 }
                 .padding(.vertical)
@@ -164,6 +166,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showingShaderDemos) {
                 ShaderDemosView()
+            }
+            .sheet(isPresented: $showingNotificationSettings) {
+                NotificationSettingsView()
             }
             .alert("Logout", isPresented: $showingLogoutConfirmation) {
                 Button("Cancel", role: .cancel) { }

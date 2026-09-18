@@ -7,6 +7,9 @@ struct HomeView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var viewModel = HomeViewModel()
     @ObservedObject var paletteManager = ColorPaletteManager.shared
+    @ObservedObject private var ringsManager = RingsManager.shared
+    @ObservedObject private var inbox = NotificationInboxManager.shared
+    @State private var showingNotifications = false
     
     private var formattedDate: String {
         let formatter = DateFormatter()
@@ -47,19 +50,26 @@ struct HomeView: View {
                             message: "Traverse reads your practice from the browser and reports it back here. There is nothing to show until then."
                         )
                     } else {
-                        // Streak — full width. It used to share a row with the
-                        // revision score card; that card is a full-width
-                        // training-load tile now, so the streak takes the whole
-                        // row instead of being squeezed into half of it.
+                        // Streak — full width, with the day's rings on the right.
+                        // It used to share a row with the revision score card;
+                        // that card is a full-width training-load tile now, so the
+                        // streak takes the whole row.
                         //
-                        // `longestStreak` is the real "best" figure. The
-                        // fallback is only for caches written before the backend
-                        // started sending it — `totalStreakDays` is a running
-                        // total, so it is wrong here, just not wrong-by-a-lot.
+                        // `longestStreak` is the real "best" figure. The fallback
+                        // is only for caches written before the backend started
+                        // sending it — `totalStreakDays` is a running total, so it
+                        // is wrong here, just not wrong-by-a-lot.
+                        //
+                        // The rings come from `RingsManager` rather than from the
+                        // stats payload because they answer a different question:
+                        // the stats say how long you have been consistent, the
+                        // rings say what you still owe today. Separate endpoints
+                        // also mean a ring fetch failure cannot blank the streak.
                         if let userStats = viewModel.userStats {
                             StreakCard(
                                 streak: userStats.stats.currentStreak,
-                                maxStreak: userStats.stats.longestStreak ?? userStats.stats.totalStreakDays
+                                maxStreak: userStats.stats.longestStreak ?? userStats.stats.totalStreakDays,
+                                rings: ringsManager.progress
                             )
                         }
 
@@ -135,13 +145,23 @@ struct HomeView: View {
             .navigationTitle(formattedDate)
             .navigationBarTitleDisplayMode(.large)
             .toolbarScrollMinimization()
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    notificationBell
+                }
+            }
+            .sheet(isPresented: $showingNotifications) {
+                NotificationsView()
+            }
             .refreshable {
                 if let username = authViewModel.currentUser?.username {
                     // Use Task to prevent early cancellation from pull-to-refresh gesture
                     await Task {
                         await viewModel.loadData(username: username, forceRefresh: true)
                     }.value
+                    await ringsManager.refresh()
                 }
+                await inbox.refreshUnreadCount()
             }
         }
         .onAppear {
@@ -153,6 +173,13 @@ struct HomeView: View {
                     await viewModel.loadData(username: username)
                 }
             }
+            // Rings are refreshed even when the username is nil, so a session
+            // restored from the keychain still draws today's rings.
+            Task { await ringsManager.refresh() }
+            // Only the badge, not the whole inbox: the list is fetched when the
+            // sheet opens, and pulling 30 rows on every tab switch to draw a
+            // number would be wasteful.
+            Task { await inbox.refreshUnreadCount() }
         }
         .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
             print("[HomeView] onChange username \(oldUsername ?? "nil") -> \(newUsername ?? "nil")")
@@ -164,6 +191,7 @@ struct HomeView: View {
                         await viewModel.loadData(username: username)
                     }
                 }
+                Task { await ringsManager.refresh() }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .revisionCompleted)) { _ in
@@ -173,12 +201,45 @@ struct HomeView: View {
                     await viewModel.loadData(username: username, forceRefresh: true)
                 }
             }
+            // A completed revision is one of the two things that can close a
+            // ring, so the rings are re-read on the same event.
+            Task { await ringsManager.refreshAfterActivity() }
         }
         .preferredColorScheme(.dark)
     }
     
-    private func hasSolvedToday(recentSolves: [Solve]?) -> Bool {
-        guard let solves = recentSolves else { return false }
+    /// The inbox entry point, with the unread count as a badge.
+    ///
+    /// A badge rather than a plain bell, because the whole point of an inbox is
+    /// that something is waiting in it. The count is capped at "9+" — an exact
+    /// number past a point stops being information and starts being a warning.
+    private var notificationBell: some View {
+        Button {
+            showingNotifications = true
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bell")
+                    .font(.system(size: 16, weight: .medium))
+
+                if inbox.unreadCount > 0 {
+                    Text(inbox.unreadCount > 9 ? "9+" : "\(inbox.unreadCount)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(Capsule().fill(paletteManager.color(at: 0)))
+                        .offset(x: 8, y: -6)
+                }
+            }
+        }
+        .accessibilityLabel(
+            inbox.unreadCount > 0
+                ? "Notifications, \(inbox.unreadCount) unread"
+                : "Notifications"
+        )
+    }
+
+    private func hasSolvedToday(recentSolves: [Solve]?) -> Bool {        guard let solves = recentSolves else { return false }
         
         let calendar = Calendar.current
         let now = Date()

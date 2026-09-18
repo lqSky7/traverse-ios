@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import UserNotifications
 
 @MainActor
 class AuthViewModel: ObservableObject {
@@ -74,6 +75,12 @@ class AuthViewModel: ObservableObject {
     }
     
     func logout() async throws {
+        // Detached before the token is deleted, because the request needs the
+        // session. Without this the signed-out device keeps receiving pushes for
+        // an account nobody is logged into, and the next user to sign in on this
+        // phone would see the previous user's notifications on the lock screen.
+        await PushRegistrationService.shared.unregisterFromServer()
+
         do {
             try await networkService.logout()
             // Clear saved cat image
@@ -85,6 +92,12 @@ class AuthViewModel: ObservableObject {
             DataManager.shared.clearAllData()
             // Reset toast manager seen state
             AchievementToastManager.shared.resetState()
+            // Drop the previous account's inbox and rings. Both are cached so the
+            // UI can render instantly at launch, which is exactly why they have
+            // to be cleared here — otherwise the next sign-in shows them for a
+            // moment before the server's answer arrives.
+            NotificationInboxManager.shared.clear()
+            RingsManager.shared.clearCache()
             // Clear widget data
             if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
                 sharedDefaults.removeObject(forKey: "widgetData")
@@ -110,6 +123,8 @@ class AuthViewModel: ObservableObject {
             DataManager.shared.clearAllData()
             // Reset toast manager seen state
             AchievementToastManager.shared.resetState()
+            NotificationInboxManager.shared.clear()
+            RingsManager.shared.clearCache()
             // Clear widget data
             if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
                 sharedDefaults.removeObject(forKey: "widgetData")
@@ -146,6 +161,12 @@ class AuthViewModel: ObservableObject {
             currentUser = updatedUser
             profileImageUrl = updatedUser.profileImageURL
             errorMessage = nil
+
+            // A session now exists, which is the first moment a device token can
+            // be uploaded. Doing it here rather than at each call site covers
+            // sign-in, sign-up and a session restored from the keychain in one
+            // place.
+            await registerForPushIfAuthorized()
         } catch let error as NetworkError {
             errorMessage = error.localizedDescription
             throw error
@@ -153,6 +174,23 @@ class AuthViewModel: ObservableObject {
             errorMessage = "Failed to fetch user data"
             throw error
         }
+    }
+
+    /// Registers with APNs and uploads the token, but only when the user has
+    /// already granted permission.
+    ///
+    /// Registering before permission is granted yields a token APNs will not
+    /// deliver to, so the prompt has to come first. The prompt is raised from the
+    /// notification settings screen and from the revisions screen; this path only
+    /// handles the case where it has already been answered.
+    private func registerForPushIfAuthorized() async {
+        let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        guard status == .authorized || status == .provisional else { return }
+
+        PushRegistrationService.shared.register()
+        // Uploads the cached token, or does nothing when iOS has not issued one
+        // yet — in which case the app delegate's callback uploads it shortly.
+        await PushRegistrationService.shared.uploadIfPossible()
     }
     
     func updateProfile(

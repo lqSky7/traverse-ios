@@ -7,8 +7,12 @@
 | `IntelligenceManager.swift` | AI reasoning interface generating contextual DSA hints and advice | `class IntelligenceManager: ObservableObject` |
 | `KeychainHelper.swift` | Secure storage service reading/writing JWT tokens in iOS Keychain | `class KeychainHelper` |
 | `LiveActivityManager.swift` | ActivityKit coordinator managing Dynamic Island and lock screen widgets | `class LiveActivityManager` |
-| `NotificationManager.swift` | Local user notification scheduler for daily streak and review reminders | `class NotificationManager` |
+| `NotificationInboxManager.swift` | Server notification inbox: paged keyset loading, optimistic read/unread with rollback, and the app-icon badge count | `class NotificationInboxManager: ObservableObject` |
+| `NotificationManager.swift` | Local user notification scheduler for daily streak and review reminders, and the delegate for remote pushes — it tells server pushes apart from local reminders by the `notificationId` key, refreshes the badge from the server on foreground, and routes taps | `class NotificationManager` |
+| `NotificationRouter.swift` | Maps a notification's `link` (falling back to its `type`) onto a tab destination, and formats relative timestamps and day buckets for the inbox | `enum NotificationRouter`, `NotificationRouter.Destination` |
+| `PushRegistrationService.swift` | Requests notification authorization, hex-encodes the APNs device token, uploads it with the right sandbox flag, and unregisters on sign-out | `class PushRegistrationService` |
 | `QRCodeGenerator.swift` | CoreImage utility rendering personal profile QR code images | `class QRCodeGenerator` |
+| `RingsManager.swift` | Owns the two daily rings: seeds the first frame from a `UserDefaults` cache (rejecting a stale one from a previous day), refreshes after activity, and saves goal changes optimistically | `class RingsManager: ObservableObject` |
 | `WatchSyncManager.swift` | WatchConnectivity session coordinator syncing data with Apple Watch | `class WatchSyncManager: NSObject` |
 | `WidgetDataUpdater.swift` | App Group data synchronizer reloading WidgetKit timelines | `class WidgetDataUpdater` |
 

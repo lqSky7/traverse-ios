@@ -65,6 +65,8 @@
 				Screens/Home/Screens/INDEX.md,
 				Screens/Home/Sheets/INDEX.md,
 				Screens/INDEX.md,
+				Screens/Problems/Components/INDEX.md,
+				Screens/Problems/INDEX.md,
 				Screens/Profile/Components/INDEX.md,
 				Screens/Profile/INDEX.md,
 				Screens/Revisions/Components/INDEX.md,

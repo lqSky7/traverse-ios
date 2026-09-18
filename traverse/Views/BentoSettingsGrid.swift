@@ -19,6 +19,7 @@ struct BentoSettingsGrid: View {
     @Binding var showingDreamPicker: Bool
     @Binding var showingFreezeShop: Bool
     @Binding var showingShaderDemos: Bool
+    @Binding var showingNotificationSettings: Bool
     
     // Haptic generators
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -255,6 +256,41 @@ struct BentoSettingsGrid: View {
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)
             
+            // Row 4.2: Notifications (full width)
+            Button {
+                mediumFeedback.impactOccurred()
+                showingNotificationSettings = true
+            } label: {
+                HStack {
+                    Image(systemName: "bell.badge")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(paletteManager.color(at: 1))
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Notifications")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Choose what reaches you, and when")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(paletteManager.color(at: 1).opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
+            
+            // Horizontal Divider
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+            
             // Row 4.5: Calendar Subscription (full width)
             Button {
                 mediumFeedback.impactOccurred()
@@ -419,7 +455,8 @@ struct BentoCellButtonStyle: ButtonStyle {
             showingImportPalette: .constant(false),
             showingDreamPicker: .constant(false),
             showingFreezeShop: .constant(false),
-            showingShaderDemos: .constant(false)
+            showingShaderDemos: .constant(false),
+            showingNotificationSettings: .constant(false)
         )
         .padding(.vertical)
     }

@@ -102,6 +102,10 @@ struct MainTabView: View {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenRevisionsTab"))) { _ in
                 selectedTab = MainTab.revisions.rawValue
             }
+            .onReceive(NotificationCenter.default.publisher(for: .notificationDeepLink)) { note in
+                guard let tab = note.userInfo?["tab"] as? Int else { return }
+                selectedTab = tab
+            }
         } else {
             TabView(selection: $selectedTab) {
                 LazyTabContent(tag: MainTab.home.rawValue, selectedTab: $selectedTab) { HomeTab() }
@@ -148,6 +152,10 @@ struct MainTabView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenRevisionsTab"))) { _ in
                 selectedTab = MainTab.revisions.rawValue
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .notificationDeepLink)) { note in
+                guard let tab = note.userInfo?["tab"] as? Int else { return }
+                selectedTab = tab
             }
         }
     }

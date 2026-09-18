@@ -3,6 +3,7 @@
 | File | Description | Key Types & Symbols |
 | :--- | :--- | :--- |
 | `AchievementToastView.swift` | Animated overlay banner notifying users of earned achievements | `struct AchievementToastView: View` |
+| `ActivityRingsView.swift` | The two concentric daily rings — outer for solves, inner for revisions — over an `.ultraThinMaterial` track, with a bloom when both close | `struct ActivityRingsView: View`, `struct SingleRingView: View` |
 | `AttemptCodeHistorySheet.swift` | Sheet displaying past code submissions and notes for a problem | `struct AttemptCodeHistorySheet: View` |
 | `BentoSettingsGrid.swift` | Modular bento-grid styled settings layout for user preferences | `struct BentoSettingsGrid: View` |
 | `CompletionStep.swift` | Step completion celebration view with checkmark animation | `struct CompletionStep: View` |

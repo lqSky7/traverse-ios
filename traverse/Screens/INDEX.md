@@ -10,6 +10,8 @@
 | `FriendStreakRequestsView.swift` | Collaborative streak invites and response management | `struct FriendStreakRequestsView: View` |
 | `FriendsView.swift` | Social leaderboard, friend activity feeds, and streak statuses | `struct FriendsView: View` |
 | `MainTabView.swift` | Root navigation controller hosting the primary app tabs | `struct MainTabView: View` |
+| `NotificationSettingsView.swift` | Per-type notification preferences rendered from the server's own catalogue, so the copy and the list of configurable types live in one place. Also carries the permission card and quiet hours | `struct NotificationSettingsView: View` |
+| `NotificationsView.swift` | The inbox, grouped into Today / Yesterday / This week / Earlier, with an unread dot, a coalesced-count badge, and a scroll sentinel that pages older rows in | `struct NotificationsView: View` |
 | `PasswordResetView.swift` | Account recovery flow with email reset code confirmation | `struct PasswordResetView: View` |
 | `ProUpgradeSheet.swift` | Pro membership sheet with feature breakdown and purchase triggers | `struct ProUpgradeSheet: View` |
 | `ProfileEditView.swift` | Profile details editor for bio, avatar, and LeetCode handle | `struct ProfileEditView: View` |

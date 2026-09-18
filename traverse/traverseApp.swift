@@ -87,10 +87,46 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         // Set notification delegate
         UNUserNotificationCenter.current().delegate = NotificationManager.shared
-        
+
+        // Re-register for remote notifications on every launch when permission is
+        // already granted. iOS can issue a new token at any time — a restore from
+        // backup, a reinstall, an OS update — and the only way to learn about it
+        // is to ask again. `register()` is cheap and idempotent when the token has
+        // not changed.
+        Task { @MainActor in
+            let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+            if status == .authorized || status == .provisional {
+                PushRegistrationService.shared.register()
+                // The token may already be cached from a previous launch; this
+                // covers the case where the upload failed last time, or where the
+                // user signed in since.
+                await PushRegistrationService.shared.uploadIfPossible()
+            }
+        }
+
         return true
     }
-    
+
+    // MARK: - Remote notifications
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        Task { @MainActor in
+            PushRegistrationService.shared.handleRegistered(deviceToken: deviceToken)
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Task { @MainActor in
+            PushRegistrationService.shared.handleRegistrationFailure(error)
+        }
+    }
+
     func applicationWillTerminate(_ application: UIApplication) {
         // Persist data before app terminates
         Task { @MainActor in

@@ -161,10 +161,22 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        // Show notification even when app is in foreground
+        let userInfo = notification.request.content.userInfo
+
+        // A server notification arriving while the app is open should still be
+        // shown — the user asked for it and may be looking at another tab. The
+        // badge is corrected from the server's own count rather than trusted
+        // from the payload, because the payload's count was computed when the
+        // push was queued, which may be several attempts ago.
+        if isServerNotification(userInfo) {
+            Task { @MainActor in
+                await NotificationInboxManager.shared.refreshUnreadCount()
+            }
+        }
+
         completionHandler([.banner, .sound, .badge])
     }
-    
+
     // Handle notification tap
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -172,13 +184,57 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        
-        if let type = userInfo["type"] as? String, type == "revision" {
-            // Handle revision notification tap
-            // You can post a notification to navigate to revisions tab
+
+        if isServerNotification(userInfo) {
+            handleServerNotificationTap(userInfo: userInfo)
+        } else if let type = userInfo["type"] as? String, type == "revision" {
+            // Locally-scheduled revision reminder.
             NotificationCenter.default.post(name: NSNotification.Name("OpenRevisionsTab"), object: nil)
         }
-        
+
         completionHandler()
+    }
+
+    /// Distinguishes a server push from one of this app's own scheduled
+    /// reminders. Both arrive through the same delegate, and they route
+    /// differently: a reminder is always the revisions tab, a server
+    /// notification depends on its type.
+    private func isServerNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        userInfo["notificationId"] != nil
+    }
+
+    /// Routes a tapped push.
+    ///
+    /// The payload carries `type` and `link`, which is enough to choose a
+    /// destination without fetching the row. The row is marked read in the
+    /// background so the inbox and badge agree with the fact that the user has
+    /// now seen it.
+    private func handleServerNotificationTap(userInfo: [AnyHashable: Any]) {
+        let type = userInfo["type"] as? String ?? ""
+        let link = userInfo["link"] as? String
+        let notificationId = userInfo["notificationId"] as? Int
+
+        Task { @MainActor in
+            if let destination = NotificationRouter.destination(forLink: link)
+                ?? NotificationRouter.destination(forType: type) {
+                NotificationCenter.default.post(
+                    name: .notificationDeepLink,
+                    object: nil,
+                    userInfo: ["tab": destination.tabIndex]
+                )
+            }
+
+            // Refreshed rather than patched locally: the tap may have opened the
+            // app from a cold start, so the inbox is empty and there is nothing
+            // to patch. A full refresh also picks up anything that arrived while
+            // the app was not running.
+            await NotificationInboxManager.shared.refresh()
+
+            if let notificationId,
+               let match = NotificationInboxManager.shared.notifications.first(where: { $0.id == notificationId }),
+               !match.isRead {
+                await NotificationInboxManager.shared.markRead(match)
+            }
+        }
     }
 }
