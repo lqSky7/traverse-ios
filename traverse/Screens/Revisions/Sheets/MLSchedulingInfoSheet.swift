@@ -3,7 +3,6 @@ import SwiftUI
 struct MLSchedulingInfoSheet: View {
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @Environment(\.dismiss) private var dismiss
-    @State private var showTechnicalDetails = false
     
     var body: some View {
         NavigationStack {
@@ -15,11 +14,11 @@ struct MLSchedulingInfoSheet: View {
                             .font(.system(size: 44))
                             .foregroundStyle(paletteManager.selectedPalette.primary)
                         
-                        Text("FSRS-5 Spaced Repetition")
+                        Text("Spaced Repetition")
                             .font(.title2)
                             .fontWeight(.bold)
                         
-                        Text("Power-Law Forgetting Curve Scheduling")
+                        Text("Reviews timed for when you're about to forget")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -30,22 +29,22 @@ struct MLSchedulingInfoSheet: View {
                 
                 // What is this section
                 Section {
-                    // NOTE: this used to say "ML-powered". It is not ML — FSRS-5 is a
-                    // deterministic power-law forgetting curve. What AI contributes is one
-                    // input to the quality score (the cognitive recall score) plus tier-based
-                    // damping of stability growth, and only for premium accounts.
-                    Text("This is a spaced repetition system based on FSRS-5 (Free Spaced Repetition Scheduler). Instead of static intervals (1d, 3d, 7d...), the algorithm tracks item-level Memory Stability (S) and Difficulty (D) to schedule reviews right when your retrievability reaches 85%.")
+                    // NOTE: this used to say "ML-powered", and later explained the algorithm
+                    // (FSRS-5, stability/difficulty, the 85% retrievability target). Scheduling
+                    // internals are deliberately not surfaced to users — see the
+                    // traverse-revision-scheduling skill. Keep this plain-language.
+                    Text("Traverse follows how each problem goes for you and schedules the next revision for when you're about to forget it. Recall a problem well and the next review moves further out; struggle with it and it comes back sooner.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                             .foregroundStyle(.green)
-                        Text("Target Recall: 85% (R = 0.85)")
+                        Text("Adapts to you")
                             .font(.footnote)
                             .fontWeight(.semibold)
                             .foregroundStyle(.green)
-                        Text("— optimal spacing window")
+                        Text("— no fixed 1d / 3d / 7d ladder")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -67,79 +66,6 @@ struct MLSchedulingInfoSheet: View {
                     FeatureListRow(icon: "number", text: "Attempt Number", detail: "How many times you have revised this problem", iconColor: paletteManager.selectedPalette.primary)
                 } header: {
                     Label("What Shapes Your Schedule", systemImage: "chart.line.uptrend.xyaxis")
-                }
-                
-                // Technical Details Section
-                Section {
-                    DisclosureGroup(isExpanded: $showTechnicalDetails) {
-                        VStack(alignment: .leading, spacing: 10) {
-                            TechRow(label: "Algorithm", value: "FSRS-5 (Free Spaced Repetition)")
-                            TechRow(label: "Curve Model", value: "Power-Law Forgetting")
-                            TechRow(label: "Key States", value: "Stability (S) & Difficulty (D)")
-                            TechRow(label: "Target Recall", value: "85% Retrievability (R = 0.85)")
-                            TechRow(label: "Clustering Prevention", value: "±10% Dynamic Interval Fuzzing")
-                            
-                            Divider()
-                            
-                            Text("Power-Law Forgetting Curve")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            
-                            Text("R(t, S) = (1 + 19/81 * (t / S))^(-0.5)")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(paletteManager.selectedPalette.primary)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.primary.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            
-                            Text("Retrievability R(t, S) represents recall probability after t days. At t = S, recall probability is exactly 90%.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            Divider()
-                            
-                            Text("Stability Recall Growth")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            
-                            Text("S' = S * e^(w8) * (11 - D) * S^(-w9) * (e^(w10*(1-R)) - 1)")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(paletteManager.selectedPalette.primary)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.primary.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            
-                            Text("Successful recall expands stability S according to the spacing effect, while lapse/failure resets stability.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            Divider()
-                            
-                            Text("Next Review Interval")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            
-                            // The interval is not ≈ S: it equals S only at R = 0.9, the FSRS
-                            // fixed point. At the scheduler's actual target of R = 0.85 the
-                            // multiplier is (0.85^-2 - 1) / (19/81) ≈ 1.64.
-                            Text("I = (S / (19/81)) * (0.85^(-2) - 1) ≈ 1.64 S")
-                                .font(.system(.caption, design: .monospaced))
-                                .foregroundStyle(paletteManager.selectedPalette.primary)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.primary.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            
-                            Text("Reviews are scheduled right before memory retrievability drops below 85%, preventing item decay.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    } label: {
-                        Label("Under the hood", systemImage: "cpu")
-                    }
                 }
                 
                 // Got it Button
@@ -190,24 +116,6 @@ struct FeatureListRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-        }
-    }
-}
-
-// MARK: - Tech Row
-struct TechRow: View {
-    let label: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .font(.caption)
-                .fontWeight(.medium)
         }
     }
 }

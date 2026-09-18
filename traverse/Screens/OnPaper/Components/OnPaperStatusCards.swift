@@ -31,7 +31,7 @@ struct OnPaperSpacedRevisionsBanner: View {
                 }
             }
             
-            Text("Reviews are optimized mathematically via FSRS-4.5 to reinforce key patterns before decay.")
+            Text("Reviews are timed to reinforce key patterns before you forget them.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

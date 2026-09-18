@@ -163,7 +163,7 @@ public struct OnPaperMainView: View {
                 paletteManager: paletteManager,
                 onShowInfo: {
                     infoSheetTitle = "Retention Health"
-                    infoSheetExplanation = "Shows how many of your interview concepts fall into each memory strength tier based on FSRS-4.5 stability.\n\n• Critical (< 2 days): Needs immediate reinforcement.\n• Weak (2–7 days): Early-stage recall, scheduled for near-term review.\n• Developing (7–21 days): Solidifying concepts, intervals expanding.\n• Strong (21–60 days): High retention confidence.\n• Mastered (60+ days): Deeply internalized mental models."
+                    infoSheetExplanation = "Shows how many of your interview concepts fall into each memory strength tier.\n\n• Critical (< 2 days): Needs immediate reinforcement.\n• Weak (2–7 days): Early-stage recall, scheduled for near-term review.\n• Developing (7–21 days): Solidifying concepts, intervals expanding.\n• Strong (21–60 days): High retention confidence.\n• Mastered (60+ days): Deeply internalized mental models."
                     showInfoSheet = true
                 }
             )
