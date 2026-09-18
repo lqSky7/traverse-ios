@@ -34,14 +34,14 @@ struct MLSchedulingInfoSheet: View {
                     // deterministic power-law forgetting curve. What AI contributes is one
                     // input to the quality score (the cognitive recall score) plus tier-based
                     // damping of stability growth, and only for premium accounts.
-                    Text("This is a spaced repetition system based on FSRS-5 (Free Spaced Repetition Scheduler). Instead of static intervals (1d, 3d, 7d...), the algorithm tracks item-level Memory Stability (S) and Difficulty (D) to schedule reviews right when your retrievability reaches 90%.")
+                    Text("This is a spaced repetition system based on FSRS-5 (Free Spaced Repetition Scheduler). Instead of static intervals (1d, 3d, 7d...), the algorithm tracks item-level Memory Stability (S) and Difficulty (D) to schedule reviews right when your retrievability reaches 85%.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                             .foregroundStyle(.green)
-                        Text("Target Recall: 90% (R = 0.9)")
+                        Text("Target Recall: 85% (R = 0.85)")
                             .font(.footnote)
                             .fontWeight(.semibold)
                             .foregroundStyle(.green)
@@ -78,7 +78,7 @@ struct MLSchedulingInfoSheet: View {
                             TechRow(label: "Algorithm", value: "FSRS-5 (Free Spaced Repetition)")
                             TechRow(label: "Curve Model", value: "Power-Law Forgetting")
                             TechRow(label: "Key States", value: "Stability (S) & Difficulty (D)")
-                            TechRow(label: "Target Recall", value: "90% Retrievability (R = 0.9)")
+                            TechRow(label: "Target Recall", value: "85% Retrievability (R = 0.85)")
                             TechRow(label: "Clustering Prevention", value: "±10% Dynamic Interval Fuzzing")
                             
                             Divider()
@@ -123,7 +123,10 @@ struct MLSchedulingInfoSheet: View {
                                 .font(.caption)
                                 .fontWeight(.semibold)
                             
-                            Text("I = (S / (19/81)) * (0.9^(-2) - 1) ≈ S")
+                            // The interval is not ≈ S: it equals S only at R = 0.9, the FSRS
+                            // fixed point. At the scheduler's actual target of R = 0.85 the
+                            // multiplier is (0.85^-2 - 1) / (19/81) ≈ 1.64.
+                            Text("I = (S / (19/81)) * (0.85^(-2) - 1) ≈ 1.64 S")
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundStyle(paletteManager.selectedPalette.primary)
                                 .padding(8)
@@ -131,7 +134,7 @@ struct MLSchedulingInfoSheet: View {
                                 .background(Color.primary.opacity(0.05))
                                 .clipShape(RoundedRectangle(cornerRadius: 6))
                             
-                            Text("Reviews are scheduled right before memory retrievability drops below 90%, preventing item decay.")
+                            Text("Reviews are scheduled right before memory retrievability drops below 85%, preventing item decay.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
