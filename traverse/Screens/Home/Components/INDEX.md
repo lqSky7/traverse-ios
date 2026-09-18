@@ -7,3 +7,4 @@
 | `HomeChartCards.swift` | Graphical visualizers for difficulty distribution and platform breakdown | `DifficultyChartCard`, `DifficultyProgressRow`, `PlatformChartCard`, `PlatformProgressRow` |
 | `HomeInsightsCards.swift` | Mistake tag analysis, solving productivity insights, and peak solving hours | `MistakeTagsAnalysisCard`, `AchievementStatsCard`, `ProductivityInsightsCard`, `BestSolvingHoursCard` |
 | `HomeSolvesCards.swift` | Submission statistics, activity heatmap, recent solve rows, and breakdown | `SubmissionStatsCard`, `SolveHeatmapCard`, `SubmissionBreakdownCard`, `RecentSolvesCard`, `SolveRow` |
+| `MedalView.swift` | Award badge renderer with press-and-drag 3D tilt, specular sweep and locked treatment; plus the progress bar and award caption formatting | `MedalView`, `MedalProgressBar`, `AwardFormat` |

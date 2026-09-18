@@ -108,7 +108,7 @@ struct DifficultyProgressRow: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                        .frame(width: geometry.size.width.progressBarWidth(fraction: Double(progress), minimum: count > 0 ? 12 : 0), height: 12)
                 }
             }
             .frame(height: 12)
@@ -241,7 +241,7 @@ struct PlatformProgressRow: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: max(geometry.size.width * progress, count > 0 ? 12 : 0), height: 12)
+                        .frame(width: geometry.size.width.progressBarWidth(fraction: Double(progress), minimum: count > 0 ? 12 : 0), height: 12)
                 }
             }
             .frame(height: 12)

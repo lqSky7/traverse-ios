@@ -9,6 +9,7 @@
 | `FriendStreakModels.swift` | Social streak definitions, streak requests, and freeze transactions | `FriendStreak`, `FriendStreakRequest`, `StreakFreeze` |
 | `FriendsModels.swift` | Friend relationship schemas, search results, and public user profiles | `Friend`, `FriendRequest`, `PublicUserProfile` |
 | `IntelligenceModels.swift` | AI revision coaching and recommendation prompt/response contracts | `IntelligenceContext`, `IntelligenceAction` |
+| `MedalCatalog.swift` | Slug list for the award badge renders in `Assets.xcassets/Medals`, plus the deterministic fallback pick | `enum MedalCatalog` |
 | `OnPaperModels.swift` | Project-based interview prep models, FSRS flashcard state, and commit logs | `OnPaperProject`, `OnPaperSession`, `FSRSCard`, `OnPaperMistake` |
 | `RevisionModels.swift` | Spaced repetition problem models, ML analytics, retention, and groups | `Revision`, `RevisionGroup`, `RevisionStatsResponse`, `RevisionAnalyticsResponse` |
 | `StatsModels.swift` | Problem-solving metrics, difficulty breakdowns, tag summaries, and solves | `UserStats`, `SolveStats`, `SubmissionStats`, `Solve` |

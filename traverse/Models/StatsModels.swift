@@ -258,14 +258,34 @@ struct AchievementStatsData: Codable {
     let unlocked: Int
     let percentage: String
     let byCategory: [String: Int]
+    /// Newest badge earned — drives the Awards card on the home feed.
+    let latestAward: AchievementDetail?
 }
 
 // MARK: - All Achievements
 struct AllAchievementsResponse: Codable {
     let achievements: [AchievementDetail]
+    /// Award shelves (Close Your Rings, Monthly Challenges, …) with their badges attached.
+    let sections: [AwardSection]?
+    /// The challenge to lead with on the Awards hub — usually the running monthly challenge.
+    let featured: AchievementDetail?
 }
 
-struct AchievementDetail: Codable, Identifiable {
+/// Numeric progress behind an award's ring. Absent for one-shot awards.
+struct AwardProgress: Codable, Hashable {
+    let current: Int
+    let target: Int
+    let unit: String
+
+    /// "11 of 14 days"
+    var caption: String { "\(current) of \(target) \(unit)" }
+    var fraction: Double {
+        guard target > 0 else { return 0 }
+        return min(1, Double(current) / Double(target))
+    }
+}
+
+struct AchievementDetail: Codable, Identifiable, Hashable {
     let id: Int
     let key: String
     let name: String
@@ -274,6 +294,52 @@ struct AchievementDetail: Codable, Identifiable {
     let category: String
     let unlocked: Bool
     let unlockedAt: String?
+    /// Award shelf id: rings | monthly | workouts | competitions | limited.
+    let section: String?
+    /// Artwork slug of the badge render in the Medals asset catalogue.
+    let medal: String?
+    let sortOrder: Int?
+    let progress: AwardProgress?
+
+    /// Resolved asset name, falling back to a stable pick so a badge always renders
+    /// even if the server predates the medal catalogue.
+    var medalAsset: String {
+        if let medal, !medal.isEmpty { return medal }
+        return MedalCatalog.fallback(for: key)
+    }
+}
+
+/// One shelf of the Awards hub.
+struct AwardSection: Codable, Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let emptyCopy: String
+    let unlocked: Int
+    let total: Int
+    let achievements: [AchievementDetail]
+
+    /// The badge the shelf card leads with: the newest unlocked one, else whatever is
+    /// closest to completion, else simply the first badge on the shelf.
+    var hero: AchievementDetail? {
+        if let newest = achievements
+            .filter({ $0.unlocked })
+            .sorted(by: { ($0.unlockedAt ?? "") > ($1.unlockedAt ?? "") })
+            .first {
+            return newest
+        }
+        if let closest = achievements
+            .filter({ $0.progress != nil })
+            .max(by: { ($0.progress?.fraction ?? 0) < ($1.progress?.fraction ?? 0) }) {
+            return closest
+        }
+        return achievements.first
+    }
+
+    /// Small overlapping badges under the hero badge on the shelf card.
+    var stack: [AchievementDetail] {
+        Array(achievements.filter { $0.id != hero?.id }.prefix(3))
+    }
 }
 
 // MARK: - Subscription Status

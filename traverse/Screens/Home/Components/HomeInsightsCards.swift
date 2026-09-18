@@ -164,69 +164,85 @@ struct MistakeTagProgressRow: View {
 
 // MARK: - Mistake Tags Detail View
 
+/// The Awards card on the home feed.
+///
+/// Apple leads with the badge you earned most recently rather than a raw count, so the
+/// card shows the newest award's medal and name. The whole card is a navigation target
+/// into the Awards shelf.
 struct AchievementStatsCard: View {
     let stats: AchievementStatsData
     @ObservedObject var paletteManager: ColorPaletteManager
-    @State private var glowPhase: CGFloat = 0
-    
-    // Progress determines glow intensity (0 to 1)
-    private var progress: CGFloat {
-        CGFloat(stats.unlocked) / CGFloat(max(stats.total, 1))
-    }
-    
-    // Break up complex expressions for compiler
-    private var glowFillOpacity: Double {
-        let baseOpacity: Double = 0.15
-        let progressMultiplier: Double = Double(progress) * 0.4
-        let animationFactor: Double = 0.5 + 0.5 * sin(glowPhase)
-        return baseOpacity + progressMultiplier * animationFactor
-    }
-    
-    private var accentColor: Color {
-        paletteManager.color(at: 3)
-    }
-    
+
+    private var latest: AchievementDetail? { stats.latestAward }
+
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
-            
-            // Hero number only
-            VStack(spacing: 8) {
-                Text("\(stats.unlocked)")
-                    .font(.system(size: 72, weight: .bold))
-                    .foregroundStyle(accentColor)
-                Text("of \(stats.total)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text("unlocked")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .center) {
+                Text("Awards")
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+
+                Spacer(minLength: 8)
+
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(width: 28, height: 28)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.65))
+                }
             }
-            .frame(maxWidth: .infinity)
-            
-            Spacer()
+
+            Spacer(minLength: 6)
+
+            if let latest {
+                MedalView(
+                    medal: latest.medalAsset,
+                    unlocked: latest.unlocked,
+                    size: 92,
+                    interactive: false
+                )
+                .frame(height: 92)
+
+                Spacer(minLength: 6)
+
+                Text(latest.name)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            } else {
+                // Nothing earned yet — keep the card's silhouette rather than collapsing it.
+                MedalView(
+                    medal: MedalCatalog.fallback(for: "first_solve"),
+                    unlocked: false,
+                    size: 92,
+                    interactive: false,
+                    showsShadow: false
+                )
+                .frame(height: 92)
+
+                Spacer(minLength: 6)
+
+                Text("Solve a problem to earn your first award")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+            }
         }
+        .padding(14)
         .frame(maxWidth: .infinity, minHeight: 180)
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    RadialGradient(
-                        colors: [accentColor.opacity(glowFillOpacity), .clear],
-                        center: .bottom,
-                        startRadius: 0,
-                        endRadius: 150
-                    )
-                )
-                .allowsHitTesting(false)
-        )
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glowPhase = .pi * 2
-            }
-        }
+        .traceInvalidFrame("AchievementStatsCard")
     }
 }
 
@@ -375,6 +391,7 @@ struct ProductivityInsightsCard: View {
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .traceInvalidFrame("ProductivityInsightsCard")
     }
 }
 

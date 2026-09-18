@@ -123,7 +123,10 @@ struct ActivityDetailView: View {
                     // Heatmap grid with day labels
                     GeometryReader { geometry in
                         let availableWidth = geometry.size.width - 40 // Account for day labels
-                        let cellSize = (availableWidth - CGFloat(19 * 3)) / 20 // 20 weeks, 3pt spacing
+                        // Clamped: the first layout pass reports a zero-width
+                        // GeometryReader, which made this negative and tripped
+                        // "Invalid frame dimension (negative or non-finite)".
+                        let cellSize = max((availableWidth - CGFloat(19 * 3)) / 20, 2) // 20 weeks, 3pt spacing
                         
                         HStack(alignment: .top, spacing: 4) {
                             // Day labels
