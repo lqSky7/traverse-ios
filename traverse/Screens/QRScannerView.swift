@@ -47,8 +47,12 @@ struct QRScannerView: View {
             }
             .sheet(isPresented: $showUserProfile) {
                 if let username = scannedUsername {
-                    UserProfileView(username: username)
-                        .environmentObject(authViewModel)
+                    // The profile sets a navigation title and a toolbar menu, so
+                    // it needs a stack when it is the root of a sheet.
+                    NavigationStack {
+                        UserProfileView(username: username)
+                    }
+                    .environmentObject(authViewModel)
                 }
             }
             .alert("Invalid QR Code", isPresented: $showError) {

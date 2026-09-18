@@ -565,25 +565,35 @@ struct SolveRow: View {
                     }
                     
                     // Highlight
-                    if let highlight = solve.highlight {
+                    //
+                    // `note` and `content` arrive as `nil` when the viewer is not
+                    // a friend (the server redacts private notes), so the block is
+                    // rendered only when there is actually something to show —
+                    // otherwise a stranger's solve would carry an empty "Note"
+                    // heading with nothing under it.
+                    if let highlight = solve.highlight,
+                       highlight.hasContent {
+                        let note = highlight.note ?? ""
+                        let content = highlight.content ?? ""
+
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 6) {
                                 Image(systemName: "note.text")
                                     .foregroundStyle(paletteManager.color(at: 4))
                                     .font(.caption)
-                                Text("Your Note")
+                                Text("Note")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                             }
                             
-                            if !highlight.note.isEmpty {
-                                MarkdownText(markdown: highlight.note)
+                            if !note.isEmpty {
+                                MarkdownText(markdown: note)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                             
-                            if !highlight.content.isEmpty && highlight.content != highlight.note {
-                                Text(highlight.content)
+                            if !content.isEmpty && content != note {
+                                Text(content)
                                     .font(.caption2)
                                     .fontDesign(.monospaced)
                                     .foregroundStyle(.secondary.opacity(0.8))

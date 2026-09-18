@@ -1,16 +1,28 @@
 import SwiftUI
 
+/// The full solve list — the destination behind "View All" on the home feed.
+///
+/// It is also how a profile renders someone else's history, which is why it
+/// takes a `title` and an optional paging callback: a friend's feed is
+/// cursor-paginated on the server, so the list has to be able to pull the next
+/// page rather than assume it holds everything.
 struct AllSolvesView: View {
     let solves: [Solve]
+    var title: String = "All Solves"
+    /// Invoked when the end of the list is reached and the server reported more
+    /// rows. The caller is responsible for ignoring repeat calls.
+    var onLoadMore: (() async -> Void)?
+
     @ObservedObject var paletteManager = ColorPaletteManager.shared
     @State private var searchText = ""
     @State private var selectedTopic: String? = nil
-    
+    @State private var isLoadingMore = false
+
     var availableTopics: [String] {
         let allTopics = solves.compactMap { $0.problem.topic }
         return Array(Set(allTopics)).filter { !$0.isEmpty }.sorted()
     }
-    
+
     var filteredSolves: [Solve] {
         solves.filter { solve in
             let matchesSearch = searchText.isEmpty ||
@@ -18,13 +30,20 @@ struct AllSolvesView: View {
                 solve.problem.slug.localizedCaseInsensitiveContains(searchText) ||
                 (solve.problem.topic ?? "").localizedCaseInsensitiveContains(searchText) ||
                 (solve.problem.subtopic ?? "").localizedCaseInsensitiveContains(searchText)
-            
+
             let matchesTopic = selectedTopic == nil || solve.problem.topic == selectedTopic
-            
+
             return matchesSearch && matchesTopic
         }
     }
-    
+
+    /// Only page while the user is looking at the unfiltered list — pulling more
+    /// rows behind an active search would grow the list under a filter that
+    /// cannot use them.
+    private var canLoadMore: Bool {
+        onLoadMore != nil && searchText.isEmpty && selectedTopic == nil
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Search Bar
@@ -110,13 +129,30 @@ struct AllSolvesView: View {
                         ForEach(filteredSolves) { solve in
                             SolveRow(solve: solve, paletteManager: paletteManager)
                         }
+
+                        if canLoadMore {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
+                            }
+                            .padding(.vertical, 12)
+                            // Fires when the footer scrolls into view, which is
+                            // when the next page is actually wanted.
+                            .task {
+                                guard !isLoadingMore else { return }
+                                isLoadingMore = true
+                                await onLoadMore?()
+                                isLoadingMore = false
+                            }
+                        }
                     }
                     .padding()
                 }
             }
         }
         .background(Color.black.ignoresSafeArea())
-        .navigationTitle("All Solves")
+        .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarScrollMinimization()
     }

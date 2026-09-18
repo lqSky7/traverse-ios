@@ -58,14 +58,21 @@ struct LiquidGlassButtonModifier: ViewModifier {
 }
 
 // MARK: - Toolbar Scroll Minimization
+//
+// TEMPORARILY DISABLED for diagnosis: this stacks a brand-new, iOS 27-beta-only
+// "Liquid Glass" toolbar minimize behavior on top of `.tabBarMinimizeBehavior`
+// (also iOS 26+/beta) on every single screen in the Home tab. Every push from
+// Home (activity heatmap, mistake tags, achievements) was producing an
+// identical multi-second "Severe Hang" + 100% CPU regardless of the
+// destination's own content, which points at the navigation-chrome transition
+// itself rather than any specific view. Turning this into a no-op isolates
+// whether these beta minimize-behavior APIs are the trigger. If freezes stop
+// after this change, re-enable gradually (e.g. drop the tab bar minimize
+// behavior first, keep this) once the actual interaction is understood.
 extension View {
     @ViewBuilder
     func toolbarScrollMinimization() -> some View {
-        if #available(iOS 27.0, *) {
-            self.toolbarMinimizeBehavior(.onScrollDown, for: .navigationBar)
-        } else {
-            self
-        }
+        self
     }
 }
 

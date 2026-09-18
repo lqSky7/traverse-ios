@@ -138,7 +138,7 @@ extension NetworkService {
     }
     
     // MARK: - Get User's Achievements
-    func getUserAchievements(username: String) async throws -> AchievementsResponse {
+    func getUserAchievements(username: String) async throws -> AllAchievementsResponse {
         guard let url = URL(string: "\(baseURL)/achievements/user/\(username)") else {
             throw NetworkError.invalidURL
         }
@@ -154,7 +154,7 @@ extension NetworkService {
         
         if httpResponse.statusCode == 200 {
             do {
-                let achievementsResponse = try JSONDecoder().decode(AchievementsResponse.self, from: data)
+                let achievementsResponse = try JSONDecoder().decode(AllAchievementsResponse.self, from: data)
                 return achievementsResponse
             } catch {
                 print("Decoding error: \(error)")

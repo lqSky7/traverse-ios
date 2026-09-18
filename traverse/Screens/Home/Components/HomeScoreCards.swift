@@ -57,6 +57,16 @@ struct StreakCard: View {
 }
 
 // MARK: - Thinking Orb Score Effect (Settings > Shaders & Demos > Thinking Orb)
+//
+// NOTE: This used to be driven by `TimelineView(.animation)`, which re-renders
+// three blurred/rotated gradient layers on *every frame, forever*, for as long
+// as this view exists in the hierarchy. Because SwiftUI's TabView keeps every
+// tab alive in memory, that meant this animation kept running at ~60fps even
+// while the user was on a completely different tab, permanently pinning a CPU
+// core (see the 100% CPU / high energy impact reports on the Home screen).
+// The visual is now fully static — computed once per `score` change instead of
+// once per frame — since the card's job (communicate a number) never needed
+// continuous motion.
 struct ThinkingOrbScoreView: View {
     let score: Int
     @ObservedObject var paletteManager: ColorPaletteManager
@@ -67,52 +77,45 @@ struct ThinkingOrbScoreView: View {
     }
     
     var body: some View {
-        TimelineView(.animation) { timeline in
-            let now = timeline.date.timeIntervalSinceReferenceDate
-            let speed = 0.6 + Double(normalizedScore) * 0.8
-            let phase = now * speed
-            let progress = sin(phase)
-            
-            let primaryColor = paletteManager.color(at: 0)
-            let secondaryColor = paletteManager.color(at: 1)
-            
-            // Dynamic scale and opacity driven by revision score
-            let orbScale = 0.55 + 0.35 * normalizedScore
-            let orbOpacity = 0.40 + 0.55 * normalizedScore
-            
-            ZStack {
-                // Primary ambient glow body
-                RoundedRectangle(cornerRadius: 120, style: .continuous)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [primaryColor, secondaryColor],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        let primaryColor = paletteManager.color(at: 0)
+        let secondaryColor = paletteManager.color(at: 1)
+        
+        // Dynamic scale and opacity driven by revision score (static per score value)
+        let orbScale = 0.55 + 0.35 * normalizedScore
+        let orbOpacity = 0.40 + 0.55 * normalizedScore
+        
+        ZStack {
+            // Primary ambient glow body
+            RoundedRectangle(cornerRadius: 120, style: .continuous)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [primaryColor, secondaryColor],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .frame(width: 110, height: 110)
-                    .blur(radius: 24)
-                    .rotationEffect(Angle(radians: progress * 0.7))
-                
-                // Secondary core layer
-                RoundedRectangle(cornerRadius: 120, style: .continuous)
-                    .foregroundStyle(secondaryColor.mix(with: .white, by: 0.35))
-                    .frame(width: 70, height: 42)
-                    .blur(radius: 18)
-                    .rotationEffect(Angle(radians: -progress * 0.7))
-                
-                // Bright white filament highlight
-                RoundedRectangle(cornerRadius: 120, style: .continuous)
-                    .foregroundStyle(Color.white.opacity(0.85))
-                    .frame(width: 80, height: 40)
-                    .offset(y: -14)
-                    .blur(radius: 24)
-                    .rotationEffect(Angle(radians: progress * 0.35))
-            }
-            .scaleEffect(orbScale)
-            .opacity(orbOpacity)
-            .blendMode(.screen)
+                )
+                .frame(width: 110, height: 110)
+                .blur(radius: 24)
+                .rotationEffect(.degrees(18))
+            
+            // Secondary core layer
+            RoundedRectangle(cornerRadius: 120, style: .continuous)
+                .foregroundStyle(secondaryColor.mix(with: .white, by: 0.35))
+                .frame(width: 70, height: 42)
+                .blur(radius: 18)
+                .rotationEffect(.degrees(-14))
+            
+            // Bright white filament highlight
+            RoundedRectangle(cornerRadius: 120, style: .continuous)
+                .foregroundStyle(Color.white.opacity(0.85))
+                .frame(width: 80, height: 40)
+                .offset(y: -14)
+                .blur(radius: 24)
+                .rotationEffect(.degrees(9))
         }
+        .scaleEffect(orbScale)
+        .opacity(orbOpacity)
+        .blendMode(.screen)
     }
 }
 

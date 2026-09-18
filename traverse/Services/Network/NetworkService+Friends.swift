@@ -273,12 +273,18 @@ extension NetworkService {
     }
     
     // MARK: - Get Friend's Solves
-    func getFriendSolves(username: String, limit: Int = 50, offset: Int = 0) async throws -> UserSolvesResponse {
+    //
+    // Cursor, not offset. The friend's feed grows at the front, so an offset
+    // shifts underneath the reader and pages silently duplicate or skip rows.
+    // The response is the same `UserSolvesResponse` the public profile feed
+    // returns, so the UI renders both with the home screen's solve row.
+    func getFriendSolves(username: String, limit: Int = 50, cursor: Int? = nil) async throws -> UserSolvesResponse {
         var components = URLComponents(string: "\(baseURL)/friends/\(username)/solves")
-        components?.queryItems = [
-            URLQueryItem(name: "limit", value: "\(limit)"),
-            URLQueryItem(name: "offset", value: "\(offset)")
-        ]
+        var queryItems = [URLQueryItem(name: "limit", value: "\(limit)")]
+        if let cursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: "\(cursor)"))
+        }
+        components?.queryItems = queryItems
         
         guard let url = components?.url else {
             throw NetworkError.invalidURL
@@ -351,7 +357,11 @@ extension NetworkService {
     }
     
     // MARK: - Get Friend's Achievements
-    func getFriendAchievements(username: String) async throws -> AchievementsResponse {
+    //
+    // Returns the same `{ achievements, sections, featured }` payload the Awards
+    // hub loads for the signed-in user, so a friend's shelf is rendered by the
+    // very same view rather than a second, thinner one.
+    func getFriendAchievements(username: String) async throws -> AllAchievementsResponse {
         guard let url = URL(string: "\(baseURL)/friends/\(username)/achievements") else {
             throw NetworkError.invalidURL
         }
@@ -372,7 +382,7 @@ extension NetworkService {
         
         if httpResponse.statusCode == 200 {
             do {
-                let achievementsResponse = try JSONDecoder().decode(AchievementsResponse.self, from: data)
+                let achievementsResponse = try JSONDecoder().decode(AllAchievementsResponse.self, from: data)
                 return achievementsResponse
             } catch {
                 print("Decoding error: \(error)")

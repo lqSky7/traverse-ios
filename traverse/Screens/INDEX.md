@@ -25,4 +25,3 @@
 - `Home/` - Home dashboard, statistics cards, and detail screens
 - `Revisions/` - Spaced repetition review hub and ML analytics
 - `Profile/` - User profile, solve history, and achievement showcase
-- `OnPaper/` - Project-based interview prep and FSRS flashcards

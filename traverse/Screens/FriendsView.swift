@@ -164,9 +164,11 @@ struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @StateObject private var streakRequestsViewModel = FriendStreakRequestsViewModel()
     @StateObject private var paletteManager = ColorPaletteManager.shared
-    @Binding var showingSearchFromTab: Bool
     @State private var showingRequests = false
     @State private var showingStreakRequests = false
+    @State private var showingSearch = false
+    @State private var showingQRSheet = false
+    @State private var showingQRScanner = false
     
     // Leaderboard: Top 3 by weighted score (streak has more weight)
     private var leaderboard: [Friend] {
@@ -245,6 +247,15 @@ struct FriendsView: View {
                     .padding(.trailing, 8)
                 }
             }
+            // The search and QR entry points belong to the list, not to the tab.
+            // As a bottom inset they push the list up instead of floating over
+            // the last row, and because they are attached here they vanish the
+            // moment you push into a profile — previously they hovered above
+            // every screen in the tab, including ones they have nothing to do
+            // with.
+            .safeAreaInset(edge: .bottom) {
+                searchBar
+            }
             .refreshable {
                 // Use Task to prevent early cancellation from pull-to-refresh gesture
                 await Task {
@@ -258,6 +269,15 @@ struct FriendsView: View {
             }
             .sheet(isPresented: $showingStreakRequests) {
                 FriendStreakRequestsView(viewModel: streakRequestsViewModel)
+            }
+            .sheet(isPresented: $showingSearch) {
+                UserSearchView()
+            }
+            .sheet(isPresented: $showingQRSheet) {
+                QRCodeSheetView()
+            }
+            .fullScreenCover(isPresented: $showingQRScanner) {
+                QRScannerView()
             }
             .task {
                 // Load friends and streaks in parallel for faster display
@@ -278,6 +298,49 @@ struct FriendsView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+    
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Button {
+                showingSearch = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.subheadline.weight(.medium))
+                    Text("Search friends")
+                        .font(.subheadline)
+                    Spacer(minLength: 0)
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+            }
+            .glassEffect(in: Capsule())
+            
+            Menu {
+                Button {
+                    showingQRSheet = true
+                } label: {
+                    Label("Show My QR Code", systemImage: "qrcode")
+                }
+                
+                Button {
+                    showingQRScanner = true
+                } label: {
+                    Label("Scan QR Code", systemImage: "qrcode.viewfinder")
+                }
+            } label: {
+                Image(systemName: "qrcode")
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .frame(width: 46, height: 46)
+            }
+            .glassEffect(in: Circle())
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
     
     private var friendsList: some View {
@@ -693,5 +756,5 @@ struct EmptyFriendsView: View {
 }
 
 #Preview {
-    FriendsView(showingSearchFromTab: .constant(false))
+    FriendsView()
 }

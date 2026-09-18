@@ -31,6 +31,9 @@ class HomeViewModel: ObservableObject {
     }
     
     func loadData(username: String, forceRefresh: Bool = false) async {
+        let callID = Int.random(in: 1000...9999)
+        let startTime = Date()
+        print("[HomeViewModel] #\(callID) loadData START username=\(username) forceRefresh=\(forceRefresh) thread=\(Thread.isMainThread ? "main" : "bg")")
         // Use cache if fresh (< 2 hours), otherwise fetch from server
         
         // Always fetch freeze dates first (lightweight, important for display)
@@ -39,12 +42,15 @@ class HomeViewModel: ObservableObject {
             await MainActor.run {
                 self.frozenDates = Set(freezeDatesResponse.freezeDates)
             }
+            print("[HomeViewModel] #\(callID) freezeDates OK count=\(freezeDatesResponse.freezeDates.count)")
         } catch {
             // Silent fail - freeze dates are not critical
+            print("[HomeViewModel] #\(callID) freezeDates FAILED (non-critical): \(error)")
         }
         
         // Check if we can use cached data
         if !forceRefresh && DataManager.shared.isCacheFresh {
+            print("[HomeViewModel] #\(callID) using cached data (cache is fresh)")
             await MainActor.run {
                 if self.userStats == nil { self.userStats = DataManager.shared.userStats }
                 if self.submissionStats == nil { self.submissionStats = DataManager.shared.submissionStats }
@@ -60,8 +66,10 @@ class HomeViewModel: ObservableObject {
             if let userStats = self.userStats?.stats {
                 updateWidgets(userStats: userStats, recentSolve: self.recentSolves?.first, revisions: self.todayRevisions)
             }
+            print("[HomeViewModel] #\(callID) loadData END (cached path) elapsed=\(Date().timeIntervalSince(startTime))s")
             return
         }
+        print("[HomeViewModel] #\(callID) cache stale or forced - fetching from network")
         await MainActor.run {
             isLoading = true
             errorMessage = nil
@@ -77,6 +85,7 @@ class HomeViewModel: ObservableObject {
             async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true)
             async let scoreTask = try? NetworkService.shared.getRevisionScore()
 
+            let networkStart = Date()
             let (userStats, submissionStats, solveStats, achievementStats, solvesResponse, revisionsResponse, completedRevisionsResponse, scoreResult) = try await (
                 userStatsTask,
                 submissionStatsTask,
@@ -87,6 +96,7 @@ class HomeViewModel: ObservableObject {
                 completedRevisionsTask,
                 scoreTask
             )
+            print("[HomeViewModel] #\(callID) all network calls completed elapsed=\(Date().timeIntervalSince(networkStart))s solves=\(solvesResponse.solves.count) revisions=\(revisionsResponse.revisions.count) scoreOK=\(scoreResult != nil)")
             
             // Filter for today + overdue only (upcoming includes future dates we don't want)
             let calendar = Calendar.current
@@ -115,7 +125,9 @@ class HomeViewModel: ObservableObject {
                 }
 
             // Merge and persist solves inside DataManager, getting the merged array back
+            let mergeStart = Date()
             let mergedSolves = DataManager.shared.mergeAndPersistSolves(solvesResponse.solves)
+            print("[HomeViewModel] #\(callID) mergeAndPersistSolves done elapsed=\(Date().timeIntervalSince(mergeStart))s mergedCount=\(mergedSolves.count)")
 
             await MainActor.run {
                 self.userStats = userStats
@@ -130,6 +142,7 @@ class HomeViewModel: ObservableObject {
                 }
                 // frozenDates already set at start of loadData
             }
+            print("[HomeViewModel] #\(callID) published data to @Published properties")
             
             // Update DataManager cache
             DataManager.shared.userStats = userStats
@@ -146,23 +159,31 @@ class HomeViewModel: ObservableObject {
             DataManager.shared.lastFetchTimestamp = Date()
             
             // Persist the data
+            let persistStart = Date()
             DataManager.shared.persistData()
+            print("[HomeViewModel] #\(callID) persistData done elapsed=\(Date().timeIntervalSince(persistStart))s")
             
             // Update widgets - send exactly what we want to display (today + overdue)
+            let widgetStart = Date()
             updateWidgets(userStats: userStats.stats, recentSolve: mergedSolves.first, revisions: todayAndOverdue)
+            print("[HomeViewModel] #\(callID) updateWidgets done elapsed=\(Date().timeIntervalSince(widgetStart))s")
 
             // Check if solved today and end live activity if needed
             DataManager.shared.checkSolvedTodayAndEndActivity()
             
             // Trigger app updates & toast check
+            let toastStart = Date()
             await AchievementToastManager.shared.syncAppOpenUpdates()
+            print("[HomeViewModel] #\(callID) syncAppOpenUpdates done elapsed=\(Date().timeIntervalSince(toastStart))s")
 
         } catch let error where error is CancellationError {
             // Ignore cancellation errors - user likely released pull-to-refresh
+            print("[HomeViewModel] #\(callID) loadData CANCELLED elapsed=\(Date().timeIntervalSince(startTime))s")
             await MainActor.run {
                 isLoading = false
             }
         } catch {
+            print("[HomeViewModel] #\(callID) loadData FAILED elapsed=\(Date().timeIntervalSince(startTime))s error=\(error)")
             await MainActor.run {
                 errorMessage = error.localizedDescription
             }
@@ -171,6 +192,7 @@ class HomeViewModel: ObservableObject {
         await MainActor.run {
             isLoading = false
         }
+        print("[HomeViewModel] #\(callID) loadData END totalElapsed=\(Date().timeIntervalSince(startTime))s")
     }
     
     private func hasSolvedToday(recentSolves: [Solve]?) -> Bool {

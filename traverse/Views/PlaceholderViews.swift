@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct HomeTab: View {
     var body: some View {
@@ -6,81 +7,34 @@ struct HomeTab: View {
     }
 }
 
+/// The Friends tab.
+///
+/// It used to own the search and QR buttons and float them in a `ZStack` over
+/// the whole tab, which is why they hovered above pushed profiles too. They now
+/// live in `FriendsView` as a bottom inset on the list itself. All that is left
+/// here is the deep-link sheet, which is genuinely tab-level.
 struct FriendsTab: View {
-    @State private var showingSearch = false
-    @State private var showingQRSheet = false
-    @State private var showingQRScanner = false
-    @State private var showQRMenu = false
     @State private var deepLinkUsername: String?
     @State private var showDeepLinkProfile = false
-    @StateObject private var paletteManager = ColorPaletteManager.shared
-    
+
     var body: some View {
-        ZStack(alignment: .bottom) {
-            FriendsView(showingSearchFromTab: $showingSearch)
-            
-            // Floating action buttons above tab bar
-            VStack {
-                Spacer()
-                
-                HStack(spacing: 12) {
-                    // QR Code Button (circular)
-                    Menu {
-                        Button(action: { showingQRSheet = true }) {
-                            Label("Show My QR Code", systemImage: "qrcode")
-                        }
-                        
-                        Button(action: { showingQRScanner = true }) {
-                            Label("Scan QR Code", systemImage: "qrcode.viewfinder")
-                        }
-                    } label: {
-                        Image(systemName: "qrcode")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(.primary)
-                            .frame(width: 44, height: 44)
+        FriendsView()
+            .sheet(isPresented: $showDeepLinkProfile) {
+                // `UserProfileView` sets a navigation title and a toolbar menu,
+                // both of which need a stack around them when the profile is the
+                // root of a sheet rather than a push.
+                NavigationStack {
+                    if let username = deepLinkUsername {
+                        UserProfileView(username: username)
                     }
-                    .glassEffect(in: Circle())
-                    
-                    // Search Friends Button (pill)
-                    Button(action: {
-                        showingSearch = true
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.body)
-                            Text("Search Friends")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                    }
-                    .glassEffect(in: Capsule())
                 }
-                .padding(.bottom, 60) // Position above tab bar
             }
-        }
-        .sheet(isPresented: $showingSearch) {
-            UserSearchView()
-        }
-        .sheet(isPresented: $showingQRSheet) {
-            QRCodeSheetView()
-        }
-        .fullScreenCover(isPresented: $showingQRScanner) {
-            QRScannerView()
-        }
-        .sheet(isPresented: $showDeepLinkProfile) {
-            if let username = deepLinkUsername {
-                UserProfileView(username: username)
+            .onReceive(NotificationCenter.default.publisher(for: .deepLinkAddFriend)) { notification in
+                if let username = notification.userInfo?["username"] as? String {
+                    deepLinkUsername = username
+                    showDeepLinkProfile = true
+                }
             }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .deepLinkAddFriend)) { notification in
-            if let username = notification.userInfo?["username"] as? String {
-                deepLinkUsername = username
-                showDeepLinkProfile = true
-            }
-        }
     }
 }
 

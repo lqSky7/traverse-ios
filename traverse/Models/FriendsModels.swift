@@ -73,41 +73,34 @@ struct UserStatisticsResponse: Codable {
 }
 
 // MARK: - Solves Models
-struct UserSolve: Codable, Identifiable {
-    let id: Int
-    let xpAwarded: Int
-    let solvedAt: String
-    let aiAnalysis: String?
-    let problem: Problem
-    let submission: Submission?
-    let highlight: Highlight?
-}
-
-struct SolvesPagination: Codable {
-    let total: Int
-    let limit: Int
-    let offset: Int
-}
-
+//
+// A profile's solve feed decodes into the *same* `Solve` the home feed uses.
+// The server returns an identical field set for `/solves/user/:username` and
+// `/friends/:username/solves` precisely so the profile screens can reuse
+// `SolveRow` / `AllSolvesView` verbatim instead of maintaining a parallel model.
+//
+// That parallel model is exactly what broke the friends screen: the endpoint
+// moved to cursor pagination, `UserSolve`'s response wrapper kept a
+// non-optional `offset`, and `JSONDecoder` threw `keyNotFound` — which failed
+// the whole response, so the list rendered nothing at all.
 struct UserSolvesResponse: Codable {
     let username: String
-    let solves: [UserSolve]
+    let solves: [Solve]
     let pagination: SolvesPagination
 }
 
-// MARK: - Achievements Models
-struct Achievement: Codable, Identifiable {
-    let id: Int
-    let key: String
-    let name: String
-    let description: String
-    let category: String
-    let unlockedAt: String
-}
-
-struct AchievementsResponse: Codable {
-    let username: String
-    let achievements: [Achievement]
+/// Pagination as the two feeds actually report it.
+///
+/// The friends feed is cursor-paginated — the list grows at the front, so
+/// skip/offset produces duplicates and gaps between pages — while the public
+/// profile feed still reports an offset. Both are decoded here so one response
+/// type serves either endpoint, and neither key can fail a decode.
+struct SolvesPagination: Codable {
+    let total: Int
+    let limit: Int
+    let offset: Int?
+    /// Cursor for the next page; `nil` when this is the last page.
+    let nextCursor: Int?
 }
 
 // MARK: - Friend Request Models

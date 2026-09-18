@@ -18,7 +18,19 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                // NOTE: These were plain `VStack`s. A plain VStack makes every card
+                // (including multiple Charts-framework charts, the activity heatmap
+                // grid, and the achievement/insight cards) a permanently-live node in
+                // SwiftUI's AttributeGraph the instant HomeView appears, whether it's
+                // on screen or not. Since NavigationLink keeps HomeView mounted
+                // *underneath* whatever gets pushed, any environment change during a
+                // push transition (e.g. safe-area insets shifting as the nav/tab bar
+                // chrome animates) forces a full re-validation of that entire giant
+                // tree at once — which is what was producing the multi-second
+                // "Severe Hang" + 100% CPU right after tapping into a card.
+                // `LazyVStack` only keeps children near the visible scroll region as
+                // live graph nodes, so a re-validation pass has far less to walk.
+                LazyVStack(spacing: 20) {
                     if let error = viewModel.errorMessage {
                         ErrorView(message: error, retry: {
                             Task {
@@ -44,7 +56,7 @@ struct HomeView: View {
                         }
                         
                         // Charts Section
-                        VStack(spacing: 16) {
+                        LazyVStack(spacing: 16) {
                             // Achievements and Insights side by side
                             if let achievementStats = viewModel.achievementStats,
                                let solves = viewModel.recentSolves, !solves.isEmpty {
@@ -111,6 +123,7 @@ struct HomeView: View {
             }
         }
         .onAppear {
+            print("[HomeView] onAppear username=\(authViewModel.currentUser?.username ?? "nil")")
             if let username = authViewModel.currentUser?.username {
                 // Set username for Watch sync
                 WidgetDataUpdater.shared.currentUsername = username
@@ -120,6 +133,7 @@ struct HomeView: View {
             }
         }
         .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
+            print("[HomeView] onChange username \(oldUsername ?? "nil") -> \(newUsername ?? "nil")")
             if let username = newUsername {
                 // Update username for Watch sync
                 WidgetDataUpdater.shared.currentUsername = username
@@ -131,6 +145,7 @@ struct HomeView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .revisionCompleted)) { _ in
+            print("[HomeView] received .revisionCompleted notification, forcing refresh")
             if let username = authViewModel.currentUser?.username {
                 Task {
                     await viewModel.loadData(username: username, forceRefresh: true)

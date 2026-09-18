@@ -1,16 +1,53 @@
 import Combine
 import SwiftUI
 
+/// Whose awards the hub should show, and therefore which endpoint to read.
+///
+/// The backend exposes three, and they are not interchangeable: your own shelf,
+/// another user's shelf (gated by their visibility setting), and a friend's
+/// shelf (which additionally applies the block rules). Naming the source
+/// explicitly keeps the view from guessing, and keeps the block check on the
+/// friends path where it belongs.
+enum AwardsSource: Equatable {
+    case me
+    /// Someone else, as reached from search, a QR scan, or a shared link.
+    case profile(String)
+    /// A friend, as reached from the friends list.
+    case friend(String)
+
+    var username: String? {
+        switch self {
+        case .me: return nil
+        case .profile(let name), .friend(let name): return name
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .me: return "Awards"
+        case .profile(let name), .friend(let name): return "\(name)'s Awards"
+        }
+    }
+}
+
 /// The Awards shelf — Apple Fitness' award page, rebuilt for Traverse.
 ///
 /// Layout mirrors the Fitness app: an in-progress challenge card leads, the first shelf
 /// gets a full-width hero card, and the remaining shelves sit in a two-up grid. A shelf
 /// with nothing on it yet spans the full width so its empty-state copy has room to breathe.
+///
+/// The same view renders your own shelf and a friend's; only `source` differs.
 struct AllAchievementsView: View {
-    @StateObject private var viewModel = AchievementsViewModel()
+    let source: AwardsSource
+    @StateObject private var viewModel: AchievementsViewModel
     @ObservedObject var paletteManager = ColorPaletteManager.shared
 
     private let cardBackground = Color(white: 0.11)
+
+    init(source: AwardsSource = .me) {
+        self.source = source
+        _viewModel = StateObject(wrappedValue: AchievementsViewModel(source: source))
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -26,6 +63,19 @@ struct AllAchievementsView: View {
                         ErrorView(message: error, retry: {
                             Task { await viewModel.loadAchievements() }
                         })
+                    } else if viewModel.sections.allSatisfy({ $0.total == 0 }) {
+                        // Nothing to show at all — every shelf is empty, which for
+                        // another user means they have not earned anything yet.
+                        ContentUnavailableView(
+                            "No Awards Yet",
+                            systemImage: "trophy",
+                            description: Text(
+                                source == .me
+                                    ? "Solve problems to start earning awards."
+                                    : "\(source.username ?? "This user") has not earned an award yet."
+                            )
+                        )
+                        .padding(.top, 80)
                     } else {
                         if let featured = viewModel.featured {
                             NavigationLink(
@@ -57,7 +107,7 @@ struct AllAchievementsView: View {
                 .padding(.bottom, 32)
             }
         }
-        .navigationTitle("Awards")
+        .navigationTitle(source.title)
         .navigationBarTitleDisplayMode(.large)
         .toolbarScrollMinimization()
         .onAppear {
@@ -273,6 +323,12 @@ class AchievementsViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    private let source: AwardsSource
+
+    init(source: AwardsSource = .me) {
+        self.source = source
+    }
+
     func loadAchievements() async {
         await MainActor.run {
             isLoading = true
@@ -280,11 +336,18 @@ class AchievementsViewModel: ObservableObject {
         }
 
         do {
-            let response = try await NetworkService.shared.getAllAchievements()
+            let response = try await fetch()
+
             await MainActor.run {
                 self.achievements = response.achievements
                 self.sections = response.sections ?? Self.fallbackSections(response.achievements)
                 self.featured = response.featured ?? Self.fallbackFeatured(response.achievements)
+            }
+
+            // Only your own shelf can contain a *new* award. Running this for a
+            // friend's shelf would toast their achievements as if you had just
+            // earned them.
+            if case .me = source {
                 AchievementToastManager.shared.checkNewAchievements(response.achievements)
             }
         } catch {
@@ -295,6 +358,18 @@ class AchievementsViewModel: ObservableObject {
 
         await MainActor.run {
             isLoading = false
+        }
+    }
+
+    /// All three endpoints return the same payload; only the gate differs.
+    private func fetch() async throws -> AllAchievementsResponse {
+        switch source {
+        case .me:
+            return try await NetworkService.shared.getAllAchievements()
+        case .profile(let username):
+            return try await NetworkService.shared.getUserAchievements(username: username)
+        case .friend(let username):
+            return try await NetworkService.shared.getFriendAchievements(username: username)
         }
     }
 

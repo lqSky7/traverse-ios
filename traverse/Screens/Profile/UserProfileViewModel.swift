@@ -37,8 +37,6 @@ class UserProfileViewModel: ObservableObject {
     
     @Published var profile: UserProfile?
     @Published var statistics: UserStatistics?
-    @Published var solves: [UserSolve] = []
-    @Published var achievements: [Achievement] = []
     @Published var friendshipStatus: FriendshipStatus = .notFriends
     @Published var friendStreakStatus: FriendStreakStatus = .none
     @Published var friendStreak: FriendStreak?
@@ -47,18 +45,13 @@ class UserProfileViewModel: ObservableObject {
     @Published var relationship: RelationshipState?
     @Published var isLoading = false
     @Published var errorMessage: String?
-    @Published var selectedTab = 0
-    @Published var displayedSolvesCount = 5
-    
-    private var allSolves: [UserSolve] = []
-    private var hasLoadedSolves = false
-    private var hasLoadedAchievements = false
+
     private var hasLoadedStreakStatus = false
     private var hasLoadedProfile = false
-    
+
     let username: String
     var currentUsername: String?
-    
+
     init(username: String) {
         self.username = username
     }
@@ -179,54 +172,11 @@ class UserProfileViewModel: ObservableObject {
         }
     }
     
-    func loadSolves(force: Bool = false) async {
-        guard !hasLoadedSolves || force else { return }
-        
-        do {
-            let solvesResponse: UserSolvesResponse
-            if friendshipStatus == .friends {
-                solvesResponse = try await NetworkService.shared.getFriendSolves(username: username)
-            } else {
-                solvesResponse = try await NetworkService.shared.getUserSolves(username: username)
-            }
-            allSolves = solvesResponse.solves
-            updateDisplayedSolves()
-            hasLoadedSolves = true
-        } catch {
-            // Silently fail for solves if user is private
-        }
-    }
-    
-    func updateDisplayedSolves() {
-        solves = Array(allSolves.prefix(displayedSolvesCount))
-    }
-    
-    func loadMoreSolves() {
-        displayedSolvesCount += 5
-        updateDisplayedSolves()
-    }
-    
-    var canLoadMoreSolves: Bool {
-        solves.count < allSolves.count
-    }
-    
-    func loadAchievements(force: Bool = false) async {
-        guard !hasLoadedAchievements || force else { return }
-        
-        do {
-            let achievementsResponse: AchievementsResponse
-            if friendshipStatus == .friends {
-                achievementsResponse = try await NetworkService.shared.getFriendAchievements(username: username)
-            } else {
-                achievementsResponse = try await NetworkService.shared.getUserAchievements(username: username)
-            }
-            achievements = achievementsResponse.achievements
-            hasLoadedAchievements = true
-        } catch {
-            // Silently fail for achievements if user is private
-        }
-    }
-    
+    // `loadSolves` and `loadAchievements` used to live here, backing the inline
+    // segmented picker on the profile. Both are gone: the profile now pushes
+    // `ProfileSolvesView` and `AllAchievementsView(source:)`, which load the same
+    // data through the views the home screen already uses.
+
     func sendFriendRequest() async {
         do {
             _ = try await NetworkService.shared.sendFriendRequest(username: username)

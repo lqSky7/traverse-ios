@@ -235,11 +235,38 @@ struct Submission: Codable {
     let attempts: [CodeAttempt]?
 }
 
+/// The note a user attached to a solve.
+///
+/// `content` and `note` are optional on purpose: the server redacts them to
+/// `null` when the viewer is not a friend, and a non-optional property would
+/// turn that into a `keyNotFound` that fails the entire solve list rather than
+/// just hiding the note.
 struct Highlight: Codable {
     let id: Int
-    let content: String
-    let note: String
+    let content: String?
+    let note: String?
     let tags: [String]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        content = try container.decodeIfPresent(String.self, forKey: .content)
+        note = try container.decodeIfPresent(String.self, forKey: .note)
+        tags = try container.decodeIfPresent([String].self, forKey: .tags) ?? []
+    }
+
+    init(id: Int, content: String?, note: String?, tags: [String]) {
+        self.id = id
+        self.content = content
+        self.note = note
+        self.tags = tags
+    }
+
+    /// True when the viewer is allowed to see anything on this note. False for a
+    /// non-friend, whose payload carries the row with both text fields redacted.
+    var hasContent: Bool {
+        !(note ?? "").isEmpty || !(content ?? "").isEmpty || !tags.isEmpty
+    }
 }
 
 struct Pagination: Codable {

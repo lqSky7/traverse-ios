@@ -1,6 +1,14 @@
 import SwiftUI
 import Glur
 
+/// Someone's profile.
+///
+/// The page is deliberately shallow: an identity header, whatever action the
+/// relationship allows, the statistics, and two links into the *shared* solve
+/// list and Awards hub. Those two used to be an inline segmented picker with a
+/// second, profile-only solve list and a second, profile-only badge grid beneath
+/// it — three implementations of data the home screen already renders, on one
+/// screen, with the whole page scrolling as one.
 struct UserProfileView: View {
     let username: String
     @StateObject private var viewModel: UserProfileViewModel
@@ -11,95 +19,63 @@ struct UserProfileView: View {
     @State private var giftSuccessMessage: String?
     @State private var showingRemoveConfirmation = false
     @State private var showingBlockConfirmation = false
-    
+
     init(username: String) {
         self.username = username
         _viewModel = StateObject(wrappedValue: UserProfileViewModel(username: username))
     }
-    
+
+    private var isFriend: Bool { viewModel.friendshipStatus == .friends }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                if let error = viewModel.errorMessage {
-                    VStack(spacing: 16) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        Text(error)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                        Button("Retry") {
-                            Task {
-                                await viewModel.loadProfile()
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding()
+                if let error = viewModel.errorMessage, viewModel.profile == nil {
+                    errorState(error)
                 } else if let profile = viewModel.profile {
                     ProfileHeaderView(profile: profile, statistics: viewModel.statistics)
-                    
-                    // Friend streak section (only for friends) - shown above remove button
-                    if viewModel.friendshipStatus == .friends {
+
+                    // Friend streak section (only for friends)
+                    if isFriend {
                         streakActionSection
                     }
-                    
+
+                    // The single inline action. Everything destructive or
+                    // housekeeping — remove, block, close-friend — lives in the
+                    // top-right menu instead of stacking up the page.
+                    if isFriend {
+                        giftFreezeButton
+                    }
+
                     friendActionButton
-                    
+
                     if let statistics = viewModel.statistics {
                         StatisticsView(statistics: statistics)
                     }
-                    
-                    Picker("View", selection: $viewModel.selectedTab) {
-                        Text("Solves").tag(0)
-                        Text("Achievements").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    
-                    if viewModel.selectedTab == 0 {
-                        SolvesListView(
-                            solves: viewModel.solves,
-                            canLoadMore: viewModel.canLoadMoreSolves,
-                            onLoadMore: { viewModel.loadMoreSolves() }
-                        )
-                    } else {
-                        AchievementsListView(achievements: viewModel.achievements)
-                    }
+
+                    profileActivityLinks
                 }
             }
         }
         .navigationTitle(username)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarScrollMinimization()
+        .toolbar {
+            if showsActionsMenu {
+                profileActionsMenu
+            }
+        }
         .task {
-            // Load profile first, then load streak status in parallel with other data
             await viewModel.loadProfile()
-            async let solvesTask: () = viewModel.loadSolves()
-            async let achievementsTask: () = viewModel.loadAchievements()
-            async let streakTask: () = viewModel.loadFriendStreakStatus()
-            _ = await (solvesTask, achievementsTask, streakTask)
+            // The streak sub-state comes from the relationship payload, so only
+            // the active-streak detail still needs its own fetch.
+            await viewModel.loadFriendStreakStatus()
         }
         .refreshable {
-            // Use Task to prevent early cancellation from pull-to-refresh gesture
             await Task {
                 await viewModel.loadProfile(force: true)
-                async let solvesTask: () = viewModel.loadSolves(force: true)
-                async let achievementsTask: () = viewModel.loadAchievements(force: true)
-                async let streakTask: () = viewModel.loadFriendStreakStatus(force: true)
-                _ = await (solvesTask, achievementsTask, streakTask)
+                await viewModel.loadFriendStreakStatus(force: true)
             }.value
-        }
-        .onChange(of: viewModel.selectedTab) { _, newValue in
-            if newValue == 0 && viewModel.solves.isEmpty {
-                Task {
-                    await viewModel.loadSolves()
-                }
-            } else if newValue == 1 && viewModel.achievements.isEmpty {
-                Task {
-                    await viewModel.loadAchievements()
-                }
-            }
         }
         .onAppear {
             viewModel.currentUsername = authViewModel.currentUser?.username
@@ -134,45 +110,260 @@ struct UserProfileView: View {
         } message: {
             Text("They will not be able to send you friend or streak requests, and neither of you will see the other. They are not told that you blocked them.")
         }
+        .confirmationDialog(
+            "Remove \(username)?",
+            isPresented: $showingRemoveConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Remove Friend", role: .destructive) {
+                Task { await viewModel.removeFriend() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This also ends any streak you share and cancels pending requests.")
+        }
     }
-    
-    @ViewBuilder
-    private var friendActionButton: some View {
-        switch viewModel.friendshipStatus {
-        case .currentUser:
-            EmptyView()
-            
-        case .notFriends:
-            VStack(spacing: 12) {
-                Group {
-                    Button {
-                        Task {
-                            await viewModel.sendFriendRequest()
-                        }
-                    } label: {
-                        Text("Send Friend Request")
-                            .foregroundStyle(.black)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .tint(paletteManager.selectedPalette.primary)
-                }
-                .applyGlassButtonStyle(.glassProminent)
-                .padding(.horizontal)
 
-                // Blocking is offered wherever you can act on someone, not only
-                // from the friend list — the case you most need it in is a
-                // stranger who will not stop.
-                if viewModel.relationship?.canRequest == true {
+    // MARK: - Toolbar actions
+
+    /// Whether the top-right menu has anything in it. An empty `Menu` still opens
+    /// an empty popover, so the item is omitted rather than shown blank.
+    private var showsActionsMenu: Bool {
+        switch viewModel.friendshipStatus {
+        case .friends:
+            return true
+        case .notFriends, .requestSent, .requestReceived:
+            // Blocking is offered wherever you can act on someone — the case you
+            // most need it in is a stranger who will not stop.
+            return viewModel.relationship?.canRequest == true
+        case .blocked, .currentUser:
+            // A blocked profile shows its own inline "Unblock" recovery button,
+            // and your own profile has nothing to manage.
+            return false
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var profileActionsMenu: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                switch viewModel.friendshipStatus {
+                case .friends:
+                    let isFavorite = viewModel.relationship?.friendship?.favorite == true
+
+                    Button {
+                        Task { await viewModel.toggleFavorite() }
+                    } label: {
+                        Label(
+                            isFavorite ? "Remove from Close Friends" : "Add to Close Friends",
+                            systemImage: isFavorite ? "star.slash" : "star"
+                        )
+                    }
+
+                    Divider()
+
+                    Button(role: .destructive) {
+                        showingRemoveConfirmation = true
+                    } label: {
+                        Label("Remove Friend", systemImage: "person.fill.xmark")
+                    }
+
                     Button(role: .destructive) {
                         showingBlockConfirmation = true
                     } label: {
-                        Label("Block \(username)", systemImage: "hand.raised")
-                            .font(.subheadline)
+                        Label("Block @\(username)", systemImage: "hand.raised")
                     }
-                    .tint(.red)
-                    .padding(.horizontal)
+
+                case .notFriends, .requestSent, .requestReceived:
+                    Button(role: .destructive) {
+                        showingBlockConfirmation = true
+                    } label: {
+                        Label("Block @\(username)", systemImage: "hand.raised")
+                    }
+
+                case .blocked, .currentUser:
+                    EmptyView()
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.semibold))
+            }
+            .tint(paletteManager.selectedPalette.primary)
+        }
+    }
+
+    // MARK: - Activity links
+
+    /// The two things there are to look at: their solves and their awards.
+    ///
+    /// Each pushes the view the home screen already uses — `AllSolvesView` and
+    /// the Awards hub — so there is one solve list and one award shelf in the
+    /// app, and a fix in either lands here too.
+    private var profileActivityLinks: some View {
+        VStack(spacing: 0) {
+            NavigationLink {
+                ProfileSolvesView(username: username, isFriend: isFriend)
+            } label: {
+                activityRow(
+                    icon: "checkmark.circle.fill",
+                    tint: paletteManager.color(at: 0),
+                    title: "Solves",
+                    subtitle: "Recent problems solved"
+                )
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+                .padding(.leading, 58)
+
+            NavigationLink {
+                AllAchievementsView(source: awardsSource)
+            } label: {
+                activityRow(
+                    icon: "trophy.fill",
+                    tint: paletteManager.color(at: 1),
+                    title: "Awards",
+                    subtitle: "Badges earned"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .background(Color(UIColor.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
+    }
+
+    /// Which awards endpoint to read. The friends route additionally applies the
+    /// block rules, so it is preferred whenever the relationship allows it.
+    private var awardsSource: AwardsSource {
+        isFriend ? .friend(username) : .profile(username)
+    }
+
+    private func activityRow(icon: String, tint: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(tint)
+                .frame(width: 30)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(16)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Gift freeze
+
+    /// The one action that stays on the page.
+    ///
+    /// Deliberately compact — it hugs its label instead of stretching edge to
+    /// edge. As a full-width pill sitting among two other full-width pills it
+    /// read as the page's primary action, pushed the statistics below the fold,
+    /// and at narrow widths wrapped its own title.
+    private var giftFreezeButton: some View {
+        Button {
+            showingGiftConfirmation = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "snowflake")
+                    .font(.footnote.weight(.semibold))
+
+                Text(isGifting ? "Sending…" : "Gift Freeze")
+                    .font(.subheadline.weight(.semibold))
+
+                Text("70 XP")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 11)
+            .fixedSize()
+        }
+        .disabled(isGifting)
+        .tint(.cyan)
+        .applyGlassButtonStyle(.glassProminent)
+        .confirmationDialog(
+            "Gift a Streak Freeze?",
+            isPresented: $showingGiftConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Gift for 70 XP") {
+                Task {
+                    isGifting = true
+                    let success = await viewModel.giftFreeze()
+                    if success {
+                        giftSuccessMessage = "Freeze gifted to \(username)!"
+                        AchievementToastManager.shared.showToast(
+                            name: "Freeze gifted to \(username)!",
+                            category: "gift_freeze",
+                            icon: "snowflake"
+                        )
+                    }
+                    isGifting = false
                 }
             }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will cost 70 XP from your balance. \(username) can use it to protect their streak!")
+        }
+    }
+
+    // MARK: - Relationship states
+
+    private func errorState(_ error: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+            Text(error)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Button("Retry") {
+                Task {
+                    await viewModel.loadProfile()
+                }
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding()
+    }
+
+    /// The primary action for each relationship state. The `.friends` case is
+    /// empty on purpose: a friend's only on-page action is the freeze button
+    /// above, and the rest moved into the top-right menu.
+    @ViewBuilder
+    private var friendActionButton: some View {
+        switch viewModel.friendshipStatus {
+        case .currentUser, .friends:
+            EmptyView()
+
+        case .notFriends:
+            Button {
+                Task {
+                    await viewModel.sendFriendRequest()
+                }
+            } label: {
+                Text("Send Friend Request")
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+            }
+            .tint(paletteManager.selectedPalette.primary)
+            .applyGlassButtonStyle(.glassProminent)
+            .padding(.horizontal)
 
         case .blocked:
             VStack(spacing: 12) {
@@ -200,117 +391,43 @@ struct UserProfileView: View {
             }
             .padding(.horizontal)
 
-        case .friends:
-            VStack(spacing: 12) {
-                // Gift Freeze Button
-                Group {
-                    Button {
-                        showingGiftConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "snowflake")
-                            Text(isGifting ? "Sending..." : "Gift Freeze (70 XP)")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .disabled(isGifting)
-                    .tint(.cyan)
-                }
-                .applyGlassButtonStyle(.glassProminent)
-                .padding(.horizontal)
-                .confirmationDialog(
-                    "Gift a Streak Freeze?",
-                    isPresented: $showingGiftConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Gift for 70 XP") {
-                        Task {
-                            isGifting = true
-                            let success = await viewModel.giftFreeze()
-                            if success {
-                                giftSuccessMessage = "Freeze gifted to \(username)!"
-                                AchievementToastManager.shared.showToast(name: "Freeze gifted to \(username)!", category: "gift_freeze", icon: "snowflake")
-                            }
-                            isGifting = false
-                        }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("This will cost 70 XP from your balance. \(username) can use it to protect their streak!")
-                }
-                
-                // Remove Friend Button — confirmed, because unfriending now also
-                // ends the shared streak and cancels any pending requests.
-                Group {
-                    Button(role: .destructive) {
-                        showingRemoveConfirmation = true
-                    } label: {
-                        Text("Remove Friend")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .tint(.red)
-                }
-                .applyGlassButtonStyle(.glassProminent)
-                .padding(.horizontal)
-
-                Button(role: .destructive) {
-                    showingBlockConfirmation = true
-                } label: {
-                    Label("Block \(username)", systemImage: "hand.raised")
-                        .font(.subheadline)
-                }
-                .tint(.red)
-                .padding(.horizontal)
-
-            }
-            .confirmationDialog(
-                "Remove \(username)?",
-                isPresented: $showingRemoveConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Remove Friend", role: .destructive) {
-                    Task { await viewModel.removeFriend() }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This also ends any streak you share and cancels pending requests.")
-            }
-            
         case .requestSent:
-            HStack {
-                Image(systemName: "clock")
-                Text("Friend Request Sent")
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(.secondary.opacity(0.1))
-            .cornerRadius(12)
-            .padding(.horizontal)
-            
+            statusPill(
+                icon: "clock",
+                text: "Friend Request Sent",
+                tint: .secondary
+            )
+
         case .requestReceived:
-            HStack {
-                Image(systemName: "envelope.badge")
-                Text("Friend Request Received")
-            }
-            .font(.subheadline)
-            .foregroundStyle(.blue)
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(.blue.opacity(0.1))
-            .cornerRadius(12)
-            .padding(.horizontal)
+            statusPill(
+                icon: "envelope.badge",
+                text: "Friend Request Received",
+                tint: .blue
+            )
         }
     }
-    
+
+    private func statusPill(icon: String, text: String, tint: Color) -> some View {
+        HStack {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.subheadline)
+        .foregroundStyle(tint)
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(tint.opacity(0.1))
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+
     @ViewBuilder
     private var streakActionSection: some View {
         VStack(spacing: 8) {
             switch viewModel.friendStreakStatus {
             case .none:
                 EmptyView()
-                
+
             case .active:
                 // Show active streak info with liquid glass and glow
                 if let streak = viewModel.friendStreak {
@@ -321,9 +438,8 @@ struct UserProfileView: View {
                     })
                     .padding(.horizontal)
                 }
-                
+
             case .canStart:
-                // Show "Start Streak" button
                 Group {
                     Button {
                         Task {
@@ -341,38 +457,21 @@ struct UserProfileView: View {
                 }
                 .applyGlassButtonStyle(.glassProminent)
                 .padding(.horizontal)
-                
+
             case .requestSent:
-                HStack {
-                    Image(systemName: "flame.badge.checkmark")
-                    Text("Streak Request Sent")
-                }
-                .font(.subheadline)
-                .foregroundStyle(paletteManager.color(at: 0))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(paletteManager.color(at: 0).opacity(0.1))
-                .cornerRadius(12)
-                .padding(.horizontal)
-                
+                statusPill(
+                    icon: "flame.badge.checkmark",
+                    text: "Streak Request Sent",
+                    tint: paletteManager.color(at: 0)
+                )
+
             case .requestReceived:
-                HStack {
-                    Image(systemName: "flame.badge.checkmark")
-                    Text("Streak Request Received")
-                    Spacer()
-                    Text("Check requests")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .font(.subheadline)
-                .foregroundStyle(paletteManager.color(at: 0))
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(paletteManager.color(at: 0).opacity(0.1))
-                .cornerRadius(12)
-                .padding(.horizontal)
+                statusPill(
+                    icon: "flame.badge.checkmark",
+                    text: "Streak Request Received",
+                    tint: paletteManager.color(at: 0)
+                )
             }
         }
     }
 }
-
