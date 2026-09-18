@@ -69,23 +69,22 @@ struct UserSearchView: View {
                     }
                     .padding()
                 } else if viewModel.searchResults.isEmpty && !viewModel.searchText.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        Text("No users found")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding()
+                    EmptyStateView(
+                        icon: "person.crop.circle.badge.questionmark",
+                        title: "No users found",
+                        message: "Nobody matches \"\(viewModel.searchText)\". Usernames are 3–20 characters, lowercase letters, numbers and underscores.",
+                        actionTitle: "Clear Search",
+                        action: {
+                            HapticManager.shared.selection()
+                            viewModel.searchText = ""
+                        }
+                    )
                 } else if viewModel.searchText.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.2.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.secondary)
-                        Text("Search for users")
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding()
+                    EmptyStateView(
+                        icon: "person.2.fill",
+                        title: "Find your friends",
+                        message: "Search by username to see their streak, solve history and progress — or scan their QR code from the Friends tab."
+                    )
                 } else {
                     List(viewModel.searchResults) { user in
                         NavigationLink(value: user.username) {

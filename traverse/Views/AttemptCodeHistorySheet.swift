@@ -22,16 +22,12 @@ struct AttemptCodeHistorySheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if previousAttempts.isEmpty && todayAttempts.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "tray")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(.secondary)
-                                Text("No raw attempt code stored for this problem.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 60)
+                            EmptyStateView(
+                                icon: "tray",
+                                title: "No attempt code stored",
+                                message: "Traverse only keeps the code for attempts it saw in the browser. Older solves imported from LeetCode do not carry it.",
+                                compact: true
+                            )
                         } else {
                             if !previousAttempts.isEmpty {
                                 VStack(alignment: .leading, spacing: 12) {

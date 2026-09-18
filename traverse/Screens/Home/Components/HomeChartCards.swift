@@ -1,79 +1,13 @@
 import SwiftUI
 import Charts
 
-struct DifficultyChartCard: View {
-    let stats: SolveStatsData
-    @ObservedObject var paletteManager: ColorPaletteManager
-    
-    private var totalProblems: Int {
-        stats.byDifficulty.easy + stats.byDifficulty.medium + stats.byDifficulty.hard
-    }
-    
-    private var maxCount: Int {
-        max(stats.byDifficulty.easy, stats.byDifficulty.medium, stats.byDifficulty.hard, 1)
-    }
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("Difficulty")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Spacer()
-            }
-            .padding(.horizontal)
-            .padding(.top)
-            .padding(.bottom, 8)
-            
-            Divider()
-                .background(Color.gray.opacity(0.3))
-            
-            // Hero total
-            VStack(spacing: 4) {
-                Text("\(totalProblems)")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(.white)
-                Text("Total Solved")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 8)
-            .padding(.bottom, 12)
-            
-            // Horizontal progress bars
-            VStack(spacing: 10) {
-                DifficultyProgressRow(
-                    label: "Easy",
-                    count: stats.byDifficulty.easy,
-                    maxCount: maxCount,
-                    color: paletteManager.color(at: 0)
-                )
-                
-                DifficultyProgressRow(
-                    label: "Medium",
-                    count: stats.byDifficulty.medium,
-                    maxCount: maxCount,
-                    color: paletteManager.color(at: 1)
-                )
-                
-                DifficultyProgressRow(
-                    label: "Hard",
-                    count: stats.byDifficulty.hard,
-                    maxCount: maxCount,
-                    color: paletteManager.color(at: 2)
-                )
-            }
-            .padding(.horizontal)
-            .padding(.bottom)
-        }
-        .frame(maxWidth: .infinity)
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-    }
-}
-
 // MARK: - Difficulty Progress Row
+//
+// The standalone "Difficulty" card that used to sit on the home feed was
+// removed in favour of a Step-Count style Attempts card. The breakdown it
+// carried did not disappear — it now lives as a "By Difficulty" section inside
+// `AttemptsAnalysisDetailView`, which is where you are already asking about
+// attempts. This row is the shared drawing for it.
 struct DifficultyProgressRow: View {
     let label: String
     let count: Int
@@ -189,15 +123,13 @@ struct PlatformChartCard: View {
                 .padding(.horizontal)
                 .padding(.bottom)
             } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "laptopcomputer")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No platform data")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(height: 100)
+                EmptyStateView(
+                    icon: "chart.pie",
+                    title: "No platform data",
+                    message: "Solve on LeetCode or GeeksforGeeks with the extension installed and the split appears here.",
+                    compact: true
+                )
+                .frame(minHeight: 100)
                 .padding()
             }
         }

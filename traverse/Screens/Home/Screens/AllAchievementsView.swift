@@ -66,16 +66,18 @@ struct AllAchievementsView: View {
                     } else if viewModel.sections.allSatisfy({ $0.total == 0 }) {
                         // Nothing to show at all — every shelf is empty, which for
                         // another user means they have not earned anything yet.
-                        ContentUnavailableView(
-                            "No Awards Yet",
-                            systemImage: "trophy",
-                            description: Text(
-                                source == .me
-                                    ? "Solve problems to start earning awards."
-                                    : "\(source.username ?? "This user") has not earned an award yet."
+                        if source == .me {
+                            GettingStartedEmptyState(
+                                title: "No awards yet",
+                                message: "Awards are earned by solving and by keeping your revision schedule. Your first one lands with your first solve."
                             )
-                        )
-                        .padding(.top, 80)
+                        } else {
+                            EmptyStateView(
+                                icon: "trophy",
+                                title: "No Awards Yet",
+                                message: "\(source.username ?? "This user") has not earned an award yet."
+                            )
+                        }
                     } else {
                         if let featured = viewModel.featured {
                             NavigationLink(

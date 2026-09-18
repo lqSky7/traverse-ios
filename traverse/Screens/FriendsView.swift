@@ -735,23 +735,11 @@ struct FriendStatItem: View {
 
 struct EmptyFriendsView: View {
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "person.2.slash")
-                .font(.system(size: 64))
-                .foregroundStyle(.secondary)
-            
-            VStack(spacing: 8) {
-                Text("No Friends Yet")
-                    .font(.title2)
-                    .bold()
-                
-                Text("Search for users and send friend requests to start building your network")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-        }
-        .padding()
+        EmptyStateView(
+            icon: "person.2.fill",
+            title: "No Friends Yet",
+            message: "Search for someone by username, or scan their QR code, to start comparing streaks and progress."
+        )
     }
 }
 

@@ -217,9 +217,14 @@ class DataManager: ObservableObject {
             solvesDict[key] = solve
         }
         
-        // 3. Convert back to array sorted by solvedAt descending
+        // 3. Convert back to array sorted by most recent activity.
+        //
+        // `solvedAt` is frozen at first acceptance, so sorting on it put a
+        // problem you revised this morning below one you first solved last week.
+        // `activityAt` (which falls back to `solvedAt`) is the ordering the list
+        // is actually meant to have.
         let merged = solvesDict.values.sorted { s1, s2 in
-            s1.solvedAt > s2.solvedAt
+            s1.activityAt > s2.activityAt
         }
         
         self.recentSolves = merged

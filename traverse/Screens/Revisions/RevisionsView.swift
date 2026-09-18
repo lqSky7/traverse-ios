@@ -106,18 +106,11 @@ struct RevisionsView: View {
                                     }
                                     .padding(.top, 100)
                                 } else if revisionGroups.isEmpty {
-                                    VStack(spacing: 16) {
-                                        Image(systemName: "calendar.badge.clock")
-                                            .font(.system(size: 60))
-                                            .foregroundStyle(.secondary)
-                                        Text("No Revisions Scheduled")
-                                            .font(.title2)
-                                            .fontWeight(.semibold)
-                                            .foregroundStyle(.white)
-                                        Text("Complete problems to schedule revisions")
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.top, 100)
+                                    EmptyStateView(
+                                        icon: "calendar.badge.clock",
+                                        title: "No Revisions Scheduled",
+                                        message: "Revisions are scheduled for you once you start solving problems. Install the browser extension and your first solve will set the schedule up."
+                                    )
                                 } else {
                                     ForEach(revisionGroups) { group in
                                         RevisionGroupCard(
@@ -513,6 +506,7 @@ struct RevisionsView: View {
                 id: revSolve.id,
                 xpAwarded: revSolve.xpAwarded,
                 solvedAt: revSolve.solvedAt,
+                lastActivityAt: revSolve.solvedAt,
                 aiAnalysis: revSolve.aiAnalysis,
                 mistakeTags: revSolve.mistakeTags,
                 cognitiveTier: revSolve.cognitiveTier,

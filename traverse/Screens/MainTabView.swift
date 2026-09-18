@@ -34,38 +34,54 @@ private struct LazyTabContent<Content: View>: View {
     }
 }
 
+// Tab indices, named so the deep-link handler below can't silently drift out of
+// sync with the order of the TabView.
+private enum MainTab: Int {
+    case home = 0
+    case problems = 1
+    case revisions = 2
+    case friends = 3
+    case settings = 4
+}
+
 struct MainTabView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @ObservedObject var paletteManager = ColorPaletteManager.shared
-    @State private var selectedTab = 0
+    @State private var selectedTab = MainTab.home.rawValue
     
     var body: some View {
         if #available(iOS 26.0, *) {
             TabView(selection: $selectedTab) {
-                LazyTabContent(tag: 0, selectedTab: $selectedTab) { HomeTab() }
+                LazyTabContent(tag: MainTab.home.rawValue, selectedTab: $selectedTab) { HomeTab() }
                     .tabItem {
                         Label("Home", systemImage: "house")
                     }
-                    .tag(0)
+                    .tag(MainTab.home.rawValue)
                 
-                LazyTabContent(tag: 1, selectedTab: $selectedTab) { RevisionsView() }
+                LazyTabContent(tag: MainTab.problems.rawValue, selectedTab: $selectedTab) { ProblemsTab() }
+                    .tabItem {
+                        Label("Problems", systemImage: "list.bullet.rectangle")
+                    }
+                    .tag(MainTab.problems.rawValue)
+                
+                LazyTabContent(tag: MainTab.revisions.rawValue, selectedTab: $selectedTab) { RevisionsView() }
                     .tabItem {
                         Label("Revisions", systemImage: "clock.arrow.circlepath")
                     }
-                    .tag(1)
+                    .tag(MainTab.revisions.rawValue)
                 
-                LazyTabContent(tag: 2, selectedTab: $selectedTab) { FriendsTab() }
+                LazyTabContent(tag: MainTab.friends.rawValue, selectedTab: $selectedTab) { FriendsTab() }
                     .tabItem {
                         Label("Friends", systemImage: "person.2")
                     }
-                    .tag(2)
+                    .tag(MainTab.friends.rawValue)
                 
-                LazyTabContent(tag: 3, selectedTab: $selectedTab) { SettingsView() }
+                LazyTabContent(tag: MainTab.settings.rawValue, selectedTab: $selectedTab) { SettingsView() }
                     .tint(.blue)
                     .tabItem {
                         Label("Settings", systemImage: "gear")
                     }
-                    .tag(3)
+                    .tag(MainTab.settings.rawValue)
             }
             // .tabBarMinimizeBehavior(.onScrollDown) — TEMPORARILY DISABLED for
             // diagnosis. Stacked with per-screen `.toolbarScrollMinimization()`,
@@ -84,34 +100,40 @@ struct MainTabView: View {
                 print("[MainTabView] tab changed \(old) -> \(new)")
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenRevisionsTab"))) { _ in
-                selectedTab = 1 // Navigate to Revisions tab
+                selectedTab = MainTab.revisions.rawValue
             }
         } else {
             TabView(selection: $selectedTab) {
-                LazyTabContent(tag: 0, selectedTab: $selectedTab) { HomeTab() }
+                LazyTabContent(tag: MainTab.home.rawValue, selectedTab: $selectedTab) { HomeTab() }
                     .tabItem {
-                        Label("Home", systemImage: selectedTab == 0 ? "house.fill" : "house")
+                        Label("Home", systemImage: selectedTab == MainTab.home.rawValue ? "house.fill" : "house")
                     }
-                    .tag(0)
+                    .tag(MainTab.home.rawValue)
                 
-                LazyTabContent(tag: 1, selectedTab: $selectedTab) { RevisionsView() }
+                LazyTabContent(tag: MainTab.problems.rawValue, selectedTab: $selectedTab) { ProblemsTab() }
                     .tabItem {
-                        Label("Revisions", systemImage: selectedTab == 1 ? "clock.arrow.circlepath" : "clock.arrow.circlepath")
+                        Label("Problems", systemImage: "list.bullet.rectangle")
                     }
-                    .tag(1)
+                    .tag(MainTab.problems.rawValue)
                 
-                LazyTabContent(tag: 2, selectedTab: $selectedTab) { FriendsTab() }
+                LazyTabContent(tag: MainTab.revisions.rawValue, selectedTab: $selectedTab) { RevisionsView() }
                     .tabItem {
-                        Label("Friends", systemImage: selectedTab == 2 ? "person.2.fill" : "person.2")
+                        Label("Revisions", systemImage: "clock.arrow.circlepath")
                     }
-                    .tag(2)
+                    .tag(MainTab.revisions.rawValue)
                 
-                LazyTabContent(tag: 3, selectedTab: $selectedTab) { SettingsView() }
+                LazyTabContent(tag: MainTab.friends.rawValue, selectedTab: $selectedTab) { FriendsTab() }
+                    .tabItem {
+                        Label("Friends", systemImage: selectedTab == MainTab.friends.rawValue ? "person.2.fill" : "person.2")
+                    }
+                    .tag(MainTab.friends.rawValue)
+                
+                LazyTabContent(tag: MainTab.settings.rawValue, selectedTab: $selectedTab) { SettingsView() }
                     .tint(.blue)
                     .tabItem {
-                        Label("Settings", systemImage: selectedTab == 3 ? "gearshape.fill" : "gearshape")
+                        Label("Settings", systemImage: selectedTab == MainTab.settings.rawValue ? "gearshape.fill" : "gearshape")
                     }
-                    .tag(3)
+                    .tag(MainTab.settings.rawValue)
             }
             .tint(paletteManager.selectedPalette.primary)
             .overlay(AchievementToastOverlayContainer(), alignment: .top)
@@ -125,7 +147,7 @@ struct MainTabView: View {
                 print("[MainTabView] tab changed \(old) -> \(new)")
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenRevisionsTab"))) { _ in
-                selectedTab = 1 // Navigate to Revisions tab
+                selectedTab = MainTab.revisions.rawValue
             }
         }
     }

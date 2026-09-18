@@ -17,6 +17,11 @@ struct UserStatsData: Codable {
     let totalSolves: Int
     let totalSubmissions: Int
     let totalStreakDays: Int
+    /// Longest unbroken run of active days. This is the figure the streak card
+    /// labels "BEST" — `totalStreakDays` is a running total that keeps climbing
+    /// across breaks, so it can never answer "what is my best streak".
+    /// Optional because caches written by older builds predate the field.
+    let longestStreak: Int?
     let problemsByDifficulty: ProblemsByDifficulty
     let availableFreezes: Int?
 }
@@ -63,6 +68,8 @@ struct SolveStatsData: Codable {
     let totalSolves: Int
     let totalXp: Int
     let totalStreakDays: Int
+    /// See `UserStatsData.longestStreak`.
+    let longestStreak: Int?
     let byDifficulty: ProblemsByDifficulty
     let byPlatform: [String: Int]
 }
@@ -88,6 +95,10 @@ struct Solve: Codable, Identifiable {
     let id: Int
     let xpAwarded: Int
     let solvedAt: String
+    /// Bumped by the backend on every later accepted submission for the same
+    /// problem; `solvedAt` is stamped once and never moves. Optional because
+    /// caches persisted by older builds of the app predate this field.
+    let lastActivityAt: String?
     let aiAnalysis: String?
     let mistakeTags: [String]?
     let cognitiveTier: Int?

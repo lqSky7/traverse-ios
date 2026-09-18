@@ -43,13 +43,11 @@ struct FriendRequestsView: View {
     private var receivedRequestsList: some View {
         Group {
             if viewModel.receivedRequests.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "tray")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                    Text("No received requests")
-                        .foregroundStyle(.secondary)
-                }
+                EmptyStateView(
+                    icon: "tray",
+                    title: "No received requests",
+                    message: "Friend requests other people send you land here. You will get a notification when one arrives."
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
@@ -66,13 +64,11 @@ struct FriendRequestsView: View {
     private var sentRequestsList: some View {
         Group {
             if viewModel.sentRequests.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "paperplane")
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                    Text("No sent requests")
-                        .foregroundStyle(.secondary)
-                }
+                EmptyStateView(
+                    icon: "paperplane",
+                    title: "No sent requests",
+                    message: "Requests you send show up here until they are accepted or declined."
+                )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {

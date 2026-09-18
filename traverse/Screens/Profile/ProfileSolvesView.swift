@@ -77,10 +77,10 @@ struct ProfileSolvesView: View {
     private var emptyState: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            ContentUnavailableView(
-                "No Solves Yet",
-                systemImage: "square.dashed",
-                description: Text("@\(username) has not logged a solve yet.")
+            EmptyStateView(
+                icon: "square.dashed",
+                title: "No Solves Yet",
+                message: "@\(username) has not logged a solve yet."
             )
         }
     }

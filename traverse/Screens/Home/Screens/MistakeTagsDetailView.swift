@@ -281,16 +281,26 @@ struct MistakeTagsDetailView: View {
                 
                 // Tags List
                 if displayedTags.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.largeTitle)
-                            .foregroundStyle(.secondary)
-                        Text(searchText.isEmpty ? "No mistake tags found" : "No results for \"\(searchText)\"")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    if searchText.isEmpty {
+                        EmptyStateView(
+                            icon: "tag",
+                            title: "No mistake tags found",
+                            message: "Tags come from the AI analysis of your attempts. They appear once you have solved a few problems with the extension installed.",
+                            compact: true
+                        )
+                    } else {
+                        EmptyStateView(
+                            icon: "magnifyingglass",
+                            title: "No results for \"\(searchText)\"",
+                            message: "Try a shorter search term, or clear it to see every tag.",
+                            actionTitle: "Clear Search",
+                            action: {
+                                HapticManager.shared.selection()
+                                searchText = ""
+                            },
+                            compact: true
+                        )
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 40)
                 } else {
                     VStack(spacing: 12) {
                         ForEach(Array(displayedTags.enumerated()), id: \.element.id) { index, item in

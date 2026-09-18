@@ -79,7 +79,6 @@ struct SubmissionStatsCard: View {
     }
 }
 
-// MARK: - Difficulty Pie Chart Card (NEW)
 // MARK: - Solve Heatmap Card
 struct SolveHeatmapCard: View {
     let solves: [Solve]
@@ -98,14 +97,21 @@ struct SolveHeatmapCard: View {
         self.paletteManager = paletteManager
     }
     
-    // Process solves into date -> difficulty data
+    /// How many weeks of history the card shows. It used to be 7, which was
+    /// sized to a half-width card. The Difficulty card that shared that row is
+    /// gone, so the heatmap is full width now — 14 weeks of adaptive cells fills
+    /// the row without making the card taller than it was.
+    private static let weeksToShow = 14
+
+    /// Process solves into date -> difficulty data.
+    ///
+    /// Bucketed on `activityAt`, not `solvedAt`: a day you spent revising is a
+    /// day you worked, and `solvedAt` never moves off the first acceptance.
     private var heatmapData: [Date: String] {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         var data: [Date: String] = [:]
-        
+
         for solve in solves {
-            guard let date = formatter.date(from: solve.solvedAt) else { continue }
+            guard let date = ActivityTimestamp.date(from: solve.activityAt) else { continue }
             let day = Calendar.current.startOfDay(for: date)
             // Keep the hardest difficulty for each day
             if let existing = data[day] {
@@ -124,15 +130,13 @@ struct SolveHeatmapCard: View {
         return aVal >= bVal ? a : b
     }
     
-    // Generate last 7 weeks of dates
     private var weekDates: [[Date]] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         
         var weeks: [[Date]] = []
         
-        // Start from 8 weeks ago (9 weeks total)
-        for weekOffset in (0..<7).reversed() {
+        for weekOffset in (0..<Self.weeksToShow).reversed() {
             var week: [Date] = []
             let weekStart = calendar.date(byAdding: .weekOfYear, value: -weekOffset, to: today)!
             let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: weekStart))!
@@ -194,24 +198,35 @@ struct SolveHeatmapCard: View {
                 .background(Color.gray.opacity(0.3))
                 .padding(.horizontal, -16)
             
-            // Heatmap grid - larger cells to fill space
-            HStack(spacing: 3) {
-                // Weeks
-                HStack(spacing: 3) {
-                    ForEach(Array(weekDates.enumerated()), id: \.offset) { weekIndex, week in
-                        VStack(spacing: 3) {
+            // Heatmap grid. Cells are sized from whichever of width or height
+            // is the tighter constraint, so the grid always fills the card
+            // exactly — no fixed 16pt cells leaving a strip of dead space in
+            // the middle of a full-width card.
+            GeometryReader { geometry in
+                let spacing: CGFloat = 3
+                let columns = CGFloat(max(weekDates.count, 1))
+                let widthCell = (geometry.size.width - spacing * (columns - 1)) / columns
+                let heightCell = (geometry.size.height - spacing * 6) / 7
+                let cell = max(min(widthCell, heightCell), 4)
+                let corner = max(cell * 0.22, 2)
+                
+                HStack(spacing: spacing) {
+                    ForEach(Array(weekDates.enumerated()), id: \.offset) { _, week in
+                        VStack(spacing: spacing) {
                             ForEach(week, id: \.self) { date in
-                                RoundedRectangle(cornerRadius: 3)
+                                RoundedRectangle(cornerRadius: corner)
                                     .fill(colorForDate(date))
-                                    .frame(width: 16, height: 16)
+                                    .frame(width: cell, height: cell)
                             }
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity)
+            .frame(height: 156)
             .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 4)
             
             // Compact legend - dots only, centered
             HStack {
@@ -223,10 +238,8 @@ struct SolveHeatmapCard: View {
                 }
                 Spacer()
             }
-            .padding(.top, 16)
+            .padding(.top, 12)
             .padding(.bottom, 12)
-            
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
         .background(Color(UIColor.systemGray6))
@@ -321,70 +334,6 @@ struct SubmissionBreakdownCard: View {
     }
 }
 
-// MARK: - Recent Solves Card
-struct RecentSolvesCard: View {
-    let solves: [Solve]
-    @ObservedObject var paletteManager: ColorPaletteManager
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(paletteManager.color(at: 0))
-                    Text("Recent Solves")
-                        .font(.headline)
-                }
-                Spacer()
-                NavigationLink(destination: AllSolvesView(solves: solves)) {
-                    HStack(spacing: 4) {
-                        Text("View All")
-                            .font(.subheadline)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(paletteManager.selectedPalette.primary)
-                }
-            }
-            .padding()
-            
-            Divider()
-                .background(Color.gray.opacity(0.3))
-            
-            // Hero count
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(solves.count)")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(paletteManager.color(at: 0))
-                Text("PROBLEMS")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
-            
-            // Solve list
-            VStack(spacing: 0) {
-                ForEach(Array(solves.prefix(5).enumerated()), id: \.element.id) { index, solve in
-                    SolveRow(solve: solve, paletteManager: paletteManager)
-                    if index < min(4, solves.count - 1) {
-                        Divider()
-                            .background(Color.gray.opacity(0.3))
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom)
-        }
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-    }
-}
-
 // MARK: - All Solves View
 
 struct SolveRow: View {
@@ -466,7 +415,7 @@ struct SolveRow: View {
                                 .foregroundStyle(paletteManager.color(at: 1))
                         }
                         
-                        Text(formatDate(solve.solvedAt))
+                        Text(formatDate(solve.activityAt))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -630,8 +579,10 @@ struct SolveRow: View {
     }
     
     private func formatDate(_ dateString: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        guard let date = formatter.date(from: dateString) else {
+        // Re-solves and revisions move `lastActivityAt`, not `solvedAt`, so the
+        // "3d ago" badge has to read the activity stamp or a problem you worked
+        // on this morning still claims to be a week old.
+        guard let date = ActivityTimestamp.date(from: dateString) else {
             return "via Chrome"
         }
         

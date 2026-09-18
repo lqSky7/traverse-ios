@@ -70,6 +70,7 @@ struct RevisionCoachSheet: View {
                 id: solveFromRev.id,
                 xpAwarded: solveFromRev.xpAwarded,
                 solvedAt: solveFromRev.solvedAt,
+                lastActivityAt: solveFromRev.solvedAt,
                 aiAnalysis: solveFromRev.aiAnalysis,
                 mistakeTags: solveFromRev.mistakeTags,
                 cognitiveTier: solveFromRev.cognitiveTier,

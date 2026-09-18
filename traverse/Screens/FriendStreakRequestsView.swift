@@ -126,18 +126,11 @@ struct FriendStreakRequestsView: View {
     }
     
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "flame.badge.checkmark")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-            Text("No Streak Requests")
-                .font(.headline)
-            Text("Start a streak with a friend from their profile!")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .padding()
+        EmptyStateView(
+            icon: "flame",
+            title: "No Streak Requests",
+            message: "A friend streak is a shared daily goal. Open a friend's profile and start one to keep each other honest."
+        )
     }
     
     private var requestsList: some View {

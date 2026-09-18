@@ -200,6 +200,17 @@ struct ActivityDetailView: View {
         .navigationTitle("Activity")
         .navigationBarTitleDisplayMode(.large)
         .toolbarScrollMinimization()
+        .overlay {
+            // With no history the screen was two zeroes over a grid of empty
+            // grey squares, which looks like a loading failure. The heatmap
+            // only earns its space once there is something to plot.
+            if heatmapData.isEmpty {
+                GettingStartedEmptyState(
+                    title: "No activity yet",
+                    message: "This heatmap fills in as you solve. Install the browser extension and your first solve appears here within a minute."
+                )
+            }
+        }
     }
 }
 

@@ -114,16 +114,29 @@ struct AllSolvesView: View {
             // Solves List
             ScrollView {
                 if filteredSolves.isEmpty {
-                    VStack(spacing: 12) {
-                        Image(systemName: "square.dashed")
-                            .font(.system(size: 40))
-                            .foregroundColor(.secondary)
-                        Text("No solves match your criteria")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    // Two different nothings: no solves at all is a new account,
+                    // while an empty result on a non-empty list is a filter that
+                    // excluded everything. Saying "no solves match your
+                    // criteria" to someone who has never solved anything sends
+                    // them looking for a filter to clear.
+                    if solves.isEmpty {
+                        GettingStartedEmptyState(
+                            title: "No solves yet",
+                            message: "This is where your solve history lives. It fills in from the browser extension as you practise."
+                        )
+                    } else {
+                        EmptyStateView(
+                            icon: "magnifyingglass",
+                            title: "No solves match your criteria",
+                            message: "Try a different search term, or clear the topic filter.",
+                            actionTitle: "Clear Filters",
+                            action: {
+                                HapticManager.shared.selection()
+                                searchText = ""
+                                selectedTopic = nil
+                            }
+                        )
                     }
-                    .padding(.top, 40)
-                    .frame(maxWidth: .infinity)
                 } else {
                     LazyVStack(spacing: 12) {
                         ForEach(filteredSolves) { solve in

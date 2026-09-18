@@ -55,11 +55,13 @@ struct AllTopicsSheet: View {
 
                 Section {
                     if filteredTopics.isEmpty {
-                        Text("No matching topics")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 16)
+                        EmptyStateView(
+                            icon: "magnifyingglass",
+                            title: "No matching topics",
+                            message: "Try a shorter search term.",
+                            compact: true
+                        )
+                        .listRowBackground(Color.clear)
                     } else {
                         ForEach(filteredTopics) { topic in
                             VStack(alignment: .leading, spacing: 8) {

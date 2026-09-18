@@ -1,54 +1,60 @@
 import SwiftUI
 
+/// The streak hero at the top of the feed.
+///
+/// This used to be a half-width tile sharing its row with the revision score
+/// card, and its contents were laid out to suit that: a small number pinned to
+/// the bottom-left, a "BEST" figure pinned to the top-right, everything else
+/// empty. It is full width now, so the layout is centred and the type scaled up
+/// to fill the space — the number is the point of the card and it was set at
+/// 40pt in a 393pt-wide tile.
+///
+/// `monospacedDigit()` keeps the number from jittering horizontally as it
+/// changes, which is visible at this size.
 struct StreakCard: View {
     let streak: Int
     var maxStreak: Int? = nil
-    
-    private var displayNumber: String {
-        streak == 0 ? "0" : "\(streak)"
-    }
-    
+
     private var daysText: String {
         streak == 1 ? "DAY" : "DAYS"
     }
-    
+
+    /// The stored best can lag behind a live streak that has already passed it,
+    /// so show whichever is larger rather than telling the user their best is
+    /// lower than the number directly above it.
     private var maxStreakDisplay: Int {
         max(streak, maxStreak ?? 0)
     }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: streak == 0 ? "flame" : "flame.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-                
-                Spacer()
-                
-                if maxStreakDisplay > 0 {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text("BEST")
-                            .font(.system(size: 9, weight: .bold))
-                            .textCase(.uppercase)
-                        Text("\(maxStreakDisplay)D")
-                            .font(.system(size: 11, weight: .bold))
-                    }
+        VStack(spacing: 0) {
+            Image(systemName: streak == 0 ? "flame" : "flame.fill")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.bottom, 4)
+
+            Text("\(streak)")
+                .font(.system(size: 68, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+
+            Text(daysText)
+                .font(.system(size: 15, weight: .bold))
+                .tracking(2.5)
+                .foregroundStyle(.white.opacity(0.85))
+
+            if maxStreakDisplay > 0 {
+                Text("BEST \(maxStreakDisplay) \(maxStreakDisplay == 1 ? "DAY" : "DAYS")")
+                    .font(.system(size: 12, weight: .semibold))
+                    .tracking(1)
                     .foregroundStyle(.white.opacity(0.5))
-                }
-            }
-            
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(displayNumber)
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.white)
-                Text(daysText)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(.top, 10)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
-        .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
         .background(
             LightingSunBackground(streak: streak)
         )
@@ -56,122 +62,7 @@ struct StreakCard: View {
     }
 }
 
-// MARK: - Thinking Orb Score Effect (Settings > Shaders & Demos > Thinking Orb)
-//
-// NOTE: This used to be driven by `TimelineView(.animation)`, which re-renders
-// three blurred/rotated gradient layers on *every frame, forever*, for as long
-// as this view exists in the hierarchy. Because SwiftUI's TabView keeps every
-// tab alive in memory, that meant this animation kept running at ~60fps even
-// while the user was on a completely different tab, permanently pinning a CPU
-// core (see the 100% CPU / high energy impact reports on the Home screen).
-// The visual is now fully static — computed once per `score` change instead of
-// once per frame — since the card's job (communicate a number) never needed
-// continuous motion.
-struct ThinkingOrbScoreView: View {
-    let score: Int
-    @ObservedObject var paletteManager: ColorPaletteManager
-    
-    // Normalized score factor [0.0, 1.0]
-    private var normalizedScore: CGFloat {
-        CGFloat(min(max(score, 0), 100)) / 100.0
-    }
-    
-    var body: some View {
-        let primaryColor = paletteManager.color(at: 0)
-        let secondaryColor = paletteManager.color(at: 1)
-        
-        // Dynamic scale and opacity driven by revision score (static per score value)
-        let orbScale = 0.55 + 0.35 * normalizedScore
-        let orbOpacity = 0.40 + 0.55 * normalizedScore
-        
-        ZStack {
-            // Primary ambient glow body
-            RoundedRectangle(cornerRadius: 120, style: .continuous)
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [primaryColor, secondaryColor],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 110, height: 110)
-                .blur(radius: 24)
-                .rotationEffect(.degrees(18))
-            
-            // Secondary core layer
-            RoundedRectangle(cornerRadius: 120, style: .continuous)
-                .foregroundStyle(secondaryColor.mix(with: .white, by: 0.35))
-                .frame(width: 70, height: 42)
-                .blur(radius: 18)
-                .rotationEffect(.degrees(-14))
-            
-            // Bright white filament highlight
-            RoundedRectangle(cornerRadius: 120, style: .continuous)
-                .foregroundStyle(Color.white.opacity(0.85))
-                .frame(width: 80, height: 40)
-                .offset(y: -14)
-                .blur(radius: 24)
-                .rotationEffect(.degrees(9))
-        }
-        .scaleEffect(orbScale)
-        .opacity(orbOpacity)
-        .blendMode(.screen)
-    }
-}
-
-// MARK: - Revision Score Card (Pure black, Thinking Orb in top right, central number, NO grid, NO glass)
-struct RevisionScoreCard: View {
-    /// Optional on purpose. This used to be non-optional and HomeView passed
-    /// `revisionScore?.score ?? 100`, so the card displayed a perfect 100 whenever
-    /// the score hadn't loaded yet or the fetch had failed — a fake "you're doing
-    /// great" on the one card whose whole job is to tell you the truth. nil now
-    /// renders as "--" with an empty orb.
-    let score: Int?
-    @ObservedObject var paletteManager: ColorPaletteManager
-    @State private var showExplanationSheet = false
-    
-    var body: some View {
-        Button(action: {
-            HapticManager.shared.selection()
-            showExplanationSheet = true
-        }) {
-            ZStack {
-                // 1. Pure black background
-                Color.black
-                
-                // 2. Thinking Orb pushed to very top-right corner
-                VStack {
-                    HStack {
-                        Spacer()
-                        ThinkingOrbScoreView(score: score ?? 0, paletteManager: paletteManager)
-                            .offset(x: 24, y: -24)
-                    }
-                    Spacer()
-                }
-                
-                // 3. Central score number with exact same font and color as streak card number
-                Text(score.map(String.init) ?? "--")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(
-                        Color.white.opacity(0.12),
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .sheet(isPresented: $showExplanationSheet) {
-            RevisionScoreExplanationSheet()
-        }
-    }
-}
-
-// MARK: - Revision Score Explanation Sheet (Matches Revision > Analytics Info Sheet 1:1)
+// MARK: - Lighting Sun Background (Lighting Simulation Shader from Settings > Demo)
 
 struct LightingSunBackground: View {
     let streak: Int
@@ -234,6 +125,11 @@ private struct AnimatableLightingSun: View, Animatable {
     }
 }
 
-
-
-// MARK: - Main Stats Card
+#Preview {
+    VStack(spacing: 16) {
+        StreakCard(streak: 12, maxStreak: 21)
+    }
+    .padding()
+    .background(Color.black)
+    .preferredColorScheme(.dark)
+}

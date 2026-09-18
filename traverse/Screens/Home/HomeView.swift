@@ -37,18 +37,46 @@ struct HomeView: View {
                                 await viewModel.loadData(username: authViewModel.currentUser?.username ?? "", forceRefresh: true)
                             }
                         })
+                    } else if let userStats = viewModel.userStats, userStats.stats.totalSolves == 0 {
+                        // A brand-new account. Every card below is built from
+                        // solve history, so without this branch the feed is a
+                        // blank black screen with a date on it — which reads as
+                        // a broken app rather than an empty one.
+                        GettingStartedEmptyState(
+                            title: "Your feed fills in from your first solve",
+                            message: "Traverse reads your practice from the browser and reports it back here. There is nothing to show until then."
+                        )
                     } else {
-                        // Top Row: Streak Card & Revision Score Card side by side
+                        // Streak — full width. It used to share a row with the
+                        // revision score card; that card is a full-width
+                        // training-load tile now, so the streak takes the whole
+                        // row instead of being squeezed into half of it.
+                        //
+                        // `longestStreak` is the real "best" figure. The
+                        // fallback is only for caches written before the backend
+                        // started sending it — `totalStreakDays` is a running
+                        // total, so it is wrong here, just not wrong-by-a-lot.
                         if let userStats = viewModel.userStats {
-                            HStack(spacing: 12) {
-                                StreakCard(streak: userStats.stats.currentStreak, maxStreak: userStats.stats.totalStreakDays)
-                                
-                                RevisionScoreCard(
-                                    score: viewModel.revisionScore?.score,
-                                    paletteManager: paletteManager
-                                )
-                            }
+                            StreakCard(
+                                streak: userStats.stats.currentStreak,
+                                maxStreak: userStats.stats.longestStreak ?? userStats.stats.totalStreakDays
+                            )
                         }
+
+                        // Revision Load — full-width tile, taps through to the
+                        // trend screen.
+                        NavigationLink(destination: RevisionLoadDetailView(
+                            breakdown: viewModel.revisionLoad ?? .empty,
+                            revisionScore: viewModel.revisionScore?.score,
+                            paletteManager: paletteManager
+                        )) {
+                            RevisionLoadCard(
+                                breakdown: viewModel.revisionLoad,
+                                revisionScore: viewModel.revisionScore?.score,
+                                paletteManager: paletteManager
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                         
                         // Main Stats Cards
                         if let solveStats = viewModel.solveStats {
@@ -74,35 +102,29 @@ struct HomeView: View {
                                 .buttonStyle(PlainButtonStyle())
                             }
                             
-                            if let solveStats = viewModel.solveStats,
-                               let solves = viewModel.recentSolves {
-                                // Difficulty and Activity side by side
-                                HStack(alignment: .top, spacing: 16) {
-                                    DifficultyChartCard(stats: solveStats.stats, paletteManager: paletteManager)
-                                    NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)) {
-                                        SolveHeatmapCard(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)
-                                            .id(viewModel.frozenDates.count)  // Force re-render when frozenDates changes
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                }
-                                
-                                // Mistake Tags Analysis full width
-                                NavigationLink(destination: MistakeTagsDetailView(solves: solves, paletteManager: paletteManager)) {
-                                    MistakeTagsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                            if let solves = viewModel.recentSolves, !solves.isEmpty {
+                                // Activity heatmap, full width now that the
+                                // difficulty card that shared its row is gone.
+                                NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)) {
+                                    SolveHeatmapCard(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)
+                                        .id(viewModel.frozenDates.count)  // Force re-render when frozenDates changes
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 
-                                // Best Solving Hours (replaces Submission Breakdown)
                                 BestSolvingHoursCard(solves: solves, paletteManager: paletteManager)
-                            }
-                            
-                            if let solves = viewModel.recentSolves, !solves.isEmpty {
-                                RecentSolvesCard(solves: solves, paletteManager: paletteManager)
                                 
-                                // New Performance Charts
-                                PerformanceMetricsCard(solves: solves, paletteManager: paletteManager)
-                                
-                                TriesDistributionCard(solves: solves, paletteManager: paletteManager)
+                                // Time and attempts, as Step Count style tiles.
+                                HStack(alignment: .top, spacing: 12) {
+                                    NavigationLink(destination: MetricDetailView(kind: .time, solves: solves, paletteManager: paletteManager)) {
+                                        TimeAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                    
+                                    NavigationLink(destination: MetricDetailView(kind: .attempts, solves: solves, paletteManager: paletteManager)) {
+                                        AttemptsAnalysisCard(solves: solves, paletteManager: paletteManager)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                }
                             }
                         }
                     }

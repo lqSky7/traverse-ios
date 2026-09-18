@@ -267,11 +267,12 @@ struct WeeklyCompletionCard: View {
             }
 
             if weekBars.isEmpty {
-                Text("No completions yet")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
+                EmptyStateView(
+                    icon: "checkmark.circle",
+                    title: "No completions yet",
+                    message: "Completed revisions are counted here each week.",
+                    compact: true
+                )
             } else {
                 Chart(weekBars) { bar in
                     BarMark(
@@ -355,11 +356,12 @@ struct RevisionTopicBreakdownCard: View {
                 .background(Color.gray.opacity(0.3))
 
             if topics.isEmpty {
-                Text("No topic data available")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
+                EmptyStateView(
+                    icon: "folder",
+                    title: "No topic data available",
+                    message: "Topic mastery appears once you have solved problems across a few categories.",
+                    compact: true
+                )
             } else {
                 VStack(spacing: 14) {
                     ForEach(displayTopics) { topic in
@@ -540,11 +542,12 @@ struct RevisionRetentionRiskCard: View {
             }
 
             if focusItems.isEmpty {
-                Text("No at-risk items yet")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
+                EmptyStateView(
+                    icon: "checkmark.shield",
+                    title: "No at-risk items yet",
+                    message: "Nothing is close to slipping. This fills in once you have revisions with a memory history.",
+                    compact: true
+                )
             } else {
                 VStack(spacing: 10) {
                     ForEach(focusItems) { item in

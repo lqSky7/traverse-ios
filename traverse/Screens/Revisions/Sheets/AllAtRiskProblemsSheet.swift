@@ -52,11 +52,13 @@ struct AllAtRiskProblemsSheet: View {
 
                 Section {
                     if filteredItems.isEmpty {
-                        Text("No matching problems")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 16)
+                        EmptyStateView(
+                            icon: "magnifyingglass",
+                            title: "No matching problems",
+                            message: "Try a shorter search term.",
+                            compact: true
+                        )
+                        .listRowBackground(Color.clear)
                     } else {
                         ForEach(filteredItems) { item in
                             HStack(spacing: 12) {
