@@ -7,6 +7,7 @@
 | `BentoSettingsGrid.swift` | Modular bento-grid styled settings layout for user preferences | `struct BentoSettingsGrid: View` |
 | `CompletionStep.swift` | Step completion celebration view with checkmark animation | `struct CompletionStep: View` |
 | `ContinueButton.swift` | Primary interactive button with loading spinner and haptic triggers | `struct ContinueButton: View` |
+| `EmptyStateView.swift` | The shared empty and getting-started states every screen uses, plus the two outbound links a zero state needs. `GettingStartedEmptyState` leads with the three steps in the order they must happen — install the extension, solve as usual, come back — because installing after the next solve loses that solve | `struct EmptyStateView: View`, `struct GettingStartedEmptyState: View`, `enum TraverseLinks` |
 | `HuePicker.swift` | Circular color wheel and hue slider for UI tint customization | `struct HuePicker: View` |
 | `InputField.swift` | Styled text input field with floating label and secure entry toggle | `struct InputField: View` |
 | `IntelligenceModifier.swift` | View modifier injecting AI guidance hooks and overlay controls | `struct IntelligenceModifier: ViewModifier` |

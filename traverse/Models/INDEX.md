@@ -2,6 +2,7 @@
 
 | File | Description | Key Types & Symbols |
 | :--- | :--- | :--- |
+| `ActivityMetrics.swift` | Every "how much / when" figure in the app: timestamp parsing, the `activityAt` accessor, difficulty weighting, day/hour/month bucketing, revision load and its bands | `enum ActivityTimestamp`, `enum ActivityMetrics`, `enum DifficultyWeight`, `struct RevisionLoadBreakdown`, `struct RevisionLoadSnapshot`, `enum RevisionLoadBand` |
 | `AuthModels.swift` | User credential schemas, login/registration requests, and token payloads | `User`, `LoginRequest`, `LoginResponse`, `RegisterRequest`, `AuthResponse` |
 | `AuthViewModel.swift` | Authentication state manager handling user sessions and token persistence | `class AuthViewModel: ObservableObject` |
 | `ColorPalette.swift` | Dynamic color themes, palette presets, and tint managers | `ColorPalette`, `class ColorPaletteManager: ObservableObject` |

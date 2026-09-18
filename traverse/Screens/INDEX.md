@@ -23,5 +23,6 @@
 
 ## Sub-Modules
 - `Home/` - Home dashboard, statistics cards, and detail screens
+- `Problems/` - Recent solves and mistake analysis, moved off Home so its deep solve payload is only fetched when the tab is opened
 - `Revisions/` - Spaced repetition review hub and ML analytics
 - `Profile/` - User profile, solve history, and achievement showcase
