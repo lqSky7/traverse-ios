@@ -7,6 +7,7 @@ enum FriendshipStatus {
     case friends
     case requestSent
     case requestReceived
+    case blocked
 }
 
 enum FriendStreakStatus {
@@ -41,6 +42,9 @@ class UserProfileViewModel: ObservableObject {
     @Published var friendshipStatus: FriendshipStatus = .notFriends
     @Published var friendStreakStatus: FriendStreakStatus = .none
     @Published var friendStreak: FriendStreak?
+    /// The server's authoritative relationship state. Everything the UI needs to
+    /// decide which action to offer is derived from this, never inferred locally.
+    @Published var relationship: RelationshipState?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var selectedTab = 0
@@ -65,19 +69,7 @@ class UserProfileViewModel: ObservableObject {
             friendshipStatus = .currentUser
             return
         }
-        
-        // Immediately check DataManager for cached friends list to set initial state
-        if !force && DataManager.shared.friends.contains(where: { $0.username == username }) {
-            friendshipStatus = .friends
-            // If we already know they're a friend, don't show loading
-            if let cached = Self.profileCache[username], cached.isValid {
-                self.profile = cached.profile
-                self.statistics = cached.statistics
-                hasLoadedProfile = true
-                return
-            }
-        }
-        
+
         // Use cache if valid and not forcing refresh
         if !force, let cached = Self.profileCache[username], cached.isValid {
             self.profile = cached.profile
@@ -86,23 +78,25 @@ class UserProfileViewModel: ObservableObject {
             hasLoadedProfile = true
             return
         }
-        
+
         // Only show loading on first load, not refresh
         if !hasLoadedProfile {
             isLoading = true
         }
         errorMessage = nil
-        
+
         do {
             async let profileData = NetworkService.shared.getUserProfile(username: username)
             async let statsData = NetworkService.shared.getUserStatistics(username: username)
-            async let friendsData = NetworkService.shared.getFriends()
-            async let receivedRequests = NetworkService.shared.getReceivedFriendRequests()
-            async let sentRequests = NetworkService.shared.getSentFriendRequests()
-            
+            // One call answers the relationship question. The previous version
+            // fetched the friends list plus both request lists and cross-referenced
+            // them here, which meant three payloads that grow with the graph to
+            // render a single button — and a stale-cache window in between.
+            async let relationshipData = NetworkService.shared.getRelationship(username: username)
+
             let userProfile = try await profileData
             profile = userProfile
-            
+
             let statsResponse = try await statsData
             // Combine profile data (currentStreak, totalXp) with stats data
             let userStats = UserStatistics(
@@ -118,29 +112,15 @@ class UserProfileViewModel: ObservableObject {
                 )
             )
             statistics = userStats
-            
-            let friends = try await friendsData
-            let received = try await receivedRequests
-            let sent = try await sentRequests
-            
-            // Determine friendship status
-            let status: FriendshipStatus
-            if friends.contains(where: { $0.username == username }) {
-                status = .friends
-            } else if received.contains(where: { $0.requester?.username == username }) {
-                status = .requestReceived
-            } else if sent.contains(where: { $0.addressee?.username == username }) {
-                status = .requestSent
-            } else {
-                status = .notFriends
-            }
-            friendshipStatus = status
-            
+
+            let state = try await relationshipData
+            applyRelationship(state)
+
             // Cache the result
             Self.profileCache[username] = CachedProfile(
                 profile: userProfile,
                 statistics: userStats,
-                friendshipStatus: status,
+                friendshipStatus: friendshipStatus,
                 timestamp: Date()
             )
             hasLoadedProfile = true
@@ -151,8 +131,52 @@ class UserProfileViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
-        
+
         isLoading = false
+    }
+
+    /// Maps the server's relationship status onto the view's presentation state.
+    ///
+    /// The streak sub-state comes from the same payload, so a 0-day streak is no
+    /// longer rendered as an active one and "at risk" is known up front.
+    func applyRelationship(_ state: RelationshipState) {
+        relationship = state
+
+        switch state.status {
+        case "self":
+            friendshipStatus = .currentUser
+        case "friends":
+            friendshipStatus = .friends
+        case "pending_outgoing":
+            friendshipStatus = .requestSent
+        case "pending_incoming":
+            friendshipStatus = .requestReceived
+        case "blocked":
+            friendshipStatus = .blocked
+        default:
+            friendshipStatus = .notFriends
+        }
+
+        guard let streak = state.streak else {
+            friendStreakStatus = .none
+            friendStreak = nil
+            return
+        }
+
+        friendStreakStatus = streak.currentStreak > 0 ? .active : .canStart
+    }
+
+    /// Re-reads the relationship from the server. Used after any action that could
+    /// change it, so the UI reflects the server's truth rather than a guess.
+    func refreshRelationship() async {
+        do {
+            let state = try await NetworkService.shared.getRelationship(username: username)
+            applyRelationship(state)
+        } catch {
+            // Leave the previous state in place; the action itself already
+            // reported its own outcome.
+            print("Failed to refresh relationship: \(error)")
+        }
     }
     
     func loadSolves(force: Bool = false) async {
@@ -206,25 +230,63 @@ class UserProfileViewModel: ObservableObject {
     func sendFriendRequest() async {
         do {
             _ = try await NetworkService.shared.sendFriendRequest(username: username)
-            friendshipStatus = .requestSent
+            // The server may have sent a request, returned an idempotent
+            // "already requested", or auto-accepted because they had already
+            // asked us. Rather than guess which, re-read the authoritative state.
+            await refreshRelationship()
             HapticManager.shared.success()
         } catch {
-            let errorMsg = error.localizedDescription
-            // If the error says "already friends", reload profile to update status
-            if errorMsg.lowercased().contains("already friends") {
-                await loadProfile()
-            }
-            errorMessage = errorMsg
+            // No error-string matching. The previous implementation did
+            // `errorMsg.lowercased().contains("already friends")` to recover state
+            // the server had never told it; the relationship endpoint now simply
+            // reports it.
+            errorMessage = error.localizedDescription
+            await refreshRelationship()
             HapticManager.shared.error()
         }
     }
-    
+
     func removeFriend() async {
         do {
             try await NetworkService.shared.removeFriend(username: username)
-            friendshipStatus = .notFriends
-            friendStreakStatus = .none
             friendStreak = nil
+            await refreshRelationship()
+            HapticManager.shared.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.shared.error()
+        }
+    }
+
+    func blockUser() async {
+        do {
+            try await NetworkService.shared.blockUser(username: username)
+            friendStreak = nil
+            await refreshRelationship()
+            HapticManager.shared.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.shared.error()
+        }
+    }
+
+    func unblockUser() async {
+        do {
+            try await NetworkService.shared.unblockUser(username: username)
+            await refreshRelationship()
+            HapticManager.shared.success()
+        } catch {
+            errorMessage = error.localizedDescription
+            HapticManager.shared.error()
+        }
+    }
+
+    func toggleFavorite() async {
+        guard let state = relationship, state.isFriends else { return }
+        let next = !(state.friendship?.favorite ?? false)
+        do {
+            try await NetworkService.shared.setFriendFavorite(username: username, favorite: next)
+            await refreshRelationship()
             HapticManager.shared.success()
         } catch {
             errorMessage = error.localizedDescription

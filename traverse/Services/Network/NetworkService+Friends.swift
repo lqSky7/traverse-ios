@@ -648,6 +648,151 @@ extension NetworkService {
             throw NetworkError.serverError("Failed to delete friend streak (Status: \(httpResponse.statusCode))")
         }
     }
-    
 
+    // MARK: - Relationship state
+
+    /// The server's authoritative answer to "what is my relationship with this user".
+    ///
+    /// This replaces the previous approach of fetching the friends list plus the
+    /// sent and received request lists and cross-referencing them locally. Three
+    /// payloads that grow with the graph, to render one button — and a stale-cache
+    /// window in between that could show "Add Friend" to someone who had already
+    /// sent you a request.
+    func getRelationship(username: String) async throws -> RelationshipState {
+        guard let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "\(baseURL)/friends/relationship/\(encoded)") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                return try JSONDecoder().decode(RelationshipState.self, from: data)
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to load relationship (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    // MARK: - Blocks
+
+    func blockUser(username: String) async throws {
+        try await performSocialAction(username: username, method: "POST", suffix: "block")
+    }
+
+    func unblockUser(username: String) async throws {
+        try await performSocialAction(username: username, method: "DELETE", suffix: "block")
+    }
+
+    func setFriendFavorite(username: String, favorite: Bool) async throws {
+        guard let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "\(baseURL)/friends/\(encoded)/favorite") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(["favorite": favorite])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to update favourite (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    func getBlockedUsers() async throws -> [BlockedUser] {
+        guard let url = URL(string: "\(baseURL)/friends/blocked") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 200 {
+            do {
+                return try JSONDecoder().decode(BlockedUsersResponse.self, from: data).blocked
+            } catch {
+                print("Decoding error: \(error)")
+                throw NetworkError.decodingError
+            }
+        } else {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Failed to load blocked users (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    /// Shared plumbing for the block / unblock pair, which differ only by verb.
+    private func performSocialAction(username: String, method: String, suffix: String) async throws {
+        guard let encoded = username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: "\(baseURL)/friends/\(encoded)/\(suffix)") else {
+            throw NetworkError.invalidURL
+        }
+
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.invalidResponse
+        }
+
+        if httpResponse.statusCode != 200 {
+            if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(errorResponse.error)
+            }
+            throw NetworkError.serverError("Request failed (Status: \(httpResponse.statusCode))")
+        }
+    }
 }

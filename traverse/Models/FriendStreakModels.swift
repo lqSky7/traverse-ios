@@ -25,7 +25,13 @@ struct SendFriendStreakRequestBody: Codable {
 
 struct SendFriendStreakRequestResponse: Codable {
     let message: String
-    let request: FriendStreakRequest
+    /// Optional: the server returns `null` when the request was already sent,
+    /// when a streak is already active, or when a mutual request was auto-accepted.
+    let request: FriendStreakRequest?
+    let alreadyRequested: Bool?
+    let alreadyActive: Bool?
+    let autoAccepted: Bool?
+    let streak: FriendStreak?
 }
 
 struct FriendStreakRequestActionResponse: Codable {
@@ -46,7 +52,15 @@ struct FriendStreak: Codable, Identifiable {
     let longestStreak: Int
     let lastIncrementDate: String?
     let createdAt: String
-    
+    /// Set when the streak was reset. Lets the UI say *when* it ended instead of
+    /// reporting the loss with no context.
+    let brokenAt: String?
+    /// True once a day has passed without the streak advancing, so the UI can warn
+    /// before it dies rather than after.
+    let atRisk: Bool?
+    /// Whole days since the streak last advanced.
+    let daysSinceIncrement: Int?
+
     // Use a computed ID based on friend's ID
     var id: Int { friend.id }
 }
@@ -57,15 +71,10 @@ struct FriendStreaksResponse: Codable {
 
 struct AcceptFriendStreakRequestResponse: Codable {
     let message: String
-    let streak: FriendStreakInfo
-}
-
-struct FriendStreakInfo: Codable {
-    let userId1: Int
-    let userId2: Int
-    let currentStreak: Int
-    let longestStreak: Int
-    let users: [FriendStreakUser]
+    /// Optional: the accept is idempotent, and the server reports "already active"
+    /// without a payload when the streak was started by a concurrent call.
+    let streak: FriendStreak?
+    let alreadyActive: Bool?
 }
 
 struct DeleteFriendStreakResponse: Codable {

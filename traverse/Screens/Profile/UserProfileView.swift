@@ -9,6 +9,8 @@ struct UserProfileView: View {
     @State private var showingGiftConfirmation = false
     @State private var isGifting = false
     @State private var giftSuccessMessage: String?
+    @State private var showingRemoveConfirmation = false
+    @State private var showingBlockConfirmation = false
     
     init(username: String) {
         self.username = username
@@ -120,6 +122,18 @@ struct UserProfileView: View {
                 Text(message)
             }
         }
+        .confirmationDialog(
+            "Block \(username)?",
+            isPresented: $showingBlockConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Block", role: .destructive) {
+                Task { await viewModel.blockUser() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("They will not be able to send you friend or streak requests, and neither of you will see the other. They are not told that you blocked them.")
+        }
     }
     
     @ViewBuilder
@@ -129,21 +143,63 @@ struct UserProfileView: View {
             EmptyView()
             
         case .notFriends:
-            Group {
+            VStack(spacing: 12) {
+                Group {
+                    Button {
+                        Task {
+                            await viewModel.sendFriendRequest()
+                        }
+                    } label: {
+                        Text("Send Friend Request")
+                            .foregroundStyle(.black)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .tint(paletteManager.selectedPalette.primary)
+                }
+                .applyGlassButtonStyle(.glassProminent)
+                .padding(.horizontal)
+
+                // Blocking is offered wherever you can act on someone, not only
+                // from the friend list — the case you most need it in is a
+                // stranger who will not stop.
+                if viewModel.relationship?.canRequest == true {
+                    Button(role: .destructive) {
+                        showingBlockConfirmation = true
+                    } label: {
+                        Label("Block \(username)", systemImage: "hand.raised")
+                            .font(.subheadline)
+                    }
+                    .tint(.red)
+                    .padding(.horizontal)
+                }
+            }
+
+        case .blocked:
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: "hand.raised.fill")
+                    Text("You blocked @\(username)")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(.secondary.opacity(0.1))
+                .cornerRadius(12)
+
                 Button {
                     Task {
-                        await viewModel.sendFriendRequest()
+                        await viewModel.unblockUser()
                     }
                 } label: {
-                    Text("Send Friend Request")
-                        .foregroundStyle(.black)
+                    Text("Unblock")
                         .frame(maxWidth: .infinity)
                 }
-                .tint(paletteManager.selectedPalette.primary)
+                .tint(.red)
+                .applyGlassButtonStyle(.glassProminent)
             }
-            .applyGlassButtonStyle(.glassProminent)
             .padding(.horizontal)
-            
+
         case .friends:
             VStack(spacing: 12) {
                 // Gift Freeze Button
@@ -183,12 +239,11 @@ struct UserProfileView: View {
                     Text("This will cost 70 XP from your balance. \(username) can use it to protect their streak!")
                 }
                 
-                // Remove Friend Button
+                // Remove Friend Button — confirmed, because unfriending now also
+                // ends the shared streak and cancels any pending requests.
                 Group {
                     Button(role: .destructive) {
-                        Task {
-                            await viewModel.removeFriend()
-                        }
+                        showingRemoveConfirmation = true
                     } label: {
                         Text("Remove Friend")
                             .frame(maxWidth: .infinity)
@@ -198,6 +253,27 @@ struct UserProfileView: View {
                 .applyGlassButtonStyle(.glassProminent)
                 .padding(.horizontal)
 
+                Button(role: .destructive) {
+                    showingBlockConfirmation = true
+                } label: {
+                    Label("Block \(username)", systemImage: "hand.raised")
+                        .font(.subheadline)
+                }
+                .tint(.red)
+                .padding(.horizontal)
+
+            }
+            .confirmationDialog(
+                "Remove \(username)?",
+                isPresented: $showingRemoveConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Remove Friend", role: .destructive) {
+                    Task { await viewModel.removeFriend() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This also ends any streak you share and cancels pending requests.")
             }
             
         case .requestSent:
