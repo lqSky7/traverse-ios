@@ -21,7 +21,7 @@ class NetworkService {
     
     init(
         session: URLSession? = nil,
-        baseURL: String = "https://neatness-enlarged-curled.ngrok-free.dev/api",
+        baseURL: String = "https://traverses.tech/api",
         keychain: KeychainHelper = .shared
     ) {
         self.session = session ?? Self.makeSession()
