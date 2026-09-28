@@ -83,6 +83,27 @@ struct UserResponse: Codable {
     let user: User
 }
 
+struct AuthSessionsResponse: Codable {
+    let sessions: [AuthSession]
+    let maxSessions: Int
+}
+
+struct AuthSession: Codable, Identifiable {
+    let id: String
+    let deviceName: String
+    let userAgent: String?
+    let ipAddress: String?
+    let createdAt: String
+    let lastSeenAt: String
+    let expiresAt: String
+    let isCurrent: Bool
+}
+
+struct AuthSessionActionResponse: Codable {
+    let success: Bool
+    let revokedCount: Int?
+}
+
 struct MessageResponse: Codable {
     let message: String
 }

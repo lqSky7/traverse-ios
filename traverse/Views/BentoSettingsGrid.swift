@@ -20,6 +20,7 @@ struct BentoSettingsGrid: View {
     @Binding var showingFreezeShop: Bool
     @Binding var showingShaderDemos: Bool
     @Binding var showingNotificationSettings: Bool
+    @Binding var showingActiveSessions: Bool
     
     // Haptic generators
     private let lightFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -163,7 +164,7 @@ struct BentoSettingsGrid: View {
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)
             
-            // Row 3: Security | Logout
+            // Row 3: Security | Active sessions
             HStack(spacing: 0) {
                 // Security Tile
                 Button {
@@ -192,194 +193,94 @@ struct BentoSettingsGrid: View {
                     .fill(.white.opacity(0.1))
                     .frame(width: 1)
                 
-                // Logout Tile
-                Button {
-                    mediumFeedback.impactOccurred()
-                    showingLogoutConfirmation = true
+                settingsTile(
+                    title: "Sessions",
+                    subtitle: "Manage signed-in devices",
+                    systemImage: "laptopcomputer.and.iphone",
+                    tint: paletteManager.color(at: 1)
+                ) { showingActiveSessions = true }
+            }
+            .frame(height: 140)
+
+            Rectangle()
+                .fill(.white.opacity(0.1))
+                .frame(height: 1)
+
+            // Two-column action rows preserve the existing bento tiles while
+            // making the settings section shorter and easier to scan.
+            HStack(spacing: 0) {
+                settingsTile(
+                    title: "Logout",
+                    subtitle: "Sign out of this device",
+                    systemImage: "rectangle.portrait.and.arrow.right.fill",
+                    tint: .red
+                ) { showingLogoutConfirmation = true }
+
+                Rectangle().fill(.white.opacity(0.1)).frame(width: 1)
+
+                NavigationLink {
+                    BillingView()
                 } label: {
                     BentoCell(alignment: .bottomLeading) {
-                        Image(systemName: "rectangle.portrait.and.arrow.right.fill")
+                        Image(systemName: "creditcard")
                             .font(.system(size: 28, weight: .medium))
-                            .foregroundStyle(.red)
+                            .foregroundStyle(paletteManager.color(at: 2))
                     } label: {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Logout")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            Text("Sign out")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                            Text("Billing").font(.headline).fontWeight(.semibold)
+                            Text("Plan and payments")
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                         }
                     }
                 }
                 .buttonStyle(BentoCellButtonStyle())
             }
             .frame(height: 140)
-            
-            // Horizontal Divider
-            Rectangle()
-                .fill(.white.opacity(0.1))
-                .frame(height: 1)
-            
-            // Row 4: Freeze Shop (full width)
-            Button {
-                mediumFeedback.impactOccurred()
-                showingFreezeShop = true
-            } label: {
-                HStack {
-                    Image(systemName: "snowflake")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(paletteManager.color(at: 0))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Freeze Shop")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Text("Protect your streak with freezes")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(paletteManager.color(at: 0).opacity(0.6))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-            }
-            .buttonStyle(BentoCellButtonStyle())
 
             Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
 
-            NavigationLink {
-                BillingView()
-            } label: {
-                HStack {
-                    Image(systemName: "creditcard")
-                        .font(.system(size: 25, weight: .medium))
-                        .foregroundStyle(paletteManager.color(at: 2))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Billing").font(.headline).fontWeight(.semibold)
-                        Text("View plan, renewal, and payment options")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption).foregroundStyle(paletteManager.color(at: 2).opacity(0.6))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+            HStack(spacing: 0) {
+                settingsTile(
+                    title: "Notifications",
+                    subtitle: "Alerts and quiet hours",
+                    systemImage: "bell.badge",
+                    tint: paletteManager.color(at: 1)
+                ) { showingNotificationSettings = true }
+
+                Rectangle().fill(.white.opacity(0.1)).frame(width: 1)
+
+                settingsTile(
+                    title: "Freeze Shop",
+                    subtitle: "Protect your streak",
+                    systemImage: "snowflake",
+                    tint: paletteManager.color(at: 0)
+                ) { showingFreezeShop = true }
             }
-            .buttonStyle(BentoCellButtonStyle())
-            
-            // Horizontal Divider
-            Rectangle()
-                .fill(.white.opacity(0.1))
-                .frame(height: 1)
-            
-            // Row 4.2: Notifications (full width)
-            Button {
-                mediumFeedback.impactOccurred()
-                showingNotificationSettings = true
-            } label: {
-                HStack {
-                    Image(systemName: "bell.badge")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(paletteManager.color(at: 1))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Notifications")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Text("Choose what reaches you, and when")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(paletteManager.color(at: 1).opacity(0.6))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+            .frame(height: 140)
+
+            Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
+
+            HStack(spacing: 0) {
+                settingsTile(
+                    title: "Calendar",
+                    subtitle: "Sync revisions",
+                    systemImage: "calendar.badge.plus",
+                    tint: paletteManager.color(at: 1),
+                    action: subscribeToCalendar
+                )
+
+                Rectangle().fill(.white.opacity(0.1)).frame(width: 1)
+
+                settingsTile(
+                    title: "Shader demos",
+                    subtitle: "Metal and glass studies",
+                    systemImage: "sparkles.tv.fill",
+                    tint: paletteManager.color(at: 2)
+                ) { showingShaderDemos = true }
             }
-            .buttonStyle(BentoCellButtonStyle())
-            
-            // Horizontal Divider
-            Rectangle()
-                .fill(.white.opacity(0.1))
-                .frame(height: 1)
-            
-            // Row 4.5: Calendar Subscription (full width)
-            Button {
-                mediumFeedback.impactOccurred()
-                subscribeToCalendar()
-            } label: {
-                HStack {
-                    Image(systemName: "calendar.badge.plus")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(paletteManager.color(at: 1))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Calendar Subscription")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Text("Sync revisions to your Calendar app")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(paletteManager.color(at: 1).opacity(0.6))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-            }
-            .buttonStyle(BentoCellButtonStyle())
-            
-            // Horizontal Divider
-            Rectangle()
-                .fill(.white.opacity(0.1))
-                .frame(height: 1)
-            
-            // Row 4.6: Shader & Glass Demos (full width)
-            Button {
-                mediumFeedback.impactOccurred()
-                showingShaderDemos = true
-            } label: {
-                HStack {
-                    Image(systemName: "sparkles.tv.fill")
-                        .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(paletteManager.color(at: 2))
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Shader & Glass Demos")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                        Text("18 Metal & UI Demos from @radiofun")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
-                        .foregroundStyle(paletteManager.color(at: 2).opacity(0.6))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-            }
-            .buttonStyle(BentoCellButtonStyle())
-            
-            // Horizontal Divider
+            .frame(height: 140)
+
+            // Keep account deletion visually separate from everyday settings.
             Rectangle()
                 .fill(.white.opacity(0.1))
                 .frame(height: 1)
@@ -426,6 +327,38 @@ struct BentoSettingsGrid: View {
             lightFeedback.prepare()
             mediumFeedback.prepare()
         }
+    }
+
+    private func settingsTile(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            mediumFeedback.impactOccurred()
+            action()
+        } label: {
+            BentoCell(alignment: .bottomLeading) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 28, weight: .medium))
+                    .foregroundStyle(tint)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .buttonStyle(BentoCellButtonStyle())
     }
     
     private func subscribeToCalendar() {
@@ -479,7 +412,8 @@ struct BentoCellButtonStyle: ButtonStyle {
             showingDreamPicker: .constant(false),
             showingFreezeShop: .constant(false),
             showingShaderDemos: .constant(false),
-            showingNotificationSettings: .constant(false)
+            showingNotificationSettings: .constant(false),
+            showingActiveSessions: .constant(false)
         )
         .padding(.vertical)
     }
