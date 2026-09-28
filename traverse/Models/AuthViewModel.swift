@@ -148,6 +148,9 @@ class AuthViewModel: ObservableObject {
             // place.
             await registerForPushIfAuthorized()
         } catch let error as NetworkError {
+            if case .unauthorized = error {
+                clearLocalSessionData()
+            }
             errorMessage = error.localizedDescription
             throw error
         } catch {

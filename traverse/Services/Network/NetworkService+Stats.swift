@@ -6,9 +6,14 @@ extension NetworkService {
         guard let url = URL(string: "\(baseURL)/auth/me/stats") else {
             throw NetworkError.invalidURL
         }
+
+        guard let token = keychain.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let (data, response) = try await session.data(for: request)
         

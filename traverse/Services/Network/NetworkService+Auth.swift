@@ -22,19 +22,16 @@ extension NetworkService {
         }
         
         if httpResponse.statusCode == 201 {
+            let authResponse: AuthResponse
             do {
-                let authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
-                
-                // Save token to Keychain if present
-                if let token = authResponse.token {
-                    _ = keychain.saveToken(token)
-                }
-                
-                return authResponse
+                authResponse = try JSONDecoder().decode(AuthResponse.self, from: data)
             } catch {
                 print("Decoding error: \(error)")
                 throw NetworkError.decodingError
             }
+
+            try persistAuthenticationToken(authResponse.token)
+            return authResponse
         } else {
             // Print response for debugging
             if let responseString = String(data: data, encoding: .utf8) {
@@ -68,19 +65,16 @@ extension NetworkService {
         }
         
         if httpResponse.statusCode == 200 {
+            let loginResponse: LoginResponse
             do {
-                let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
-                
-                // Save token to Keychain if present
-                if let token = loginResponse.token {
-                    _ = keychain.saveToken(token)
-                }
-                
-                return loginResponse
+                loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
             } catch {
                 print("Decoding error: \(error)")
                 throw NetworkError.decodingError
             }
+
+            try persistAuthenticationToken(loginResponse.token)
+            return loginResponse
         } else {
             // Print response for debugging
             if let responseString = String(data: data, encoding: .utf8) {
@@ -156,6 +150,9 @@ extension NetworkService {
                 throw NetworkError.decodingError
             }
         } else {
+            if httpResponse.statusCode == 401 {
+                throw NetworkError.unauthorized
+            }
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
                 throw NetworkError.serverError(errorResponse.error)
             }
@@ -390,6 +387,13 @@ extension NetworkService {
                 throw NetworkError.serverError(errorResponse.error)
             }
             throw NetworkError.serverError("Failed to recover account (Status: \(httpResponse.statusCode))")
+        }
+    }
+
+    private func persistAuthenticationToken(_ token: String?) throws {
+        guard let token, !token.isEmpty, keychain.saveToken(token) else {
+            keychain.deleteToken()
+            throw NetworkError.serverError("Unable to securely save your sign-in. Please try again.")
         }
     }
 }
