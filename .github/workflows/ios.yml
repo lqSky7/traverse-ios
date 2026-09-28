@@ -1,0 +1,126 @@
+name: iOS CI and Release
+
+on:
+  push:
+    branches: [main, remove-onpaper]
+    tags: ['v*']
+  pull_request:
+    branches: [main, remove-onpaper]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: iOS unit and integration tests
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Select stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Prepare pinned Glur package dependency
+        run: |
+          git clone --filter=blob:none https://github.com/joogps/Glur.git "$RUNNER_TEMP/Glur"
+          git -C "$RUNNER_TEMP/Glur" checkout 35ae7c26fe4ef9b348547c4a1489893e38ca134f
+          mv "$RUNNER_TEMP/Glur" "$GITHUB_WORKSPACE/../Glur"
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -project traverse.xcodeproj -scheme traverse
+      - name: Run XCTest suite
+        shell: bash
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(device["udid"] for runtime in d["devices"].values() for device in runtime if device["isAvailable"] and device["name"].startswith("iPhone")))')
+          xcodebuild test \
+            -project traverse.xcodeproj \
+            -scheme traverse \
+            -destination "platform=iOS Simulator,id=${DEVICE_ID}" \
+            -derivedDataPath "$RUNNER_TEMP/TraverseDerivedData" \
+            CODE_SIGNING_ALLOWED=NO
+
+  release:
+    name: Archive and publish iOS app
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Select stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Prepare pinned Glur package dependency
+        run: |
+          git clone --filter=blob:none https://github.com/joogps/Glur.git "$RUNNER_TEMP/Glur"
+          git -C "$RUNNER_TEMP/Glur" checkout 35ae7c26fe4ef9b348547c4a1489893e38ca134f
+          mv "$RUNNER_TEMP/Glur" "$GITHUB_WORKSPACE/../Glur"
+      - name: Import App Store signing credentials
+        env:
+          IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_APP_STORE_PROFILE_BASE64: ${{ secrets.IOS_APP_STORE_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64" || { echo "Missing IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64"; exit 1; }
+          test -n "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" || { echo "Missing IOS_DISTRIBUTION_CERTIFICATE_PASSWORD"; exit 1; }
+          test -n "$IOS_APP_STORE_PROFILE_BASE64" || { echo "Missing IOS_APP_STORE_PROFILE_BASE64"; exit 1; }
+          KEYCHAIN_PATH="$RUNNER_TEMP/traverse-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$IOS_DISTRIBUTION_CERTIFICATE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/distribution.p12"
+          security import "$RUNNER_TEMP/distribution.p12" -k "$KEYCHAIN_PATH" -P "$IOS_DISTRIBUTION_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          echo "$IOS_APP_STORE_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/app-store.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$RUNNER_TEMP/app-store.mobileprovision" > "$PROFILE_PLIST"
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/app-store.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "PROFILE_NAME=$PROFILE_NAME" >> "$GITHUB_ENV"
+      - name: Archive iOS app
+        run: |
+          xcodebuild archive \
+            -project traverse.xcodeproj \
+            -scheme traverse \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Traverse.xcarchive" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY='Apple Distribution' \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+            DEVELOPMENT_TEAM=9F946WAJQ7
+      - name: Export signed IPA
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF_PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>9F946WAJQ7</string>
+            <key>provisioningProfiles</key><dict>
+              <key>com.ca5eelo.traverse</key><string>$PROFILE_NAME</string>
+            </dict>
+          </dict></plist>
+          EOF_PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Traverse.xcarchive" \
+            -exportPath "$RUNNER_TEMP/TraverseExport" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Traverse iOS ${{ github.ref_name }}
+          generate_release_notes: true
+          files: ${{ runner.temp }}/TraverseExport/*.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

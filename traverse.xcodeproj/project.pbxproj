@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6A1B01000000000000000009 /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A1B0100000000000000000C /* XCTest.framework */; };
 		6A060AE02F04CC1900C536AE /* Glur in Frameworks */ = {isa = PBXBuildFile; productRef = 6A060ADF2F04CC1900C536AE /* Glur */; };
 		6AA5C77B2F14C90A00E0117C /* loopbg.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = 6AA5C7792F14C90A00E0117C /* loopbg.mp4 */; };
 /* End PBXBuildFile section */
@@ -35,6 +36,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		6A1B0100000000000000000C /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = Developer/Library/Frameworks/XCTest.framework; sourceTree = DEVELOPER_DIR; };
 		6A07DEA32F0165C2009A4EB8 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		6A07DEA52F0165C2009A4EB8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		6A07DEC42F016670009A4EB8 /* TraverseWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraverseWidgetExtension.entitlements; sourceTree = "<group>"; };
@@ -42,6 +44,7 @@
 		6A8B313F2F7F00000050A4FB /* TraverseWatchWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraverseWatchWidgetExtension.entitlements; sourceTree = "<group>"; };
 		6AA5C7792F14C90A00E0117C /* loopbg.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = loopbg.mp4; sourceTree = "<group>"; };
 		6AAF62C82EF90FE6006944A1 /* traverse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = traverse.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6A1B01000000000000000001 /* traverseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = traverseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -84,6 +87,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		6A1B01000000000000000002 /* traverseTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = traverseTests;
+			sourceTree = "<group>";
+		};
 		6A07DEA72F0165C2009A4EB8 /* TraverseWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -113,6 +121,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		6A1B01000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A1B01000000000000000009 /* XCTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6AAF62C52EF90FE6006944A1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -153,6 +169,7 @@
 				6A8B31412F7F00000050A4FB /* TraverseWatchWidgetExtension */,
 				6A07DEA22F0165C2009A4EB8 /* Frameworks */,
 				6AAF62C92EF90FE6006944A1 /* Products */,
+				6A1B01000000000000000002 /* traverseTests */,
 				6A07DEA72F0165C2009A4EB8 /* TraverseWidget */,
 				6A68A3AF2FBA386C00C29AF2 /* TraverseWidgetExtension copy-Info.plist */,
 			);
@@ -162,6 +179,7 @@
 			isa = PBXGroup;
 			children = (
 				6AAF62C82EF90FE6006944A1 /* traverse.app */,
+				6A1B01000000000000000001 /* traverseTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -194,6 +212,26 @@
 			productReference = 6AAF62C82EF90FE6006944A1 /* traverse.app */;
 			productType = "com.apple.product-type.application";
 		};
+		6A1B01000000000000000004 /* traverseTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6A1B0100000000000000000D /* Build configuration list for PBXNativeTarget "traverseTests" */;
+			buildPhases = (
+				6A1B01000000000000000005 /* Sources */,
+				6A1B01000000000000000003 /* Frameworks */,
+				6A1B01000000000000000006 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (
+				6A1B01000000000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				6A1B01000000000000000002 /* traverseTests */,
+			);
+			name = traverseTests;
+			productName = traverseTests;
+			productReference = 6A1B01000000000000000001 /* traverseTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -206,6 +244,10 @@
 				TargetAttributes = {
 					6AAF62C72EF90FE6006944A1 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					6A1B01000000000000000004 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 6AAF62C72EF90FE6006944A1;
 					};
 				};
 			};
@@ -225,13 +267,20 @@
 			productRefGroup = 6AAF62C92EF90FE6006944A1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (
-				6AAF62C72EF90FE6006944A1 /* traverse */,
-			);
+				targets = (
+					6AAF62C72EF90FE6006944A1 /* traverse */,
+					6A1B01000000000000000004 /* traverseTests */,
+				);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		6A1B01000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6AAF62C62EF90FE6006944A1 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -243,6 +292,12 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		6A1B01000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6AAF62C42EF90FE6006944A1 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -253,6 +308,42 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
+		6A1B0100000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ca5eelo.traverseTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/traverse.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/traverse";
+			};
+			name = Debug;
+		};
+		6A1B0100000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ca5eelo.traverseTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/traverse.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/traverse";
+			};
+			name = Release;
+		};
 		6AAF62D12EF90FE6006944A1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -455,6 +546,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		6A1B0100000000000000000D /* Build configuration list for PBXNativeTarget "traverseTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A1B0100000000000000000A /* Debug */,
+				6A1B0100000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		6AAF62C32EF90FE6006944A1 /* Build configuration list for PBXProject "traverse" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -474,6 +574,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin PBXContainerItemProxy section */
+		6A1B01000000000000000008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6AAF62C02EF90FE6006944A1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6AAF62C72EF90FE6006944A1;
+			remoteInfo = traverse;
+		};
+		6A1B01000000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6AAF62C72EF90FE6006944A1 /* traverse */;
+			targetProxy = 6A1B01000000000000000008 /* PBXContainerItemProxy */;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin XCLocalSwiftPackageReference section */
 		6A060ADE2F04CC1900C536AE /* XCLocalSwiftPackageReference "../Glur" */ = {

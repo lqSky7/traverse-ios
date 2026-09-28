@@ -7,8 +7,8 @@ import UserNotifications
 /// Separate from `NotificationInboxManager` (which owns server state) and from
 /// `NotificationManager` (which owns locally-scheduled reminders) because the
 /// token has a lifecycle of its own: iOS can issue a new one at any time, the
-/// upload needs a session, and the token must outlive a sign-out so the next
-/// sign-in can re-register without waiting for iOS to hand it over again.
+/// upload needs a session, and the local copy is cleared on sign-out so another
+/// account cannot inherit the previous account's device registration.
 ///
 /// The token is cached in `UserDefaults`, not the keychain. It is not a secret —
 /// it is an opaque address that only Apple's servers can deliver to, and it is
@@ -81,8 +81,8 @@ final class PushRegistrationService {
 
     /// Detaches this device from the signed-out account.
     ///
-    /// The local token is kept: it is still this device's token and the next
-    /// sign-in should reuse it rather than waiting for iOS to reissue.
+    /// The local token is removed after sign-out; registration runs again after
+    /// the next account signs in.
     func unregisterFromServer() async {
         guard let token = cachedToken else { return }
 
@@ -91,6 +91,13 @@ final class PushRegistrationService {
         } catch {
             print("[Push] token unregister failed: \(error.localizedDescription)")
         }
+    }
+
+    /// Removes the device's cached address on sign-out. APNs can issue it again
+    /// after the next sign-in, when it can be registered to that account.
+    func clearLocalRegistrationState() {
+        UserDefaults.standard.removeObject(forKey: tokenKey)
+        UserDefaults.standard.removeObject(forKey: sandboxKey)
     }
 
     /// Whether this build talks to the sandbox or production APNs.

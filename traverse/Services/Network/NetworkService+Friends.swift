@@ -7,7 +7,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -19,7 +19,7 @@ extension NetworkService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -50,7 +50,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -58,7 +58,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -86,7 +86,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -94,7 +94,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -122,7 +122,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -130,7 +130,7 @@ extension NetworkService {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -158,7 +158,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -166,7 +166,7 @@ extension NetworkService {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -186,7 +186,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -194,7 +194,7 @@ extension NetworkService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -214,7 +214,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -222,7 +222,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -250,7 +250,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -258,7 +258,7 @@ extension NetworkService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -290,7 +290,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -298,7 +298,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -326,7 +326,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -334,7 +334,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -366,7 +366,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -374,7 +374,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -405,7 +405,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -417,7 +417,7 @@ extension NetworkService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -445,7 +445,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -453,7 +453,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -481,7 +481,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -489,7 +489,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -517,7 +517,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -525,7 +525,7 @@ extension NetworkService {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -545,7 +545,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -553,7 +553,7 @@ extension NetworkService {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -573,7 +573,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -581,7 +581,7 @@ extension NetworkService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -601,7 +601,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -609,7 +609,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -637,7 +637,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
         
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
         
@@ -645,7 +645,7 @@ extension NetworkService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -674,7 +674,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
 
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
 
@@ -682,7 +682,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -719,7 +719,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
 
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
 
@@ -729,7 +729,7 @@ extension NetworkService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(["favorite": favorite])
 
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -748,7 +748,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
 
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
 
@@ -756,7 +756,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -784,7 +784,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
 
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
 
@@ -792,7 +792,7 @@ extension NetworkService {
         request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse

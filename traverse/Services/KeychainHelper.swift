@@ -11,8 +11,13 @@ class KeychainHelper {
     
     private init() {}
     
-    private let service = "com.traverse.app"
-    private let tokenKey = "authToken"
+    private let service: String
+    private let tokenKey: String
+
+    init(service: String = "com.traverse.app", tokenKey: String = "authToken") {
+        self.service = service
+        self.tokenKey = tokenKey
+    }
     
     // Save token to Keychain
     func saveToken(_ token: String) -> Bool {

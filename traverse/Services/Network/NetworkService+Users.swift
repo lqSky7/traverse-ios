@@ -16,7 +16,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -47,7 +47,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -78,7 +78,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -115,7 +115,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -146,7 +146,7 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse

@@ -141,7 +141,7 @@ extension NetworkService {
             throw NetworkError.invalidURL
         }
 
-        guard let token = KeychainHelper.shared.getToken() else {
+        guard let token = keychain.getToken() else {
             throw NetworkError.serverError("Not authenticated")
         }
 
@@ -154,7 +154,7 @@ extension NetworkService {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
 
-        let (data, response) = try await NetworkService.session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse

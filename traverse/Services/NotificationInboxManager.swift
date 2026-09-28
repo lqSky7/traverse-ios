@@ -28,6 +28,19 @@ final class NotificationInboxManager: ObservableObject {
 
     var hasMore: Bool { nextCursor != nil }
 
+    /// Drops all account-owned inbox state from memory when a session ends.
+    func clear() {
+        notifications = []
+        unreadCount = 0
+        isLoading = false
+        isLoadingMore = false
+        errorMessage = nil
+        nextCursor = nil
+        hasLoadedOnce = false
+        isRefreshing = false
+        Task { try? await UNUserNotificationCenter.current().setBadgeCount(0) }
+    }
+
     // MARK: - Loading
 
     /// Loads the first page. A no-op when a refresh is already in flight, so

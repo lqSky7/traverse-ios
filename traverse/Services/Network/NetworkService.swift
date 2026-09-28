@@ -5,7 +5,7 @@ class NetworkService {
 
     /// Authenticated responses stay in the app's explicit model cache instead of
     /// being duplicated in URLCache or shared across account changes.
-    static let session: URLSession = {
+    private static func makeSession() -> URLSession {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.urlCache = nil
         configuration.httpCookieStorage = nil
@@ -13,11 +13,21 @@ class NetworkService {
         configuration.timeoutIntervalForRequest = 20
         configuration.timeoutIntervalForResource = 60
         return URLSession(configuration: configuration)
-    }()
+    }
     
-    let baseURL = "https://neatness-enlarged-curled.ngrok-free.dev/api"
+    let baseURL: String
+    let session: URLSession
+    let keychain: KeychainHelper
     
-    private init() {}
+    init(
+        session: URLSession? = nil,
+        baseURL: String = "https://neatness-enlarged-curled.ngrok-free.dev/api",
+        keychain: KeychainHelper = .shared
+    ) {
+        self.session = session ?? Self.makeSession()
+        self.baseURL = baseURL
+        self.keychain = keychain
+    }
     
     // MARK: - Calendar Feed URL
     func calendarFeedURL(username: String, token: String) -> URL? {

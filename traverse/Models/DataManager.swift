@@ -38,6 +38,14 @@ class DataManager: ObservableObject {
     @Published var revisionScore: RevisionScoreResponse?
     
     private var hasFetchedInitialData = false
+    private let persistedCacheFiles = [
+        "friends.json", "receivedRequests.json", "sentRequests.json",
+        "receivedStreakRequests.json", "sentStreakRequests.json", "friendStreaks.json",
+        "userStats.json", "submissionStats.json", "solveStats.json", "achievementStats.json",
+        "recentSolves.json", "todayRevisions.json", "completedRevisions.json",
+        "lastFetchTimestamp.json", "revisionGroups.json", "revisionStats.json",
+        "revisionScore.json"
+    ]
     
     var isCacheFresh: Bool {
         guard let timestamp = lastFetchTimestamp else { return false }
@@ -165,8 +173,20 @@ class DataManager: ObservableObject {
             print("Failed to save \(filename): \(error)")
         }
     }
+
+    private func removePersistedCacheFiles() {
+        let fileManager = FileManager.default
+        for filename in persistedCacheFiles {
+            try? fileManager.removeItem(at: getDocumentsDirectory().appendingPathComponent(filename))
+        }
+    }
     
     func persistData() {
+        guard KeychainHelper.shared.getToken() != nil else {
+            removePersistedCacheFiles()
+            return
+        }
+
         saveData(friends, filename: "friends.json")
         saveData(receivedRequests, filename: "receivedRequests.json")
         saveData(sentRequests, filename: "sentRequests.json")
@@ -365,6 +385,8 @@ class DataManager: ObservableObject {
         revisionStats = nil
         revisionScore = nil
         hasFetchedInitialData = false
+
+        removePersistedCacheFiles()
     }
     
     

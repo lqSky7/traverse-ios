@@ -83,61 +83,41 @@ class AuthViewModel: ObservableObject {
 
         do {
             try await networkService.logout()
-            // Clear saved cat image
-            if let userId = currentUser?.id {
-                deleteLocalCatImage(for: userId)
-                UserDefaults.standard.removeObject(forKey: "catImageURL_\(userId)")
-            }
-            // Clear DataManager cache
-            DataManager.shared.clearAllData()
-            // Reset toast manager seen state
-            AchievementToastManager.shared.resetState()
-            // Drop the previous account's inbox and rings. Both are cached so the
-            // UI can render instantly at launch, which is exactly why they have
-            // to be cleared here — otherwise the next sign-in shows them for a
-            // moment before the server's answer arrives.
-            NotificationInboxManager.shared.clear()
-            RingsManager.shared.clearCache()
-            // Clear widget data
-            if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
-                sharedDefaults.removeObject(forKey: "widgetData")
-                sharedDefaults.synchronize()
-            }
-            // Refresh tokens were removed when social sign-in was reverted; only the
-            // access token is stored now.
-            KeychainHelper.shared.deleteToken()
-            isAuthenticated = false
-            currentUser = nil
-            profileImageUrl = nil
-            username = ""
-            email = ""
-            password = ""
         } catch {
-            // Even if server logout fails, clear local state
-            if let userId = currentUser?.id {
-                deleteLocalCatImage(for: userId)
-                UserDefaults.standard.removeObject(forKey: "catImageURL_\(userId)")
-            }
-            KeychainHelper.shared.deleteToken()
-            // Clear DataManager cache
-            DataManager.shared.clearAllData()
-            // Reset toast manager seen state
-            AchievementToastManager.shared.resetState()
-            NotificationInboxManager.shared.clear()
-            RingsManager.shared.clearCache()
-            // Clear widget data
-            if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
-                sharedDefaults.removeObject(forKey: "widgetData")
-                sharedDefaults.synchronize()
-            }
-            isAuthenticated = false
-            currentUser = nil
-            profileImageUrl = nil
-            username = ""
-            email = ""
-            password = ""
+            clearLocalSessionData()
             throw error
         }
+
+        clearLocalSessionData()
+    }
+
+    private func clearLocalSessionData() {
+        let fileManager = FileManager.default
+        if let cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            try? fileManager.removeItem(at: cacheDirectory.appendingPathComponent("catImages", isDirectory: true))
+        }
+        for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix("catImageURL_") {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+
+        DataManager.shared.clearAllData()
+        AchievementToastManager.shared.resetState()
+        NotificationInboxManager.shared.clear()
+        RingsManager.shared.clearCache()
+        PushRegistrationService.shared.clearLocalRegistrationState()
+        UserDefaults.standard.removeObject(forKey: "cachedExamModeActive")
+
+        if let sharedDefaults = UserDefaults(suiteName: "group.com.traverse.app") {
+            sharedDefaults.removeObject(forKey: "widgetData")
+        }
+
+        KeychainHelper.shared.deleteToken()
+        isAuthenticated = false
+        currentUser = nil
+        profileImageUrl = nil
+        username = ""
+        email = ""
+        password = ""
     }
     
     func fetchCurrentUser() async throws {
@@ -332,4 +312,3 @@ class AuthViewModel: ObservableObject {
         }
     }
 }
-
