@@ -84,7 +84,7 @@ struct ProUpgradeSheet: View {
     }
     
     private func openPaymentPage() {
-        if let url = URL(string: "https://leet-feedback.vercel.app/") {
+        if let url = URL(string: "https://traverses.tech/billing") {
             openURL(url)
         }
     }

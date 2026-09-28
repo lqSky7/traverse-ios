@@ -1,6 +1,27 @@
 import Foundation
 
 extension NetworkService {
+    func cancelSubscription() async throws -> SubscriptionCancellationResponse {
+        guard let url = URL(string: "\(baseURL)/subscription/cancel") else {
+            throw NetworkError.invalidURL
+        }
+        guard let token = KeychainHelper.shared.getToken() else {
+            throw NetworkError.serverError("Not authenticated")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await NetworkService.session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw NetworkError.invalidResponse }
+        guard httpResponse.statusCode == 200 else {
+            if let error = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                throw NetworkError.serverError(error.error)
+            }
+            throw NetworkError.serverError("Couldn't cancel renewal (Status: \(httpResponse.statusCode))")
+        }
+        return try JSONDecoder().decode(SubscriptionCancellationResponse.self, from: data)
+    }
+
     // MARK: - Subscription Status
     
     /// Get subscription status for the authenticated user
@@ -17,7 +38,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -55,7 +76,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -95,7 +116,7 @@ extension NetworkService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -135,7 +156,7 @@ extension NetworkService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(requestBody)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -171,7 +192,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -209,7 +230,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -231,4 +252,10 @@ extension NetworkService {
         }
     }
 
+}
+
+struct SubscriptionCancellationResponse: Decodable {
+    let success: Bool
+    let cancelAt: String?
+    let message: String?
 }

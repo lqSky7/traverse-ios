@@ -155,7 +155,12 @@ class DataManager: ObservableObject {
         let encoder = JSONEncoder()
         do {
             let data = try encoder.encode(data)
-            try data.write(to: getDocumentsDirectory().appendingPathComponent(filename))
+            let fileURL = getDocumentsDirectory().appendingPathComponent(filename)
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            var writableURL = fileURL
+            try? writableURL.setResourceValues(values)
         } catch {
             print("Failed to save \(filename): \(error)")
         }

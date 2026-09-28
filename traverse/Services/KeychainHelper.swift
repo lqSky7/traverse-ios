@@ -18,17 +18,24 @@ class KeychainHelper {
     func saveToken(_ token: String) -> Bool {
         guard let data = token.data(using: .utf8) else { return false }
         
-        // Delete any existing token first
-        deleteToken()
-        
-        let query: [String: Any] = [
+        let identityQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: tokenKey,
-            kSecValueData as String: data
+            kSecAttrAccount as String: tokenKey
         ]
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
+        let tokenAttributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        let updateStatus = SecItemUpdate(identityQuery as CFDictionary, tokenAttributes as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+        guard updateStatus == errSecItemNotFound else { return false }
+
+        var insertQuery = identityQuery
+        insertQuery[kSecValueData as String] = data
+        insertQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(insertQuery as CFDictionary, nil)
         return status == errSecSuccess
     }
     

@@ -29,7 +29,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -70,7 +70,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -106,7 +106,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -142,7 +142,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -178,7 +178,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -219,7 +219,7 @@ extension NetworkService {
         let body = PauseRevisionsRequest(pauseDays: pauseDays)
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -251,7 +251,7 @@ extension NetworkService {
         let body = ResumeRevisionsRequest(backlogDays: backlogDays)
         request.httpBody = try JSONEncoder().encode(body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -282,7 +282,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -318,7 +318,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -348,7 +348,7 @@ extension NetworkService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -379,7 +379,7 @@ extension NetworkService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.httpBody = try? JSONSerialization.data(withJSONObject: requestBody)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
@@ -407,7 +407,7 @@ extension NetworkService {
         request.httpMethod = "DELETE"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await NetworkService.session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse

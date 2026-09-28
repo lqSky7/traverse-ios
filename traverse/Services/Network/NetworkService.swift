@@ -2,6 +2,18 @@ import Foundation
 
 class NetworkService {
     static let shared = NetworkService()
+
+    /// Authenticated responses stay in the app's explicit model cache instead of
+    /// being duplicated in URLCache or shared across account changes.
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.httpCookieStorage = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.timeoutIntervalForRequest = 20
+        configuration.timeoutIntervalForResource = 60
+        return URLSession(configuration: configuration)
+    }()
     
     let baseURL = "https://neatness-enlarged-curled.ngrok-free.dev/api"
     

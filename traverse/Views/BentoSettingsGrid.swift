@@ -250,6 +250,29 @@ struct BentoSettingsGrid: View {
                 .padding(.vertical, 16)
             }
             .buttonStyle(BentoCellButtonStyle())
+
+            Rectangle().fill(.white.opacity(0.1)).frame(height: 1)
+
+            NavigationLink {
+                BillingView()
+            } label: {
+                HStack {
+                    Image(systemName: "creditcard")
+                        .font(.system(size: 25, weight: .medium))
+                        .foregroundStyle(paletteManager.color(at: 2))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Billing").font(.headline).fontWeight(.semibold)
+                        Text("View plan, renewal, and payment options")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption).foregroundStyle(paletteManager.color(at: 2).opacity(0.6))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(BentoCellButtonStyle())
             
             // Horizontal Divider
             Rectangle()

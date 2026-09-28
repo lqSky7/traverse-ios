@@ -383,6 +383,23 @@ struct AwardSection: Codable, Identifiable, Hashable {
 // MARK: - Subscription Status
 struct SubscriptionStatusResponse: Codable {
     let isSubscriptionActive: Bool
+    let activeUntil: String?
+    let planName: String?
+    let canCancel: Bool?
+    let cancellationScheduled: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case isSubscriptionActive, activeUntil, planName, canCancel, cancellationScheduled
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        isSubscriptionActive = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionActive) ?? false
+        activeUntil = try container.decodeIfPresent(String.self, forKey: .activeUntil)
+        planName = try container.decodeIfPresent(String.self, forKey: .planName)
+        canCancel = try container.decodeIfPresent(Bool.self, forKey: .canCancel)
+        cancellationScheduled = try container.decodeIfPresent(Bool.self, forKey: .cancellationScheduled)
+    }
 }
 
 // MARK: - Freeze Models
