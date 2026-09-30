@@ -7,3 +7,7 @@
 | `AllAtRiskProblemsSheet.swift` | List of concepts flagged by ML with declining memory stability | `struct AllAtRiskProblemsSheet: View` |
 | `MLSchedulingInfoSheet.swift` | Educational sheet detailing FSRS-based spacing algorithms and parameters | `struct MLSchedulingInfoSheet: View` |
 | `ExamModeSheets.swift` | Sheets for pausing exam mode and resuming active spaced repetition | `PauseExamModeSheet`, `ResumeRevisionsSheet`, `AnalyticsInfoSheet` |
+
+## Revision cleanup (2026-09-30)
+
+The iOS app retains revision, stats, and widget support. Retention risk uses retrievability. The watchOS/macOS apps and Watch sync were removed.

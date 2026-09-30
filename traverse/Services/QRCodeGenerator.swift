@@ -182,54 +182,6 @@ struct StylishQRCodeView: View {
     }
 }
 
-// MARK: - Compact QR for Watch
-
-struct CompactQRCodeView: View {
-    let username: String
-    let size: CGFloat
-    
-    init(username: String, size: CGFloat = 120) {
-        self.username = username
-        self.size = size
-    }
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            ZStack {
-                // White background for QR
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
-                    .frame(width: size + 16, height: size + 16)
-                
-                // QR Code
-                if let qrImage = QRCodeGenerator.shared.generateFriendQR(for: username, size: size) {
-                    Image(uiImage: qrImage)
-                        .interpolation(.none)
-                        .resizable()
-                        .frame(width: size, height: size)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        .overlay {
-                            // Small center dot
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.blue, .purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: size * 0.15, height: size * 0.15)
-                        }
-                }
-            }
-            
-            Text("@\(username)")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-
 #Preview("Stylish QR") {
     ZStack {
         Color.black.ignoresSafeArea()
@@ -237,9 +189,3 @@ struct CompactQRCodeView: View {
     }
 }
 
-#Preview("Compact QR") {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        CompactQRCodeView(username: "testuser", size: 120)
-    }
-}

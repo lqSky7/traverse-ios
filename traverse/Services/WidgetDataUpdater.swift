@@ -3,7 +3,6 @@
 //  traverse
 //
 //  Updates shared widget data in App Group UserDefaults (for iOS widgets)
-//  AND sends the same data to Apple Watch via WatchSyncManager.
 //
 
 import Foundation
@@ -15,10 +14,10 @@ class WidgetDataUpdater {
     
     private init() {}
     
-    /// Current username for QR code sync to Watch
+    /// Current username for the shared widget data.
     var currentUsername: String?
     
-    /// Cached QR code image data for Watch sync
+    /// Cached QR code image data for widgets.
     private var cachedQRImageData: Data?
     
     /// Explicitly generate QR code image data ONLY when Friends page or QR sheet is opened
@@ -153,8 +152,6 @@ class WidgetDataUpdater {
         // Reload all iOS widgets
         WidgetCenter.shared.reloadAllTimelines()
         
-        // Sync to Apple Watch
-        WatchSyncManager.shared.syncWidgetData(widgetData)
     }
     
     func updateStreakStatus(solvedToday: Bool, currentStreak: Int, totalXp: Int, totalSolves: Int) {
@@ -195,7 +192,5 @@ class WidgetDataUpdater {
         WidgetCenter.shared.reloadTimelines(ofKind: "StreakLockScreenWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "MotivationalLockScreenWidget")
         
-        // Sync to Apple Watch
-        WatchSyncManager.shared.syncWidgetData(widgetData)
     }
 }

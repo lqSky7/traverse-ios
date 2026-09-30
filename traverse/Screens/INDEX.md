@@ -28,3 +28,7 @@
 - `Problems/` - Recent solves and mistake analysis, moved off Home so its deep solve payload is only fetched when the tab is opened
 - `Revisions/` - Spaced repetition review hub and ML analytics
 - `Profile/` - User profile, solve history, and achievement showcase
+
+## Revision cleanup (2026-09-30)
+
+The iOS app retains revision, stats, and widget support. Retention risk uses retrievability. The watchOS/macOS apps and Watch sync were removed.

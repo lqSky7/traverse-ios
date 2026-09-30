@@ -48,7 +48,6 @@ struct SubmissionStats: Codable {
 struct SubmissionStatsData: Codable {
     let total: Int
     let accepted: Int
-    let failed: Int
     let acceptanceRate: String
     let languageBreakdown: [LanguageBreakdown]
 }

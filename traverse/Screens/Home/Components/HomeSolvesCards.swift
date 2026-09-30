@@ -4,74 +4,17 @@ import Charts
 struct SubmissionStatsCard: View {
     let stats: SubmissionStatsData
     @ObservedObject var paletteManager = ColorPaletteManager.shared
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Submission Statistics")
+            Text("Successful Submissions")
                 .font(.headline)
-            
             Divider()
-                .background(Color.gray.opacity(0.3))
-            
-            HStack(spacing: 20) {
-                VStack(spacing: 4) {
-                    Text("\(stats.total)")
-                        .font(.title2)
-                        .bold()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                    Text("Total")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack(spacing: 4) {
-                    Text("\(stats.accepted)")
-                        .font(.title2)
-                        .bold()
-                        .foregroundStyle(paletteManager.color(at: 3))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                    Text("Accepted")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack(spacing: 4) {
-                    Text("\(stats.failed)")
-                        .font(.title2)
-                        .bold()
-                        .foregroundStyle(paletteManager.color(at: 4))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-                    Text("Failed")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack(spacing: 4) {
-                    HStack(spacing: 0) {
-                        Text(String(format: "%.0f", Double(stats.acceptanceRate.replacingOccurrences(of: "%", with: "")) ?? 0))
-                            .font(.title2)
-                            .bold()
-                            .foregroundStyle(paletteManager.color(at: 8))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                        Text("%")
-                            .font(.title3)
-                            .bold()
-                            .foregroundStyle(paletteManager.color(at: 8))
-                    }
-                    Text("Rate")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-            }
+            Text("\(stats.total)")
+                .font(.title2.bold())
+                .foregroundStyle(paletteManager.color(at: 3))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(UIColor.systemGray6))
         .cornerRadius(16)
@@ -151,7 +94,7 @@ struct SolveHeatmapCard: View {
         return weeks
     }
     
-    private func colorForDate(_ date: Date) -> Color {
+    private func colorForDate(_ date: Date, heatmapData: [Date: String]) -> Color {
         // Check if this date was frozen (ice blue color)
         let dateString = Self.dateFormatter.string(from: date)
         if frozenDates.contains(dateString) {
@@ -186,7 +129,7 @@ struct SolveHeatmapCard: View {
                         .font(.headline)
                 }
                 Spacer()
-                Text("\(totalSolvedDays)")
+                Text("\(heatmapData.count)")
                     .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(paletteManager.color(at: 3))
             }
@@ -215,7 +158,7 @@ struct SolveHeatmapCard: View {
                         VStack(spacing: spacing) {
                             ForEach(week, id: \.self) { date in
                                 RoundedRectangle(cornerRadius: corner)
-                                    .fill(colorForDate(date))
+                                    .fill(colorForDate(date, heatmapData: heatmapData))
                                     .frame(width: cell, height: cell)
                             }
                         }
@@ -253,84 +196,9 @@ struct SolveHeatmapCard: View {
 struct SubmissionBreakdownCard: View {
     let stats: SubmissionStatsData
     @ObservedObject var paletteManager: ColorPaletteManager
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Submission Breakdown")
-                .font(.headline)
-            
-            Divider()
-                .background(Color.gray.opacity(0.3))
-            
-            VStack(spacing: 20) {
-                // Stacked Bar Chart
-                Chart {
-                    BarMark(
-                        x: .value("Count", max(stats.accepted, 1))
-                    )
-                    .foregroundStyle(paletteManager.color(at: 3).gradient)
-                    .cornerRadius(6)
-                    
-                    BarMark(
-                        x: .value("Count", max(stats.failed, 1)),
-                        stacking: .standard
-                    )
-                    .foregroundStyle(paletteManager.color(at: 4).gradient)
-                    .cornerRadius(6)
-                }
-                .frame(height: 60)
-                .chartXScale(domain: 0...(Double(max(stats.accepted + stats.failed, 1))))
-                .chartXAxis(.hidden)
-                .chartYAxis(.hidden)
-                
-                // Legend with percentages
-                HStack(spacing: 20) {
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(paletteManager.color(at: 3))
-                            .frame(width: 12, height: 12)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Accepted")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 4) {
-                                Text("\(stats.accepted)")
-                                    .font(.headline)
-                                    .bold()
-                                Text("(\(stats.total > 0 ? Int((Double(stats.accepted) / Double(stats.total)) * 100) : 0)%)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(paletteManager.color(at: 4))
-                            .frame(width: 12, height: 12)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Failed")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 4) {
-                                Text("\(stats.failed)")
-                                    .font(.headline)
-                                    .bold()
-                                Text("(\(stats.total > 0 ? Int((Double(stats.failed) / Double(stats.total)) * 100) : 0)%)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-        .padding()
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        SubmissionStatsCard(stats: stats)
     }
 }
 

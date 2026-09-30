@@ -225,7 +225,6 @@ struct RevisionAnalyticsResponse: Codable {
 struct RevisionAnalyticsOverview: Codable {
     let totalProblemsTracked: Int
     let masteredProblems: Int
-    let leechProblems: Int
     let averageStability: Double
     let averageRetrievability: Double
 }
@@ -267,9 +266,7 @@ struct RevisionRetentionItem: Codable, Identifiable {
     let retrievability: Double
     let stability: Double
     let difficulty_D: Double
-    let lapses: Int
     let lastReviewAt: String?
-    let isLeech: Bool
 }
 
 struct RevisionAnalyticsStreaks: Codable {

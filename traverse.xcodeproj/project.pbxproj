@@ -23,16 +23,6 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		6A8B31332F7EC7C80050A4FB /* Embed Watch Content */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
-			dstSubfolderSpec = 16;
-			files = (
-			);
-			name = "Embed Watch Content";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -41,7 +31,6 @@
 		6A07DEA52F0165C2009A4EB8 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		6A07DEC42F016670009A4EB8 /* TraverseWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraverseWidgetExtension.entitlements; sourceTree = "<group>"; };
 		6A68A3AF2FBA386C00C29AF2 /* TraverseWidgetExtension copy-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "TraverseWidgetExtension copy-Info.plist"; path = "/Users/ca5/Projects/personal/WeSplit/traverse/TraverseWidgetExtension copy-Info.plist"; sourceTree = "<absolute>"; };
-		6A8B313F2F7F00000050A4FB /* TraverseWatchWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TraverseWatchWidgetExtension.entitlements; sourceTree = "<group>"; };
 		6AA5C7792F14C90A00E0117C /* loopbg.mp4 */ = {isa = PBXFileReference; lastKnownFileType = file; path = loopbg.mp4; sourceTree = "<group>"; };
 		6AAF62C82EF90FE6006944A1 /* traverse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = traverse.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A1B01000000000000000001 /* traverseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = traverseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -100,16 +89,6 @@
 			path = TraverseWidget;
 			sourceTree = "<group>";
 		};
-		6A8B31292F7EC7C70050A4FB /* Traverse Watch App */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Traverse Watch App";
-			sourceTree = "<group>";
-		};
-		6A8B31412F7F00000050A4FB /* TraverseWatchWidgetExtension */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TraverseWatchWidgetExtension;
-			sourceTree = "<group>";
-		};
 		6AAF62CA2EF90FE6006944A1 /* traverse */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -163,10 +142,7 @@
 			children = (
 				6AA5C77A2F14C90A00E0117C /* assets */,
 				6A07DEC42F016670009A4EB8 /* TraverseWidgetExtension.entitlements */,
-				6A8B313F2F7F00000050A4FB /* TraverseWatchWidgetExtension.entitlements */,
 				6AAF62CA2EF90FE6006944A1 /* traverse */,
-				6A8B31292F7EC7C70050A4FB /* Traverse Watch App */,
-				6A8B31412F7F00000050A4FB /* TraverseWatchWidgetExtension */,
 				6A07DEA22F0165C2009A4EB8 /* Frameworks */,
 				6AAF62C92EF90FE6006944A1 /* Products */,
 				6A1B01000000000000000002 /* traverseTests */,
@@ -195,7 +171,6 @@
 				6AAF62C52EF90FE6006944A1 /* Frameworks */,
 				6AAF62C62EF90FE6006944A1 /* Resources */,
 				6A07DEBA2F0165C3009A4EB8 /* Embed Foundation Extensions */,
-				6A8B31332F7EC7C80050A4FB /* Embed Watch Content */,
 			);
 			buildRules = (
 			);

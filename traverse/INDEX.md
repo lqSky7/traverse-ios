@@ -7,3 +7,7 @@
 | `OnboardingFlow.swift` | Multi-step onboarding experience and orientation for new users | `struct OnboardingFlow: View` |
 | `Info.plist` | Application bundle metadata and capability definitions | Configuration property list |
 | `traverse.entitlements` | App entitlements for iCloud, App Groups, and authentication | Security entitlements |
+
+## Revision cleanup (2026-09-30)
+
+The iOS app retains revision, stats, and widget support. Retention risk uses retrievability. The watchOS/macOS apps and Watch sync were removed.

@@ -117,7 +117,6 @@ struct HomeView: View {
                                 // difficulty card that shared its row is gone.
                                 NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)) {
                                     SolveHeatmapCard(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)
-                                        .id(viewModel.frozenDates.count)  // Force re-render when frozenDates changes
                                 }
                                 .buttonStyle(PlainButtonStyle())
                                 
@@ -154,6 +153,9 @@ struct HomeView: View {
                 NotificationsView()
             }
             .refreshable {
+                if authViewModel.currentUser == nil {
+                    try? await authViewModel.fetchCurrentUser()
+                }
                 if let username = authViewModel.currentUser?.username {
                     // Use Task to prevent early cancellation from pull-to-refresh gesture
                     await Task {
@@ -167,7 +169,7 @@ struct HomeView: View {
         .onAppear {
             print("[HomeView] onAppear username=\(authViewModel.currentUser?.username ?? "nil")")
             if let username = authViewModel.currentUser?.username {
-                // Set username for Watch sync
+                // Set the username in shared widget data.
                 WidgetDataUpdater.shared.currentUsername = username
                 Task {
                     await viewModel.loadData(username: username)
@@ -184,12 +186,10 @@ struct HomeView: View {
         .onChange(of: authViewModel.currentUser?.username) { oldUsername, newUsername in
             print("[HomeView] onChange username \(oldUsername ?? "nil") -> \(newUsername ?? "nil")")
             if let username = newUsername {
-                // Update username for Watch sync
+                // Update the username in shared widget data.
                 WidgetDataUpdater.shared.currentUsername = username
-                if viewModel.solveStats == nil {
-                    Task {
-                        await viewModel.loadData(username: username)
-                    }
+                Task {
+                    await viewModel.loadData(username: username)
                 }
                 Task { await ringsManager.refresh() }
             }

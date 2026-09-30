@@ -26,7 +26,7 @@ struct RevisionLoadExplanationSheet: View {
 
                     explainer(
                         title: "Bands",
-                        body: "Well Below and Below mean you are tapering and retention will start to slip. Optimal means you are holding steady. Above and Well Above mean a sharp ramp — expect gains, but take a lighter day if revisions start failing."
+                        body: "Well Below and Below mean you are tapering and retention will start to slip. Optimal means you are holding steady. Above and Well Above mean a sharp ramp — expect gains, but take a lighter day if the workload becomes hard to sustain."
                     )
 
                     explainer(

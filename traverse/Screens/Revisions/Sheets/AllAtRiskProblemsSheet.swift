@@ -9,7 +9,6 @@ struct AllAtRiskProblemsSheet: View {
 
     enum RiskSortOption: String, CaseIterable {
         case lowestRetention = "Lowest Retention"
-        case mostLapses = "Most Lapses"
         case alphabetical = "Alphabetical"
     }
 
@@ -21,15 +20,13 @@ struct AllAtRiskProblemsSheet: View {
         switch sortOption {
         case .lowestRetention:
             return list.sorted { $0.retrievability < $1.retrievability }
-        case .mostLapses:
-            return list.sorted { $0.lapses > $1.lapses }
         case .alphabetical:
             return list.sorted { $0.problemTitle.localizedCaseInsensitiveCompare($1.problemTitle) == .orderedAscending }
         }
     }
 
     private func riskColor(for item: RevisionRetentionItem) -> Color {
-        if item.isLeech || item.retrievability < 0.5 {
+        if item.retrievability < 0.5 {
             return paletteManager.color(at: 0)
         }
         if item.retrievability < 0.7 {
@@ -78,15 +75,7 @@ struct AllAtRiskProblemsSheet: View {
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
 
-                                        if item.isLeech {
-                                            Text("Leech (\(item.lapses) lapses)")
-                                                .font(.caption2.weight(.bold))
-                                                .foregroundStyle(paletteManager.color(at: 0))
-                                        } else if item.lapses > 0 {
-                                            Text("\(item.lapses) lapses")
-                                                .font(.caption2)
-                                                .foregroundStyle(.secondary)
-                                        }
+
                                     }
                                 }
 

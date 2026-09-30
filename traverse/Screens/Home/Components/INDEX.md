@@ -11,3 +11,7 @@
 | `HomeHoursCard.swift` | Peak / fastest hour summary and 24-bar histogram, bucketed on last activity time | `BestSolvingHoursCard` |
 | `HomeSolvesCards.swift` | Submission statistics, the full-width activity heatmap, and the shared solve row used by every solve list | `SubmissionStatsCard`, `SolveHeatmapCard`, `SubmissionBreakdownCard`, `SolveRow` |
 | `MedalView.swift` | Award badge renderer with press-and-drag 3D tilt, specular sweep and locked treatment; plus the progress bar and award caption formatting | `MedalView`, `MedalProgressBar`, `AwardFormat` |
+
+## Revision cleanup (2026-09-30)
+
+The iOS app retains revision, stats, and widget support. Retention risk uses retrievability. The watchOS/macOS apps and Watch sync were removed.

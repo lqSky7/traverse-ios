@@ -15,3 +15,7 @@
 | `RevisionModels.swift` | Spaced repetition problem models, ML analytics, retention, and groups | `Revision`, `RevisionGroup`, `RevisionStatsResponse`, `RevisionAnalyticsResponse` |
 | `RingModels.swift` | Daily ring progress — solve and revision counts against the stored goals, both fractions clamped to 1 — plus the goal pair and its bounds | `RingProgress`, `RingGoals` |
 | `StatsModels.swift` | Problem-solving metrics, difficulty breakdowns, tag summaries, and solves | `UserStats`, `SolveStats`, `SubmissionStats`, `Solve` |
+
+## Revision cleanup (2026-09-30)
+
+The iOS app retains revision, stats, and widget support. Retention risk uses retrievability. The watchOS/macOS apps and Watch sync were removed.

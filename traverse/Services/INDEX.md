@@ -13,8 +13,11 @@
 | `PushRegistrationService.swift` | Requests notification authorization, hex-encodes the APNs device token, uploads it with the right sandbox flag, and unregisters on sign-out | `class PushRegistrationService` |
 | `QRCodeGenerator.swift` | CoreImage utility rendering personal profile QR code images | `class QRCodeGenerator` |
 | `RingsManager.swift` | Owns the two daily rings: seeds the first frame from a `UserDefaults` cache (rejecting a stale one from a previous day), refreshes after activity, and saves goal changes optimistically | `class RingsManager: ObservableObject` |
-| `WatchSyncManager.swift` | WatchConnectivity session coordinator syncing data with Apple Watch | `class WatchSyncManager: NSObject` |
 | `WidgetDataUpdater.swift` | App Group data synchronizer reloading WidgetKit timelines | `class WidgetDataUpdater` |
 
 ## Sub-Directories
 - `Network/` - REST API client and domain-specific endpoint extensions
+
+## Revision cleanup (2026-09-30)
+
+The iOS app retains revision, stats, and widget support. Retention risk uses retrievability. The watchOS/macOS apps and Watch sync were removed.

@@ -461,32 +461,26 @@ struct RevisionRetentionRiskCard: View {
         let problemId: Int
         let title: String
         let retrievability: Double
-        let lapses: Int
-        let isLeech: Bool
     }
 
     private var focusItems: [RiskItem] {
-        let filtered = items.filter { $0.isLeech || $0.lapses > 0 || $0.retrievability < 0.7 }
+        let filtered = items.filter { $0.retrievability < 0.7 }
         let base = filtered.isEmpty ? items : filtered
         let sorted = base.sorted {
-            if $0.isLeech != $1.isLeech { return $0.isLeech && !$1.isLeech }
-            if $0.retrievability != $1.retrievability { return $0.retrievability < $1.retrievability }
-            return $0.lapses > $1.lapses
+            return $0.retrievability < $1.retrievability
         }
 
         return Array(sorted.prefix(5)).map { item in
             RiskItem(
                 problemId: item.problemId,
                 title: item.problemTitle,
-                retrievability: item.retrievability,
-                lapses: item.lapses,
-                isLeech: item.isLeech
+                retrievability: item.retrievability
             )
         }
     }
 
-    private var leechCount: Int {
-        items.filter { $0.isLeech }.count
+    private var criticalCount: Int {
+        items.filter { $0.retrievability < 0.5 }.count
     }
 
     private var lowRetrievabilityCount: Int {
@@ -494,7 +488,7 @@ struct RevisionRetentionRiskCard: View {
     }
 
     private func riskColor(for item: RiskItem) -> Color {
-        if item.isLeech || item.retrievability < 0.5 {
+        if item.retrievability < 0.5 {
             return paletteManager.color(at: 0)
         }
         if item.retrievability < 0.7 {
@@ -523,10 +517,10 @@ struct RevisionRetentionRiskCard: View {
 
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("\(leechCount)")
+                    Text("\(criticalCount)")
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(paletteManager.color(at: 0))
-                    Text("Leeches")
+                    Text("Below 50%")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -611,7 +605,7 @@ struct RevisionRetentionRiskCard: View {
         .sheet(isPresented: $showInfo) {
             AnalyticsInfoSheet(
                 title: "At-Risk Problems",
-                explanation: "Problems with the weakest memory retention right now — these are most likely to be forgotten if not reviewed soon.\n\n• Leeches: Problems you've forgotten 8+ times. These need a different approach — try re-solving from scratch.\n• Below 60%: Problems where your recall probability has dropped significantly.\n\nThe percentage shows how likely you are to remember the solution right now."
+                explanation: "Problems with the weakest memory retention right now — these are most likely to be forgotten if not reviewed soon.\n\n• Below 50%: Problems with the lowest estimated retention.\n• Below 60%: Problems where your recall probability has dropped significantly.\n\nThe percentage shows how likely you are to remember the solution right now."
             )
         }
     }

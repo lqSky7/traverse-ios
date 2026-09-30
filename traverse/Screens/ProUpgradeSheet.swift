@@ -18,7 +18,6 @@ struct ProUpgradeSheet: View {
     private let features: [(icon: String, text: String)] = [
         ("rectangle.grid.2x2.fill", "All Platforms"),
         ("bolt.fill", "Early Access"),
-        ("applewatch", "WatchOS"),
         ("arrow.triangle.2.circlepath", "Anki Sync"),
         ("chart.line.uptrend.xyaxis", "AI Insights")
     ]

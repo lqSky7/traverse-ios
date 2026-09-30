@@ -462,7 +462,7 @@ enum RevisionLoadBand: String {
         case .above:
             return "Your 7-day load is above your baseline. You may see gains in retention, but recover as needed if you feel especially fatigued."
         case .wellAbove:
-            return "Your 7-day load is well above your baseline. This is a sharp ramp — watch your accuracy and take a lighter day if revisions start failing."
+            return "Your 7-day load is well above your baseline. This is a sharp ramp — watch your retention and take a lighter day if reviews become hard to keep up with."
         case .noData:
             return "Not enough history yet. Load compares your last 7 days against a longer baseline, and it needs about two weeks of activity before that comparison means anything. Keep going — this fills in on its own."
         }
