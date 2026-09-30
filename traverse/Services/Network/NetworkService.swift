@@ -21,7 +21,7 @@ class NetworkService {
     
     init(
         session: URLSession? = nil,
-        baseURL: String = "https://traverses.tech/api",
+        baseURL: String = "https://traverses.dpdns.org/api",
         keychain: KeychainHelper = .shared
     ) {
         self.session = session ?? Self.makeSession()

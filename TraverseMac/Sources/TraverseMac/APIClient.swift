@@ -49,7 +49,7 @@ final class TokenStore {
 final class APIClient {
     static let shared = APIClient()
 
-    private let baseURL = URL(string: "https://traverse-backend-api.azurewebsites.net/api")!
+    private let baseURL = URL(string: "https://traverses.dpdns.org/api")!
     private let tokenStore = TokenStore.shared
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
