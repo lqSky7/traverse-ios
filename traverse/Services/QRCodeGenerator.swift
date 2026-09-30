@@ -188,4 +188,3 @@ struct StylishQRCodeView: View {
         StylishQRCodeView(username: "testuser", size: 200)
     }
 }
-

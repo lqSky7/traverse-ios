@@ -60,9 +60,7 @@
     }
   ],
   "supported-platforms" : {
-    "circles" : [
-      
-    ],
+    "circles" : [],
     "squares" : "shared"
   }
 }
