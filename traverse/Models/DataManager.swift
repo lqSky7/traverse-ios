@@ -30,6 +30,7 @@ class DataManager: ObservableObject {
     @Published var recentSolves: [Solve]?
     @Published var todayRevisions: [Revision] = []
     @Published var completedRevisions: [Revision] = []
+    @Published var frozenDates: Set<String> = []
     @Published var lastFetchTimestamp: Date?
     
     // Revision data
@@ -43,7 +44,7 @@ class DataManager: ObservableObject {
         "receivedStreakRequests.json", "sentStreakRequests.json", "friendStreaks.json",
         "userStats.json", "submissionStats.json", "solveStats.json", "achievementStats.json",
         "recentSolves.json", "todayRevisions.json", "completedRevisions.json",
-        "lastFetchTimestamp.json", "revisionGroups.json", "revisionStats.json",
+        "frozenDates.json", "lastFetchTimestamp.json", "revisionGroups.json", "revisionStats.json",
         "revisionScore.json"
     ]
     
@@ -131,6 +132,11 @@ class DataManager: ObservableObject {
             self.completedRevisions = decodedRevisions
         }
         
+        if let frozenDatesData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("frozenDates.json")),
+           let decodedDates = try? decoder.decode(Set<String>.self, from: frozenDatesData) {
+            self.frozenDates = decodedDates
+        }
+        
         // Load timestamp
         if let timestampData = try? Data(contentsOf: getDocumentsDirectory().appendingPathComponent("lastFetchTimestamp.json")),
            let decodedTimestamp = try? decoder.decode(Date.self, from: timestampData) {
@@ -216,6 +222,9 @@ class DataManager: ObservableObject {
         // Save revision data
         saveData(todayRevisions, filename: "todayRevisions.json")
         saveData(completedRevisions, filename: "completedRevisions.json")
+        if !frozenDates.isEmpty {
+            saveData(frozenDates, filename: "frozenDates.json")
+        }
         saveData(revisionGroups, filename: "revisionGroups.json")
         if let revisionStats = revisionStats {
             saveData(revisionStats, filename: "revisionStats.json")

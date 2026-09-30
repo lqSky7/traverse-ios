@@ -46,6 +46,7 @@ class HomeViewModel: ObservableObject {
             self.todayRevisions = DataManager.shared.todayRevisions
             self.completedRevisions = DataManager.shared.completedRevisions
             self.revisionScore = DataManager.shared.revisionScore
+            self.frozenDates = DataManager.shared.frozenDates
         }
     }
 
@@ -54,19 +55,7 @@ class HomeViewModel: ObservableObject {
         let startTime = Date()
         print("[HomeViewModel] #\(callID) loadData START username=\(username) forceRefresh=\(forceRefresh) thread=\(Thread.isMainThread ? "main" : "bg")")
 
-        // Always fetch freeze dates first (lightweight, important for display)
-        do {
-            let freezeDatesResponse = try await NetworkService.shared.getUsedFreezeDates()
-            await MainActor.run {
-                self.frozenDates = Set(freezeDatesResponse.freezeDates)
-            }
-            print("[HomeViewModel] #\(callID) freezeDates OK count=\(freezeDatesResponse.freezeDates.count)")
-        } catch {
-            // Silent fail - freeze dates are not critical
-            print("[HomeViewModel] #\(callID) freezeDates FAILED (non-critical): \(error)")
-        }
-
-        // Check if we can use cached data
+        // 1. Check if we can use cached data first (zero network roundtrips)
         if !forceRefresh && DataManager.shared.isCacheFresh {
             print("[HomeViewModel] #\(callID) using cached data (cache is fresh)")
             await MainActor.run {
@@ -78,6 +67,7 @@ class HomeViewModel: ObservableObject {
                 if self.todayRevisions.isEmpty { self.todayRevisions = DataManager.shared.todayRevisions }
                 if self.completedRevisions.isEmpty { self.completedRevisions = DataManager.shared.completedRevisions }
                 if self.revisionScore == nil { self.revisionScore = DataManager.shared.revisionScore }
+                if self.frozenDates.isEmpty { self.frozenDates = DataManager.shared.frozenDates }
                 self.rebuildLoadBreakdown()
                 isLoading = false
             }
@@ -94,13 +84,14 @@ class HomeViewModel: ObservableObject {
             errorMessage = nil
         }
 
-        // Two waves, on purpose.
-        //
-        // The heavy solves call is *started* here so it overlaps the latency of
-        // everything else, but it is awaited only after the light data has been
-        // published. That way the streak, load, progress and awards cards paint
-        // as soon as their (small) responses land, instead of the whole feed
-        // waiting behind a 200-row payload with AI blobs attached.
+        // 2. Incremental solves optimization:
+        // If we already have cached solves on disk, we only need the latest ~15 solves to catch up
+        // rather than re-downloading all 60 heavy records with AI blobs over mobile networks.
+        // DataManager.shared.mergeAndPersistSolves will deduplicate and merge into our local cache.
+        let solveFetchLimit = (DataManager.shared.recentSolves?.isEmpty == false) ? 15 : Self.homeSolveLimit
+
+        // 3. Parallel fetch wave:
+        async let freezeDatesTask = try? NetworkService.shared.getUsedFreezeDates()
         async let userStatsTask = NetworkService.shared.getUserStats(username: username)
         async let submissionStatsTask = NetworkService.shared.getSubmissionStats()
         async let solveStatsTask = NetworkService.shared.getSolveStats()
@@ -108,7 +99,7 @@ class HomeViewModel: ObservableObject {
         async let revisionsTask = NetworkService.shared.getRevisions(upcoming: true, limit: 50)
         async let completedRevisionsTask = NetworkService.shared.getGroupedRevisions(includeCompleted: true)
         async let scoreTask = try? NetworkService.shared.getRevisionScore()
-        async let solvesTask = NetworkService.shared.getSolves(limit: Self.homeSolveLimit)
+        async let solvesTask = NetworkService.shared.getSolves(limit: solveFetchLimit)
 
         let networkStart = Date()
         let lightData: (UserStats, SubmissionStats, SolveStats, AchievementStats, RevisionsResponse, GroupedRevisionsResponse, RevisionScoreResponse?)
@@ -172,7 +163,12 @@ class HomeViewModel: ObservableObject {
             self.rebuildLoadBreakdown()
             // Light data is on screen; the solves wave below can take its time.
             isLoading = false
-            // frozenDates already set at start of loadData
+        }
+        
+        if let freezeDatesResult = await freezeDatesTask {
+            let datesSet = Set(freezeDatesResult.freezeDates)
+            await MainActor.run { self.frozenDates = datesSet }
+            DataManager.shared.frozenDates = datesSet
         }
         print("[HomeViewModel] #\(callID) published light data to @Published properties")
 
