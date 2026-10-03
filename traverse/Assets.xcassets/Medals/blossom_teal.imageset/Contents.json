@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "blossom_teal.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

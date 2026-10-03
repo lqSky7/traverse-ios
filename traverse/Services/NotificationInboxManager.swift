@@ -169,14 +169,14 @@ final class NotificationInboxManager: ObservableObject {
 
     /// Drops everything held in memory. Called on sign-out so the next account
     /// does not see the previous user's inbox, and so the badge is cleared.
-    func clear() {
-        notifications = []
-        unreadCount = 0
-        nextCursor = nil
-        hasLoadedOnce = false
-        errorMessage = nil
-        Task { await syncBadge() }
-    }
+//    func clear() {
+//        notifications = []
+//        unreadCount = 0
+//        nextCursor = nil
+//        hasLoadedOnce = false
+//        errorMessage = nil
+//        Task { await syncBadge() }
+//    }
 
     // MARK: - Badge
 

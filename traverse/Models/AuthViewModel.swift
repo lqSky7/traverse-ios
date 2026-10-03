@@ -18,9 +18,18 @@ class AuthViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var profileImageUrl: String?
     
-    private let networkService = NetworkService.shared
+    private let networkService: NetworkService
+    private let avatarSession: URLSession
+    private var avatarTask: Task<Void, Never>?
     
-    init() {
+    init(
+        networkService: NetworkService = .shared,
+        avatarSession: URLSession = .shared,
+        restoreSession: Bool = true
+    ) {
+        self.networkService = networkService
+        self.avatarSession = avatarSession
+        guard restoreSession else { return }
         checkAuthentication()
         if isAuthenticated {
             Task {
@@ -92,6 +101,8 @@ class AuthViewModel: ObservableObject {
     }
 
     private func clearLocalSessionData() {
+        avatarTask?.cancel()
+        avatarTask = nil
         let fileManager = FileManager.default
         if let cacheDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first {
             try? fileManager.removeItem(at: cacheDirectory.appendingPathComponent("catImages", isDirectory: true))
@@ -124,23 +135,35 @@ class AuthViewModel: ObservableObject {
         do {
             let user = try await networkService.getCurrentUser()
             
-            // Fetch cat image if not already set
+            // Identity must be available before optional avatar work: Home loads
+            // as soon as the username appears, even when the image service is down.
             var updatedUser = user
             if updatedUser.profileImageURL == nil {
-                // Check if we have a saved image for this user
-                if let savedImageURL = getSavedCatImageURL(for: user.id) {
-                    updatedUser.profileImageURL = savedImageURL
-                } else {
-                    // Fetch new cat image
-                    let catImageURL = try await fetchCatImage()
-                    updatedUser.profileImageURL = catImageURL
-                    saveCatImageURL(catImageURL, for: user.id)
-                }
+                updatedUser.profileImageURL = getSavedCatImageURL(for: user.id)
             }
-            
             currentUser = updatedUser
             profileImageUrl = updatedUser.profileImageURL
             errorMessage = nil
+
+            avatarTask?.cancel()
+            if updatedUser.profileImageURL == nil {
+                avatarTask = Task { [weak self] in
+                    guard let self else { return }
+                    do {
+                        let imageURL = try await self.fetchCatImage()
+                        guard !Task.isCancelled,
+                              var current = self.currentUser,
+                              current.id == user.id,
+                              current.profileImageURL == nil else { return }
+                        current.profileImageURL = imageURL
+                        self.saveCatImageURL(imageURL, for: user.id)
+                        self.currentUser = current
+                        self.profileImageUrl = imageURL
+                    } catch {
+                        // The default avatar remains usable; this is not an auth error.
+                    }
+                }
+            }
 
             // A session now exists, which is the first moment a device token can
             // be uploaded. Doing it here rather than at each call site covers
@@ -263,7 +286,7 @@ class AuthViewModel: ObservableObject {
             throw NetworkError.serverError("Invalid cat API URL")
         }
         
-        let (data, _) = try await URLSession.shared.data(from: url)
+        let (data, _) = try await avatarSession.data(from: url)
         
         struct CatImage: Codable {
             let url: String
@@ -276,7 +299,7 @@ class AuthViewModel: ObservableObject {
         
         // Download the actual image data
         guard let imageURL = URL(string: firstImage.url),
-              let (imageData, _) = try? await URLSession.shared.data(from: imageURL) else {
+              let (imageData, _) = try? await avatarSession.data(from: imageURL) else {
             throw NetworkError.serverError("Failed to download cat image")
         }
         
@@ -305,7 +328,12 @@ class AuthViewModel: ObservableObject {
     }
     
     private func getSavedCatImageURL(for userId: Int) -> String? {
-        UserDefaults.standard.string(forKey: "catImageURL_\(userId)")
+        guard let saved = UserDefaults.standard.string(forKey: "catImageURL_\(userId)"),
+              let url = URL(string: saved) else { return nil }
+        if url.isFileURL && !FileManager.default.fileExists(atPath: url.path) {
+            return nil
+        }
+        return saved
     }
     
     private func deleteLocalCatImage(for userId: Int) {

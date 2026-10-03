@@ -19,43 +19,45 @@ struct RecentSolvesCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(paletteManager.color(at: 0))
-                    Text("Recent Solves")
-                        .font(.headline)
-                }
-                Spacer()
+            // Header — the same anatomy as `MistakeTagsAnalysisCard` directly below it on this
+            // screen: icon + title on the left, the headline figure and a chevron on the right, one
+            // divider, then content.
+            //
+            // This card used to break that: the count sat in its own 40pt band *below* a second
+            // divider, and "View All" was spelled out as text. So the top third read as three
+            // stacked strips — title, lone number, rows — with uneven padding between them, and the
+            // two cards disagreed about where a number belongs and what a navigation affordance
+            // looks like. Same screen, same header.
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(paletteManager.color(at: 0))
+                Text("Recent Solves")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Spacer(minLength: 8)
+
                 NavigationLink(destination: AllSolvesView(solves: solves)) {
-                    HStack(spacing: 4) {
-                        Text("View All")
-                            .font(.subheadline)
+                    HStack(spacing: 6) {
+                        Text("\(solves.count)")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundStyle(paletteManager.color(at: 0))
                         Image(systemName: "chevron.right")
-                            .font(.caption)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(paletteManager.selectedPalette.primary)
+                    // The label is small and the row is not the target, so the hit area is grown
+                    // explicitly rather than left to the text bounds.
+                    .contentShape(Rectangle())
                 }
+                .accessibilityLabel("View all \(solves.count) solves")
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top)
+            .padding(.bottom, 8)
 
             Divider()
                 .background(Color.gray.opacity(0.3))
-
-            // Hero count
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text("\(solves.count)")
-                    .font(.system(size: 40, weight: .bold))
-                    .foregroundStyle(paletteManager.color(at: 0))
-                Text("PROBLEMS")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
 
             // Solve list
             VStack(spacing: 0) {
@@ -68,10 +70,11 @@ struct RecentSolvesCard: View {
                 }
             }
             .padding(.horizontal)
+            .padding(.top, 12)
             .padding(.bottom)
         }
         .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
     }
 }

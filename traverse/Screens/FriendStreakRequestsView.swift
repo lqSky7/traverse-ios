@@ -83,106 +83,6 @@ class FriendStreakRequestsViewModel: ObservableObject {
     }
 }
 
-struct FriendStreakRequestsView: View {
-    @ObservedObject var viewModel: FriendStreakRequestsViewModel
-    @StateObject private var paletteManager = ColorPaletteManager.shared
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            Group {
-                if viewModel.receivedRequests.isEmpty && viewModel.sentRequests.isEmpty {
-                    emptyState
-                } else {
-                    requestsList
-                }
-            }
-            .navigationTitle("Streak Requests")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarScrollMinimization()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-            .refreshable {
-                await viewModel.loadRequests()
-            }
-            .task {
-                await viewModel.loadRequests()
-            }
-            .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    viewModel.errorMessage = nil
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                }
-            }
-        }
-    }
-    
-    private var emptyState: some View {
-        EmptyStateView(
-            icon: "flame",
-            title: "No Streak Requests",
-            message: "A friend streak is a shared daily goal. Open a friend's profile and start one to keep each other honest."
-        )
-    }
-    
-    private var requestsList: some View {
-        List {
-            if !viewModel.receivedRequests.isEmpty {
-                Section {
-                    ForEach(viewModel.receivedRequests) { request in
-                        ReceivedStreakRequestRow(
-                            request: request,
-                            onAccept: {
-                                Task {
-                                    await viewModel.acceptRequest(request)
-                                }
-                            },
-                            onReject: {
-                                Task {
-                                    await viewModel.rejectRequest(request)
-                                }
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                } header: {
-                    Text("Received")
-                }
-            }
-            
-            if !viewModel.sentRequests.isEmpty {
-                Section {
-                    ForEach(viewModel.sentRequests) { request in
-                        SentStreakRequestRow(
-                            request: request,
-                            onCancel: {
-                                Task {
-                                    await viewModel.cancelRequest(request)
-                                }
-                            }
-                        )
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                } header: {
-                    Text("Sent")
-                }
-            }
-        }
-        .listStyle(.plain)
-    }
-}
 
 // MARK: - Request Row Components
 
@@ -191,20 +91,11 @@ struct ReceivedStreakRequestRow: View {
     let onAccept: () -> Void
     let onReject: () -> Void
     @StateObject private var paletteManager = ColorPaletteManager.shared
-    @State private var glowPhase: CGFloat = 0
-    
+
     private var accentColor: Color {
         paletteManager.color(at: 0)
     }
-    
-    private var glowFillOpacity: Double {
-        0.15 + 0.1 * (0.5 + 0.5 * sin(glowPhase))
-    }
-    
-    private var glowStrokeOpacity: Double {
-        0.4 + 0.2 * (0.5 + 0.5 * sin(glowPhase))
-    }
-    
+
     var body: some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
@@ -288,36 +179,8 @@ struct ReceivedStreakRequestRow: View {
         }
         .padding(16)
         .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, .clear, accentColor.opacity(glowFillOpacity)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .allowsHitTesting(false)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [.clear, .clear, accentColor.opacity(glowStrokeOpacity)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 2
-                )
-                .allowsHitTesting(false)
-        )
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glowPhase = .pi * 2
-            }
-        }
     }
 }
 

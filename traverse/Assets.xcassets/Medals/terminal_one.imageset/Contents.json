@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "terminal_one.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

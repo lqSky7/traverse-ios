@@ -10,7 +10,6 @@ import UIKit
 struct MedalView: View {
     let medal: String
     var unlocked: Bool = true
-    var size: CGFloat = 120
     /// Off by default: a badge only tilts where the user has explicitly asked for it
     /// (currently only the badge detail sheet).
     ///
@@ -29,20 +28,29 @@ struct MedalView: View {
     @GestureState private var drag: CGSize = .zero
     @State private var hapticsArmed = true
 
-    private var tiltX: Double { Double(-drag.height / max(size, 1)) * maxTilt }
-    private var tiltY: Double { Double(drag.width / max(size, 1)) * maxTilt }
-
-    /// Parallax: the badge pushes a hair toward the viewer while it is being handled.
-    private var lift: CGFloat {
-        let magnitude = min(1, hypot(drag.width, drag.height) / max(size, 1))
-        return 1 + magnitude * 0.05
+    var body: some View {
+        // No intrinsic size: the badge squares itself up to whatever the parent offers,
+        // so a grid cell, a card row or a full-bleed detail sheet all get the right
+        // badge without anyone hard-coding a point size.
+        GeometryReader { geo in
+            let side = max(min(geo.size.width, geo.size.height), 1)
+            badge(side: side)
+                .frame(width: side, height: side)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
+        }
+        .aspectRatio(1, contentMode: .fit)
     }
 
-    private var isTilting: Bool { drag != .zero }
+    // MARK: - Rendering
 
-    var body: some View {
-        badge
-            .frame(width: size, height: size)
+    private func badge(side: CGFloat) -> some View {
+        let tiltX = Double(-drag.height / side) * maxTilt
+        let tiltY = Double(drag.width / side) * maxTilt
+        let magnitude = min(1, hypot(drag.width, drag.height) / side)
+        let lift = 1 + magnitude * 0.05
+        let isTilting = drag != .zero
+
+        return badgeArt(side: side)
             .shadow(
                 color: .black.opacity(showsShadow ? (unlocked ? 0.45 : 0.25) : 0),
                 radius: isTilting ? 18 : 10,
@@ -68,8 +76,6 @@ struct MedalView: View {
             .accessibilityLabel(Text(medalAccessibilityLabel))
     }
 
-    // MARK: - Rendering
-
     private var baseImage: some View {
         Image(medal)
             .resizable()
@@ -77,14 +83,14 @@ struct MedalView: View {
             .aspectRatio(contentMode: .fit)
     }
 
-    private var badge: some View {
+    private func badgeArt(side: CGFloat) -> some View {
         ZStack {
             if unlocked {
                 baseImage
                 // The renders already carry their own baked specular, so the moving highlight
                 // is only worth drawing where the user can actually tilt the badge.
                 if interactive {
-                    specularSheen
+                    specularSheen(side: side)
                 }
             } else {
                 // Unearned badges read as a drained, dark relief — same silhouette, no colour.
@@ -100,10 +106,11 @@ struct MedalView: View {
     }
 
     /// A fixed light source: as the badge leans, the highlight sweeps across its face.
-    private var specularSheen: some View {
-        let reach = max(size, 1) * 0.9
+    private func specularSheen(side: CGFloat) -> some View {
+        let reach = max(side, 1) * 0.9
         let offsetX = -drag.width * 0.85
         let offsetY = -drag.height * 0.85
+        let isTilting = drag != .zero
 
         return RadialGradient(
             colors: [

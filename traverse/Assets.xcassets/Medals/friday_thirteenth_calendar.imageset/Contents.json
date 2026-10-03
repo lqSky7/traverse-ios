@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "friday_thirteenth_calendar.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

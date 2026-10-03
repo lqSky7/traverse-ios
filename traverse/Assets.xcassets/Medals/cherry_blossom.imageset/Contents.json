@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "cherry_blossom.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

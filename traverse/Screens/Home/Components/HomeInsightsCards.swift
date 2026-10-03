@@ -38,7 +38,6 @@ struct AchievementStatsCard: View {
                 MedalView(
                     medal: latest.medalAsset,
                     unlocked: latest.unlocked,
-                    size: 92,
                     interactive: false
                 )
                 .frame(height: 92)
@@ -57,7 +56,6 @@ struct AchievementStatsCard: View {
                 MedalView(
                     medal: MedalCatalog.fallback(for: "first_solve"),
                     unlocked: false,
-                    size: 92,
                     interactive: false,
                     showsShadow: false
                 )
@@ -90,7 +88,7 @@ struct ProductivityInsightsCard: View {
     @ObservedObject var paletteManager: ColorPaletteManager
 
     private struct DayData: Identifiable {
-        let id = UUID()
+        var id: Date { date }
         let date: Date
         let label: String
         let solves: Int
@@ -148,14 +146,14 @@ struct ProductivityInsightsCard: View {
             Chart {
                 ForEach(last7DaysData) { day in
                     BarMark(
-                        x: .value("Day", day.label),
+                        x: .value("Day", day.date, unit: .day),
                         y: .value("Count", day.solves)
                     )
                     .foregroundStyle(paletteManager.color(at: 0))
                     .position(by: .value("Type", "Solves"))
 
                     BarMark(
-                        x: .value("Day", day.label),
+                        x: .value("Day", day.date, unit: .day),
                         y: .value("Count", day.revisions)
                     )
                     .foregroundStyle(paletteManager.color(at: 1))
@@ -172,8 +170,8 @@ struct ProductivityInsightsCard: View {
                 }
             }
             .chartXAxis {
-                AxisMarks { _ in
-                    AxisValueLabel()
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisValueLabel(format: .dateTime.weekday(.narrow))
                         .foregroundStyle(.secondary)
                         .font(.caption2)
                 }

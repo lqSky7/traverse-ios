@@ -60,23 +60,6 @@ struct BestSolvingHoursCard: View {
         return (0..<24).map { HourBucket(hour: $0, count: counts[$0], totalSeconds: totals[$0]) }
     }
 
-    /// Earliest hour with the most solves, or `nil` when nothing is recorded.
-    private var peakHour: HourBucket? {
-        buckets.filter { $0.count > 0 }.max { $0.count < $1.count }
-    }
-
-    private var fastestHour: HourBucket? {
-        buckets
-            .filter { $0.count >= Self.minimumSamplesForFastestHour && $0.averageSeconds > 0 }
-            .min { $0.averageSeconds < $1.averageSeconds }
-    }
-
-    private var maxCount: Int {
-        max(buckets.map(\.count).max() ?? 0, 1)
-    }
-
-    private var hasData: Bool { peakHour != nil }
-
     private func formatHour(_ hour: Int) -> String {
         if hour == 0 { return "12am" }
         if hour < 12 { return "\(hour)am" }
@@ -91,6 +74,15 @@ struct BestSolvingHoursCard: View {
     }
 
     var body: some View {
+        // Chart marks share the same buckets and summaries instead of each
+        // scanning and parsing the entire solve history for their colour.
+        let buckets = self.buckets
+        let peakHour = buckets.filter { $0.count > 0 }.max { $0.count < $1.count }
+        let fastestHour = buckets
+            .filter { $0.count >= Self.minimumSamplesForFastestHour && $0.averageSeconds > 0 }
+            .min { $0.averageSeconds < $1.averageSeconds }
+        let maxCount = max(buckets.map(\.count).max() ?? 0, 1)
+
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Image(systemName: "clock.fill")
@@ -103,7 +95,7 @@ struct BestSolvingHoursCard: View {
             Divider()
                 .background(Color.gray.opacity(0.3))
 
-            if hasData {
+            if peakHour != nil {
                 HStack(alignment: .top, spacing: 20) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(formatHour(peakHour?.hour ?? 0))

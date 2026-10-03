@@ -143,17 +143,12 @@ struct ActiveStreakCard: View {
     let streak: FriendStreak
     @ObservedObject var paletteManager: ColorPaletteManager
     let onDelete: () -> Void
-    @State private var glowPhase: CGFloat = 0
     @State private var showDeleteConfirmation = false
-    
+
     private var streakColor: Color {
         paletteManager.color(at: 2) // Use different color from personal streak
     }
-    
-    private var glowFillOpacity: Double {
-        0.15 + 0.1 * (0.5 + 0.5 * sin(glowPhase))
-    }
-    
+
     var body: some View {
         HStack(spacing: 0) {
             // Friend Streak column
@@ -188,19 +183,8 @@ struct ActiveStreakCard: View {
         }
         .padding(16)
         .background(Color(UIColor.systemGray6))
-        .cornerRadius(16)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, .clear, streakColor.opacity(glowFillOpacity)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .allowsHitTesting(false)
-        )
         .contextMenu {
             Button(role: .destructive) {
                 showDeleteConfirmation = true
@@ -219,11 +203,6 @@ struct ActiveStreakCard: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This will permanently delete your streak of \(streak.currentStreak) days. This cannot be undone.")
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                glowPhase = .pi * 2
-            }
         }
     }
 }

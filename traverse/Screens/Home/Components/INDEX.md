@@ -2,7 +2,7 @@
 
 | File | Description | Key Types & Symbols |
 | :--- | :--- | :--- |
-| `HomeScoreCards.swift` | Streak card plus the animated lighting-sun shader background it sits on. The card carries the two activity rings on its right and opens the goal sheet when tapped | `StreakCard`, `LightingSunBackground`, `AnimatableLightingSun` |
+| `HomeScoreCards.swift` | Streak card: a flat `systemGray6` tile carrying the two activity rings, a chroma-swept streak number, and a seven-day week strip whose dots walk the brand chroma band. Opens the goal sheet when tapped. The old lighting-sun shader background was removed — the Metal function itself survives, used by `LightingSimDemoView` | `StreakCard`, `StreakDay`, `StreakDayState`, `WeekStrip` |
 | `HomeLoadCard.swift` | Revision Load tile in the shape of Apple Fitness' Training Load card: gauge, band word, 7-day vs 28-day comparison, revision score footer | `RevisionLoadCard`, `RevisionLoadGauge` |
 | `HomeStepMetricCards.swift` | Time and attempt analysis as Step Count style tiles (title, chevron, Today, hero number, hourly bar strip) plus shared number formatting | `TimeAnalysisCard`, `AttemptsAnalysisCard`, `StepMetricCard`, `MetricFormat` |
 | `HomeStatsCards.swift` | Main solve statistics summary and the shared error view | `MainStatsCard`, `StatItem`, `ErrorView` |

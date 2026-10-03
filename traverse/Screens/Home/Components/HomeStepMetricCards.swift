@@ -99,6 +99,7 @@ struct TimeAnalysisCard: View {
     }
 
     var body: some View {
+        let points = self.points
         StepMetricCard(
             title: "Time Analysis",
             caption: "This Week",
@@ -124,6 +125,7 @@ struct AttemptsAnalysisCard: View {
     }
 
     var body: some View {
+        let points = self.points
         StepMetricCard(
             title: "Attempts Analysis",
             caption: "This Week",

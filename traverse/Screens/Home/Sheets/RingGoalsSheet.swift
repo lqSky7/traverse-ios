@@ -134,8 +134,8 @@ struct RingGoalsSheet: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color(UIColor.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func previewFraction(_ count: Int, _ goal: Int) -> Double {
@@ -195,8 +195,8 @@ struct RingGoalsSheet: View {
                 .frame(width: 54, alignment: .trailing)
         }
         .padding(14)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color(UIColor.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var explanation: some View {
@@ -215,8 +215,8 @@ struct RingGoalsSheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color(UIColor.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var tomorrowNote: some View {
@@ -232,8 +232,8 @@ struct RingGoalsSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color(UIColor.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -254,7 +254,7 @@ struct RingGoalsSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(Color.orange.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Save

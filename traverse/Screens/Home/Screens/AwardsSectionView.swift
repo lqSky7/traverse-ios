@@ -82,13 +82,12 @@ private struct AwardGridCell: View {
             MedalView(
                 medal: award.medalAsset,
                 unlocked: award.unlocked,
-                size: 72,
                 // Static in the grid. The tilt gesture lives in the sheet below, where
                 // it can't make every badge draggable or swallow the back-swipe.
                 interactive: false,
                 showsShadow: false
             )
-            .frame(height: 76)
+            .frame(maxWidth: .infinity)
 
             Text(award.name)
                 .font(.caption)
@@ -145,11 +144,11 @@ struct AwardDetailSheet: View {
                 MedalView(
                     medal: award.medalAsset,
                     unlocked: award.unlocked,
-                    size: 240,
                     // The one place a badge is tiltable — the user has tapped it open,
                     // so there is no scroll view or back-swipe to fight here.
                     interactive: true
                 )
+                .frame(maxWidth: 280)
 
                 Text("Hold and drag the badge to tilt it")
                     .font(.caption)

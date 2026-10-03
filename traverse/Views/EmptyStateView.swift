@@ -51,6 +51,12 @@ struct EmptyStateView: View {
     /// the only thing on a screen.
     var compact: Bool = false
 
+    /// Optional once-per-visit latch for the headline sweep. Pass the owning screen's gate when this
+    /// state lives inside a `LazyVStack`/`LazyColumn`, or the sweep replays every time the row is
+    /// recycled by a scroll. Leave it nil for a state that is the whole screen — it then sweeps
+    /// once per appearance, which is already the right cadence.
+    var sweepGate: ChromaSweepGate? = nil
+
     @ObservedObject private var paletteManager = ColorPaletteManager.shared
 
     private var accent: Color { paletteManager.selectedPalette.primary }
@@ -67,10 +73,22 @@ struct EmptyStateView: View {
                     .foregroundStyle(accent)
             }
 
-            Text(title)
-                .font(.system(size: compact ? 15 : 19, weight: .semibold))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
+            // The headline sweeps in; the message below it deliberately does not. Sweeping both
+            // would double how long the state takes to read, and the message is the part that has
+            // to be legible immediately — a blank screen is the one place a user is already
+            // wondering whether the app is broken.
+            ChromaText(
+                text: title,
+                font: .system(size: compact ? 15 : 19, weight: .semibold),
+                restingColor: .white,
+                delay: 0.3,
+                duration: 1.4,
+                gate: sweepGate,
+                sweepKey: "empty-title",
+                lineLimit: nil,
+                alignment: .center,
+                monospacedDigits: false
+            )
 
             Text(message)
                 .font(.system(size: compact ? 13 : 14))
@@ -111,6 +129,10 @@ struct GettingStartedEmptyState: View {
     /// Overridden per screen so the state explains why *this* tab is empty.
     var title: String = "Nothing here yet"
     var message: String = "Traverse records what you do in the browser and reports it back here. Nothing to show until your first solve."
+
+    /// Optional once-per-visit latch — see the note on `EmptyStateView.sweepGate`. Home renders this
+    /// inside a `LazyVStack`, so it needs one; a screen that shows it as its whole body does not.
+    var sweepGate: ChromaSweepGate? = nil
 
     @Environment(\.openURL) private var openURL
     @ObservedObject private var paletteManager = ColorPaletteManager.shared
@@ -160,10 +182,21 @@ struct GettingStartedEmptyState: View {
                         .foregroundStyle(accent)
                 }
 
-                Text(title)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
+                // Only the headline sweeps. The three steps below are the part that has to be read
+                // and acted on, and animating them would delay the one thing this screen exists to
+                // communicate.
+                ChromaText(
+                    text: title,
+                    font: .system(size: 20, weight: .bold),
+                    restingColor: .white,
+                    delay: 0.3,
+                    duration: 1.4,
+                    gate: sweepGate,
+                    sweepKey: "getting-started-title",
+                    lineLimit: nil,
+                    alignment: .center,
+                    monospacedDigits: false
+                )
 
                 Text(message)
                     .font(.system(size: 14))

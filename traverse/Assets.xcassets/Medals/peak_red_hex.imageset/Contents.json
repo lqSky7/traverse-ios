@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "peak_red_hex.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -6,11 +6,13 @@ import SwiftUI
 /// against a fixed full-circle track so an untouched day still reads as two
 /// rings rather than nothing.
 ///
-/// The track is `.ultraThinMaterial` rather than a flat grey. On the streak card
-/// the rings sit on top of `LightingSunBackground`, which is a shader whose
-/// brightness changes with the streak — a hard-coded grey track would look right
-/// at one streak length and wrong at every other. A material samples what is
-/// behind it, so the track stays legible across the whole range.
+/// The track is `.ultraThinMaterial` rather than a flat grey. It originally earned its
+/// place because the rings sat on top of a streak-driven shader whose brightness changed
+/// with the streak, so a hard-coded grey would have looked right at one streak length and
+/// wrong at every other. That shader is gone and the streak card is a flat `systemGray6`
+/// tile now, but the material still earns its place: this view is also used by the widget
+/// and the previews, and a material stays legible on whatever surface it lands on instead
+/// of only on the one it was tuned for.
 ///
 /// Progress is animated rather than snapped. The rings are the reward for the
 /// action that just happened, and a ring that jumps from 0.0 to 1.0 in one frame

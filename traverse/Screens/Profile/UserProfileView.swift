@@ -35,16 +35,23 @@ struct UserProfileView: View {
                 } else if let profile = viewModel.profile {
                     ProfileHeaderView(profile: profile, statistics: viewModel.statistics)
 
-                    // Friend streak section (only for friends)
-                    if isFriend {
-                        streakActionSection
+                    // The active-streak detail, when there is one. The action row below renders in
+                    // every state, so the streak button never disappears.
+                    if isFriend, viewModel.friendStreakStatus == .active,
+                       let streak = viewModel.friendStreak {
+                        ActiveStreakCard(streak: streak, paletteManager: paletteManager, onDelete: {
+                            Task {
+                                await viewModel.deleteStreak()
+                            }
+                        })
+                        .padding(.horizontal)
                     }
 
-                    // The single inline action. Everything destructive or
-                    // housekeeping — remove, block, close-friend — lives in the
-                    // top-right menu instead of stacking up the page.
+                    // Streak and freeze, side by side. Everything destructive or housekeeping —
+                    // remove, block, close-friend — lives in the top-right menu instead of stacking
+                    // up the page.
                     if isFriend {
-                        giftFreezeButton
+                        actionRow
                     }
 
                     friendActionButton
@@ -268,30 +275,21 @@ struct UserProfileView: View {
 
     // MARK: - Gift freeze
 
-    /// The one action that stays on the page.
+    /// Gift a streak freeze, beside the streak button.
     ///
-    /// Deliberately compact — it hugs its label instead of stretching edge to
-    /// edge. As a full-width pill sitting among two other full-width pills it
-    /// read as the page's primary action, pushed the statistics below the fold,
-    /// and at narrow widths wrapped its own title.
+    /// Compact by design — it hugs its label instead of stretching edge to edge, so it can share a
+    /// row with the streak button without either reading as the page's primary action. Its anatomy
+    /// comes from `pillLabel`, the same helper the streak button is built from, so the two cannot
+    /// drift apart.
     private var giftFreezeButton: some View {
         Button {
             showingGiftConfirmation = true
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "snowflake")
-                    .font(.footnote.weight(.semibold))
-
-                Text(isGifting ? "Sending…" : "Gift Freeze")
-                    .font(.subheadline.weight(.semibold))
-
-                Text("70 XP")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 11)
-            .fixedSize()
+            pillLabel(
+                icon: "snowflake",
+                title: isGifting ? "Sending…" : "Gift Freeze",
+                caption: "70 XP"
+            )
         }
         .disabled(isGifting)
         .tint(.cyan)
@@ -407,6 +405,10 @@ struct UserProfileView: View {
         }
     }
 
+    /// A full-width status bar, for the relationship states that replace an action outright.
+    ///
+    /// Distinct from `pill` on purpose: this one is the only thing in its slot, so it can afford the
+    /// full width, whereas `pill` has to share a row with a second button.
     private func statusPill(icon: String, text: String, tint: Color) -> some View {
         HStack {
             Image(systemName: icon)
@@ -421,57 +423,127 @@ struct UserProfileView: View {
         .padding(.horizontal)
     }
 
-    @ViewBuilder
-    private var streakActionSection: some View {
-        VStack(spacing: 8) {
-            switch viewModel.friendStreakStatus {
-            case .none:
-                EmptyView()
+    // MARK: - Action row
 
-            case .active:
-                // Show active streak info with liquid glass and glow
-                if let streak = viewModel.friendStreak {
-                    ActiveStreakCard(streak: streak, paletteManager: paletteManager, onDelete: {
-                        Task {
-                            await viewModel.deleteStreak()
-                        }
-                    })
-                    .padding(.horizontal)
-                }
+    /// The streak action and the freeze gift, side by side.
+    ///
+    /// They used to be two stacked rows with different shapes — a full-width "Start Streak" pill and
+    /// a compact "Gift Freeze" one — so they read as two unrelated things, and the full-width pill
+    /// looked like the page's primary action. Both are compact now and share one row.
+    ///
+    /// `ViewThatFits` picks the row when there is room and stacks them when there is not. Two glass
+    /// pills plus their labels come close to the width of a narrow phone, and a row that cannot fit
+    /// has to degrade rather than push the page sideways.
+    private var actionRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                streakButton
+                giftFreezeButton
+            }
 
-            case .canStart:
-                Group {
-                    Button {
-                        Task {
-                            await viewModel.sendStreakRequest()
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "flame")
-                            Text("Start Streak")
-                        }
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .tint(paletteManager.color(at: 0))
-                }
-                .applyGlassButtonStyle(.glassProminent)
-                .padding(.horizontal)
-
-            case .requestSent:
-                statusPill(
-                    icon: "flame.badge.checkmark",
-                    text: "Streak Request Sent",
-                    tint: paletteManager.color(at: 0)
-                )
-
-            case .requestReceived:
-                statusPill(
-                    icon: "flame.badge.checkmark",
-                    text: "Streak Request Received",
-                    tint: paletteManager.color(at: 0)
-                )
+            VStack(spacing: 8) {
+                streakButton
+                giftFreezeButton
             }
         }
+        .padding(.horizontal, 12)
+    }
+
+    /// The streak button, in whichever state the relationship is in.
+    ///
+    /// Every state draws the same pill in the same slot; only the icon, label and tint change. The
+    /// active state used to swap the button out for a card, so the control simply vanished the
+    /// moment a streak existed — which is exactly when its slot most needs to stay legible.
+    @ViewBuilder
+    private var streakButton: some View {
+        switch viewModel.friendStreakStatus {
+        case .none:
+            EmptyView()
+
+        case .active:
+            // A status, not an action: the card above owns ending the streak. The label is just
+            // "Active" rather than "Streak Active" so the row has room for the freeze pill beside
+            // it — the card above already says which streak this is.
+            statusButton(
+                icon: "flame.fill",
+                title: "Active",
+                caption: viewModel.friendStreak.map { "\($0.currentStreak)d" },
+                tint: paletteManager.color(at: 0)
+            )
+
+        case .canStart:
+            Button {
+                Task {
+                    await viewModel.sendStreakRequest()
+                }
+            } label: {
+                pillLabel(icon: "flame", title: "Start Streak", caption: nil)
+            }
+            .tint(paletteManager.color(at: 0))
+            .applyGlassButtonStyle(.glassProminent)
+
+        case .requestSent:
+            statusButton(
+                icon: "flame.badge.checkmark",
+                title: "Request Sent",
+                caption: nil,
+                tint: .secondary
+            )
+
+        case .requestReceived:
+            statusButton(
+                icon: "flame.badge.checkmark",
+                title: "Request Received",
+                caption: nil,
+                tint: paletteManager.color(at: 0)
+            )
+        }
+    }
+
+    /// The shared pill anatomy: icon, label, and an optional trailing caption.
+    ///
+    /// Deliberately compact — it hugs its content rather than stretching, so two of them sit on one
+    /// row without either reading as the page's primary action. Both the streak and the freeze
+    /// button are built from this, so they cannot drift apart.
+    ///
+    /// Note there is no `.fixedSize()` here. It used to have one, to stop the pill stretching to fill
+    /// its parent — but inside an `HStack` a button already sizes to its content, and `fixedSize`
+    /// made the pill refuse to *compress* as well. Two pills wider than the row therefore could not
+    /// shrink, and the row overflowed and dragged the whole page sideways with it.
+    private func pillLabel(icon: String, title: String, caption: String?) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.footnote.weight(.semibold))
+
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+
+            if let caption {
+                Text(caption)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+    }
+
+    /// A non-interactive pill in the same slot, for the states that report rather than act.
+    ///
+    /// Rendered as a *disabled button* rather than a plain capsule, and that detail matters:
+    /// `applyGlassButtonStyle` is only `self.buttonStyle(.glassProminent)`, and `buttonStyle` has no
+    /// effect on anything that is not a `Button`. A bare capsule therefore came out both flat — no
+    /// liquid glass — and a different height from the freeze button beside it, because the button
+    /// style contributes its own metrics. `.disabled(true)` keeps it inert while still picking up
+    /// the glass, the same way `giftFreezeButton` looks while gifting.
+    private func statusButton(icon: String, title: String, caption: String?, tint: Color) -> some View {
+        Button {} label: {
+            pillLabel(icon: icon, title: title, caption: caption)
+        }
+        .disabled(true)
+        .tint(tint)
+        .applyGlassButtonStyle(.glassProminent)
     }
 }

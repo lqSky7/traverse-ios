@@ -5,83 +5,6 @@
 
 import SwiftUI
 
-struct FriendRequestsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @ObservedObject var viewModel: FriendsViewModel
-    @StateObject private var paletteManager = ColorPaletteManager.shared
-    @State private var selectedTab = 0
-    
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                Picker("Requests", selection: $selectedTab) {
-                    Text("Received (\(viewModel.receivedRequests.count))").tag(0)
-                    Text("Sent (\(viewModel.sentRequests.count))").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                if selectedTab == 0 {
-                    receivedRequestsList
-                } else {
-                    sentRequestsList
-                }
-            }
-            .navigationTitle("Friend Requests")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarScrollMinimization()
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-    
-    private var receivedRequestsList: some View {
-        Group {
-            if viewModel.receivedRequests.isEmpty {
-                EmptyStateView(
-                    icon: "tray",
-                    title: "No received requests",
-                    message: "Friend requests other people send you land here. You will get a notification when one arrives."
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(viewModel.receivedRequests) { request in
-                        if let requester = request.requester {
-                            ReceivedRequestRow(request: request, requester: requester, viewModel: viewModel)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private var sentRequestsList: some View {
-        Group {
-            if viewModel.sentRequests.isEmpty {
-                EmptyStateView(
-                    icon: "paperplane",
-                    title: "No sent requests",
-                    message: "Requests you send show up here until they are accepted or declined."
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(viewModel.sentRequests) { request in
-                        if let addressee = request.addressee {
-                            SentRequestRow(request: request, addressee: addressee, viewModel: viewModel)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct ReceivedRequestRow: View {
     let request: FriendRequest
@@ -270,8 +193,4 @@ extension View {
 enum GlassButtonStyle {
     case glass
     case glassProminent
-}
-
-#Preview {
-    FriendRequestsView(viewModel: FriendsViewModel())
 }

@@ -9,7 +9,6 @@ import Security
 class KeychainHelper {
     static let shared = KeychainHelper()
     
-    private init() {}
     
     private let service: String
     private let tokenKey: String

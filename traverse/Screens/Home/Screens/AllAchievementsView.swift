@@ -189,7 +189,6 @@ private struct FeaturedAwardCard: View {
             MedalView(
                 medal: award.medalAsset,
                 unlocked: award.unlocked,
-                size: 64,
                 interactive: false,
                 showsShadow: false
             )
@@ -248,9 +247,9 @@ private struct AwardShelfCard: View {
                 MedalView(
                     medal: hero.medalAsset,
                     unlocked: hero.unlocked,
-                    size: 116,
                     interactive: false
                 )
+                .frame(maxWidth: .infinity)
                 .frame(height: 116)
 
                 VStack(spacing: 4) {
@@ -283,7 +282,6 @@ private struct AwardShelfCard: View {
                 MedalView(
                     medal: award.medalAsset,
                     unlocked: award.unlocked,
-                    size: 30,
                     interactive: false,
                     showsShadow: false
                 )

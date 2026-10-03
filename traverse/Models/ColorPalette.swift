@@ -32,6 +32,23 @@ struct ColorPalette: Identifiable, Codable, Equatable, Hashable {
     var secondary: Color {
         Color(hex: colors[safe: 1] ?? colors[0]).adjustedForDarkMode()
     }
+
+    /// The palette colour at position `index` of `count` positions, walking the whole palette
+    /// left to right.
+    ///
+    /// Used to spread the palette across a row of small elements — the streak card's seven day
+    /// dots — so a row of seven reads as the full palette rather than repeating part of it.
+    ///
+    /// Distinct from `ColorPaletteManager.color(at:)`, which cycles a single index and answers
+    /// "which accent does this element use". This one answers "where does this element sit in a
+    /// sequence", which is why it needs the count. Uses `swiftUIColors`, matching `color(at:)`.
+    func color(at index: Int, of count: Int) -> Color {
+        let list = swiftUIColors
+        guard count > 1, !list.isEmpty else { return list.first ?? .white }
+        let t = Double(index) / Double(count - 1)
+        let slot = Int((t * Double(list.count - 1)).rounded())
+        return list[min(max(slot, 0), list.count - 1)]
+    }
     
     static let allPalettes: [ColorPalette] = [
         ColorPalette(
@@ -68,9 +85,52 @@ struct ColorPalette: Identifiable, Codable, Equatable, Hashable {
             id: 6,
             name: "Lavender Fields",
             colors: ["E0BBE4", "957DAD", "D291BC", "FEC8D8", "FFDFD3"]
+        ),
+        // The chroma band, as the shipped default.
+        //
+        // Taken verbatim from the website's `--preloader-chroma` custom property, which describes
+        // itself as "pink → crimson → amber → ice → cobalt". The slot order here is not the band's
+        // own left-to-right order — see `defaultPalette` below for why.
+        //
+        // The band is **mode-invariant** on the site: the `.dark` rules only change the un-swept
+        // base colour the band emerges from (`rgb(100,116,139)` → `rgb(163,163,163)` → white), never
+        // the band itself. So these five hexes are correct as-is on the app's permanently dark
+        // surface, and no dark variant is needed.
+        //
+        // Worth knowing: the band has never been a *static palette* on the website. Every chroma
+        // rule there uses a neutral for the first third, the band as a transient middle, and
+        // `transparent` after — the band only exists during a sweep. Promoting it to a palette is a
+        // new use of the asset, not a port of an existing one.
+        ColorPalette(
+            id: 7,
+            name: "Traverse",
+            colors: ["FFB6C1", "145AE6", "FFBE14", "F02832", "EBEBFF"]
         )
     ]
 
+    /// The palette a user gets before they ever open the picker.
+    ///
+    /// Slot order is deliberately NOT the band's left-to-right order, because the two orders
+    /// carry different meanings. The band is a *sequence* — the sweep reads pink → crimson →
+    /// amber → ice → cobalt and that order is the whole point. A palette is a *set*, and these
+    /// slots have positional meaning baked into the code: slot 0 is the palette's primary,
+    /// `RevisionLoadBand.paletteIndex` maps `optimal → 0` and walks away from it in both
+    /// directions, slot 2 is the streak flame, and slot 3 carries numerals
+    /// (`SubmissionStatsCard`, `SolveHeatmapCard`).
+    ///
+    /// That last one is why ice sits in slot 4. `#EBEBFF` is the band's glint — designed to
+    /// flash bright for half a second mid-sweep, not to be a standing tint. On the 24pt
+    /// numeral in `SolveHeatmapCard` it reads as unstyled white text rather than as a colour.
+    /// Slot 4 is the least-used slot in the app (14 call sites, all small labels and icons),
+    /// so it is the one safe home for it. Every band hex is still present.
+    ///
+    /// The wash on the streak card keeps true band order, because a gradient's order *is* its
+    /// meaning. Same five colours, two orders, each where it belongs.
+    static let defaultPaletteID = 7
+
+    static var defaultPalette: ColorPalette {
+        allPalettes.first { $0.id == defaultPaletteID } ?? allPalettes[0]
+    }
 }
 
 // MARK: - Color Palette Manager
@@ -118,7 +178,13 @@ class ColorPaletteManager: ObservableObject {
             }
         }()
 
-        // Compute selected palette or use default without accessing self before init
+        // Compute selected palette or use default without accessing self before init.
+        //
+        // NOTE on migration: `didSet` does not fire during `init`, so nothing is written to
+        // `selectedColorPaletteID` here. A user who never opened the picker therefore has no
+        // saved key and picks up `defaultPalette` — while anyone who explicitly chose
+        // Monochrome has `0` stored and keeps it. That is the behaviour we want: the new
+        // default reaches everyone who never expressed a preference, and nobody else.
         let selected: ColorPalette = {
             if let savedID = UserDefaults.standard.value(forKey: ColorPaletteManager.userDefaultsKey) as? Int {
                 if let custom = loadedCustom, custom.id == savedID {
@@ -126,10 +192,10 @@ class ColorPaletteManager: ObservableObject {
                 } else if let palette = ColorPalette.allPalettes.first(where: { $0.id == savedID }) {
                     return palette
                 } else {
-                    return ColorPalette.allPalettes[0]
+                    return ColorPalette.defaultPalette
                 }
             } else {
-                return ColorPalette.allPalettes[0]
+                return ColorPalette.defaultPalette
             }
         }()
 

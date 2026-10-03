@@ -10,6 +10,19 @@ struct HomeView: View {
     @ObservedObject private var ringsManager = RingsManager.shared
     @ObservedObject private var inbox = NotificationInboxManager.shared
     @State private var showingNotifications = false
+
+    /// Once-per-visit latch for the feed's chroma sweeps.
+    ///
+    /// Lives here rather than on the card because the card is inside a `LazyVStack` and is
+    /// disposed when it scrolls out of the keep-alive window — a latch on the card would reset on
+    /// scroll and the sweep would replay every time the user scrolled back to the top.
+    ///
+    /// `NavigationStack` keeps this view mounted underneath whatever gets pushed, so `onAppear`
+    /// here does *not* reliably fire on the way back. The reset is therefore hung off the pushed
+    /// destinations' `onDisappear` — see the `NavigationLink`s in the feed below. That is
+    /// deterministic: leaving a detail view clears the gate, so the feed sweeps again when it is
+    /// uncovered, and nothing else does.
+    @StateObject private var sweepGate = ChromaSweepGate()
     
     private var formattedDate: String {
         let formatter = DateFormatter()
@@ -47,7 +60,10 @@ struct HomeView: View {
                         // a broken app rather than an empty one.
                         GettingStartedEmptyState(
                             title: "Your feed fills in from your first solve",
-                            message: "Traverse reads your practice from the browser and reports it back here. There is nothing to show until then."
+                            message: "Traverse reads your practice from the browser and reports it back here. There is nothing to show until then.",
+                            // This sits inside the feed's `LazyVStack`, so without the gate the
+                            // headline would re-sweep every time the row is recycled by a scroll.
+                            sweepGate: sweepGate
                         )
                     } else {
                         // Streak — full width, with the day's rings on the right.
@@ -69,17 +85,27 @@ struct HomeView: View {
                             StreakCard(
                                 streak: userStats.stats.currentStreak,
                                 maxStreak: userStats.stats.longestStreak ?? userStats.stats.totalStreakDays,
-                                rings: ringsManager.progress
+                                rings: ringsManager.progress,
+                                // The week strip reads solve history and freeze days. Both are
+                                // already on the view model for the heatmap, so this is plumbing
+                                // rather than a new fetch.
+                                solves: viewModel.recentSolves ?? [],
+                                frozenDates: viewModel.frozenDates,
+                                sweepGate: sweepGate
                             )
                         }
 
                         // Revision Load — full-width tile, taps through to the
                         // trend screen.
+                        //
+                        // Every destination below carries `.onDisappear { sweepGate.reset() }`.
+                        // That is what makes the feed's sweep replay when you come back from a
+                        // detail view, and what keeps it from replaying while you stay put.
                         NavigationLink(destination: RevisionLoadDetailView(
                             breakdown: viewModel.revisionLoad ?? .empty,
                             revisionScore: viewModel.revisionScore?.score,
                             paletteManager: paletteManager
-                        )) {
+                        ).onDisappear { sweepGate.reset() }) {
                             RevisionLoadCard(
                                 breakdown: viewModel.revisionLoad,
                                 revisionScore: viewModel.revisionScore?.score,
@@ -99,14 +125,14 @@ struct HomeView: View {
                             if let achievementStats = viewModel.achievementStats,
                                let solves = viewModel.recentSolves, !solves.isEmpty {
                                 HStack(alignment: .top, spacing: 16) {
-                                    NavigationLink(destination: AllAchievementsView()) {
+                                    NavigationLink(destination: AllAchievementsView().onDisappear { sweepGate.reset() }) {
                                         AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
                                     }
                                     .buttonStyle(PlainButtonStyle())
                                     ProductivityInsightsCard(solves: solves, completedRevisions: viewModel.completedRevisions, paletteManager: paletteManager)
                                 }
                             } else if let achievementStats = viewModel.achievementStats {
-                                NavigationLink(destination: AllAchievementsView()) {
+                                NavigationLink(destination: AllAchievementsView().onDisappear { sweepGate.reset() }) {
                                     AchievementStatsCard(stats: achievementStats.stats, paletteManager: paletteManager)
                                 }
                                 .buttonStyle(PlainButtonStyle())
@@ -115,7 +141,7 @@ struct HomeView: View {
                             if let solves = viewModel.recentSolves, !solves.isEmpty {
                                 // Activity heatmap, full width now that the
                                 // difficulty card that shared its row is gone.
-                                NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)) {
+                                NavigationLink(destination: ActivityDetailView(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager).onDisappear { sweepGate.reset() }) {
                                     SolveHeatmapCard(solves: solves, frozenDates: viewModel.frozenDates, paletteManager: paletteManager)
                                 }
                                 .buttonStyle(PlainButtonStyle())
@@ -124,12 +150,12 @@ struct HomeView: View {
                                 
                                 // Time and attempts, as Step Count style tiles.
                                 HStack(alignment: .top, spacing: 12) {
-                                    NavigationLink(destination: MetricDetailView(kind: .time, solves: solves, paletteManager: paletteManager)) {
+                                    NavigationLink(destination: MetricDetailView(kind: .time, solves: solves, paletteManager: paletteManager).onDisappear { sweepGate.reset() }) {
                                         TimeAnalysisCard(solves: solves, paletteManager: paletteManager)
                                     }
                                     .buttonStyle(PlainButtonStyle())
                                     
-                                    NavigationLink(destination: MetricDetailView(kind: .attempts, solves: solves, paletteManager: paletteManager)) {
+                                    NavigationLink(destination: MetricDetailView(kind: .attempts, solves: solves, paletteManager: paletteManager).onDisappear { sweepGate.reset() }) {
                                         AttemptsAnalysisCard(solves: solves, paletteManager: paletteManager)
                                     }
                                     .buttonStyle(PlainButtonStyle())

@@ -165,10 +165,14 @@ struct FriendsView: View {
     @StateObject private var streakRequestsViewModel = FriendStreakRequestsViewModel()
     @StateObject private var paletteManager = ColorPaletteManager.shared
     @State private var showingRequests = false
-    @State private var showingStreakRequests = false
     @State private var showingSearch = false
     @State private var showingQRSheet = false
     @State private var showingQRScanner = false
+
+    /// Everything waiting on an answer, both kinds. Drives the single toolbar badge.
+    private var pendingRequestCount: Int {
+        viewModel.receivedRequests.count + streakRequestsViewModel.receivedRequests.count
+    }
     
     // Leaderboard: Top 3 by weighted score (streak has more weight)
     private var leaderboard: [Friend] {
@@ -212,39 +216,39 @@ struct FriendsView: View {
             .toolbarScrollMinimization()
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button {
-                            showingStreakRequests = true
-                        } label: {
-                            ZStack {
-                                Image(systemName: "flame.circle")
-                                    .frame(width: 24, height: 24)
-                                    .foregroundStyle(paletteManager.color(at: 0))
-                                if !streakRequestsViewModel.receivedRequests.isEmpty {
-                                    Circle()
-                                        .fill(.red)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 8, y: -8)
+                    Button {
+                        showingRequests = true
+                    } label: {
+                        // One entry point for both kinds of request.
+                        //
+                        // This used to be two icons side by side — a flame and a person-clock — and
+                        // they did not line up. `flame.circle` and
+                        // `person.crop.circle.badge.clock` have different intrinsic sizes, and each
+                        // badge was placed with a raw `.offset` measured from its own glyph's
+                        // bounds, so the two dots sat at different heights. One icon was tinted with
+                        // the palette and the other was left at the default accent, so they did not
+                        // read as a pair either. Both problems disappear with only one of them.
+                        //
+                        // The badge itself now matches the notification bell on Home: palette
+                        // colour rather than a hardcoded red, black text, and a 9+ cap.
+                        Image(systemName: "person.crop.circle.badge.clock")
+                            .overlay(alignment: .topTrailing) {
+                                if pendingRequestCount > 0 {
+                                    Text(pendingRequestCount > 9 ? "9+" : "\(pendingRequestCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.black)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1.5)
+                                        .background(Capsule().fill(paletteManager.color(at: 0)))
+                                        .offset(x: 9, y: -7)
                                 }
                             }
-                        }
-                        
-                        Button {
-                            showingRequests = true
-                        } label: {
-                            ZStack {
-                                Image(systemName: "person.crop.circle.badge.clock")
-                                    .frame(width: 24, height: 24)
-                                if !viewModel.receivedRequests.isEmpty {
-                                    Circle()
-                                        .fill(.red)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 8, y: -8)
-                                }
-                            }
-                        }
                     }
-                    .padding(.trailing, 8)
+                    .accessibilityLabel(
+                        pendingRequestCount > 0
+                            ? "Requests, \(pendingRequestCount) waiting"
+                            : "Requests"
+                    )
                 }
             }
             // The search and QR entry points belong to the list, not to the tab.
@@ -265,10 +269,11 @@ struct FriendsView: View {
                 }.value
             }
             .sheet(isPresented: $showingRequests) {
-                FriendRequestsView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingStreakRequests) {
-                FriendStreakRequestsView(viewModel: streakRequestsViewModel)
+                RequestsView(
+                    friendsViewModel: viewModel,
+                    streakViewModel: streakRequestsViewModel,
+                    paletteManager: paletteManager
+                )
             }
             .sheet(isPresented: $showingSearch) {
                 UserSearchView()
@@ -387,8 +392,6 @@ struct FriendsView: View {
                         }
                     }
                 }
-                .background(Color(UIColor.systemGray6))
-                .cornerRadius(12)
             }
             .padding()
         }
@@ -418,12 +421,12 @@ struct LeaderboardSection: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
                 .background(Color(UIColor.systemGray6))
-                .cornerRadius(20)
+                .cornerRadius(16)
             } else {
                 // Elegant gradient leaderboard card
                 ZStack {
                     // Gradient background
-                    RoundedRectangle(cornerRadius: 20)
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -540,27 +543,11 @@ struct FriendRow: View {
     let friend: Friend
     @ObservedObject var paletteManager: ColorPaletteManager
     var friendStreak: FriendStreak?
-    @State private var glowPhase: CGFloat = 0
-    
-    private var hasActiveStreak: Bool {
-        // Show glow when friend streak exists (even if 0 days)
-        return friendStreak != nil
-    }
-    
+
     private var streakColor: Color {
         paletteManager.color(at: 0)
     }
-    
-    private var glowFillOpacity: Double {
-        guard hasActiveStreak else { return 0 }
-        return 0.15 + 0.1 * (0.5 + 0.5 * sin(glowPhase))
-    }
-    
-    private var glowStrokeOpacity: Double {
-        guard hasActiveStreak else { return 0 }
-        return 0.4 + 0.2 * (0.5 + 0.5 * sin(glowPhase))
-    }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Avatar
@@ -620,29 +607,7 @@ struct FriendRow: View {
                     .offset(x: -8, y: 0)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            Group {
-                if hasActiveStreak {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [.clear, .clear, streakColor.opacity(glowFillOpacity)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .allowsHitTesting(false)
-                }
-            }
-        )
-        .onAppear {
-            if hasActiveStreak {
-                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
-                    glowPhase = .pi * 2
-                }
-            }
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

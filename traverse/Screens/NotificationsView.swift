@@ -15,8 +15,26 @@ struct NotificationsView: View {
     /// "Today" does not push "Yesterday" to the top of the list.
     private let bucketOrder = ["Today", "Yesterday", "This week", "Earlier"]
 
+    /// The inbox without the request types.
+    ///
+    /// `FRIEND_REQUEST` and `STREAK_REQUEST` no longer belong here. A request now arrives as a
+    /// full-screen prompt with Accept and Reject, which is the right surface for the one thing in
+    /// this list that actually needs an answer — and leaving a copy in the inbox meant the same
+    /// request appeared twice, with the inbox copy unable to do anything about it.
+    ///
+    /// `FRIEND_ACCEPTED` deliberately stays. It is the outcome of a request *you* sent, so it has
+    /// no prompt and no other surface; dropping it would leave you no way to learn it happened.
+    ///
+    /// Filtering on `knownType` rather than the raw string means an unknown future type still
+    /// renders instead of being silently dropped.
+    private var visibleNotifications: [AppNotification] {
+        inbox.notifications.filter {
+            $0.knownType != .friendRequest && $0.knownType != .streakRequest
+        }
+    }
+
     private var grouped: [(String, [AppNotification])] {
-        let byBucket = Dictionary(grouping: inbox.notifications, by: \.timeBucket)
+        let byBucket = Dictionary(grouping: visibleNotifications, by: \.timeBucket)
         return bucketOrder.compactMap { bucket in
             guard let items = byBucket[bucket], !items.isEmpty else { return nil }
             return (bucket, items)
@@ -26,12 +44,15 @@ struct NotificationsView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if inbox.isLoading && inbox.notifications.isEmpty {
+                // Every branch tests `visibleNotifications`, not the raw inbox. An inbox holding
+                // nothing but request rows would otherwise fall through to `list` and render an
+                // empty screen instead of the empty state.
+                if inbox.isLoading && visibleNotifications.isEmpty {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = inbox.errorMessage, inbox.notifications.isEmpty {
+                } else if let error = inbox.errorMessage, visibleNotifications.isEmpty {
                     errorState(error)
-                } else if inbox.notifications.isEmpty {
+                } else if visibleNotifications.isEmpty {
                     emptyState
                 } else {
                     list
@@ -85,7 +106,7 @@ struct NotificationsView: View {
                             }
                         }
                     }
-                    .background(Color(UIColor.systemGray6).opacity(0.35))
+                    .background(Color(UIColor.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .padding(.horizontal, 16)
                 }
@@ -227,7 +248,7 @@ struct NotificationsView: View {
                 .font(.headline)
                 .foregroundStyle(.white)
 
-            Text("Friend requests, awards and closed rings will show up here.")
+            Text("Awards, closed rings and announcements will show up here. Friend and streak requests arrive as a full-screen prompt instead.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

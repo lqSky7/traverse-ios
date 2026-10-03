@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "laurel_star_crimson.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

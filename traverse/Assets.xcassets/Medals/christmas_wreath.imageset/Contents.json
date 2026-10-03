@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "christmas_wreath.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -148,7 +148,7 @@ struct NotificationSettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
+        .background(Color(UIColor.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
@@ -163,8 +163,8 @@ struct NotificationSettingsView: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .background(Color(UIColor.systemGray6).opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color(UIColor.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Types
@@ -185,7 +185,7 @@ struct NotificationSettingsView: View {
                     typeRow(entry)
                 }
             }
-            .background(Color(UIColor.systemGray6).opacity(0.4))
+            .background(Color(UIColor.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
@@ -307,7 +307,7 @@ struct NotificationSettingsView: View {
                 }
             }
             .padding(16)
-            .background(Color(UIColor.systemGray6).opacity(0.4))
+            .background(Color(UIColor.systemGray6))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
@@ -380,7 +380,7 @@ struct NotificationSettingsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(Color.orange.opacity(0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     // MARK: - Loading and saving
